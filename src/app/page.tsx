@@ -1,101 +1,89 @@
-import Image from "next/image";
+'use client'
+
+import { useEstado } from '../hooks/useEstado'
+import AppHeader from '@/components/layout/AppHeader'
+import BottomNav from '@/components/layout/BottomNav'
+import ConfigPage from '@/components/pages/ConfigPage'
+import EquipoPage from '@/components/pages/EquipoPage'
+import PlanPage from '@/components/pages/PlanPage'
+import CapatazPage from '@/components/pages/CapatazPage'
+import CargaPage from '@/components/pages/CargaPage'
+import BancoSheet from '@/components/sheets/BancoSheet'
+import PerfilesSheet from '@/components/sheets/PerfilesSheet'
+import CeldaSheet from '@/components/sheets/CeldaSheet'
+import SwapSheet from '@/components/sheets/SwapSheet'
+import SugerenciaSheet from '@/components/sheets/SugerenciaSheet'
+import RelevosSheet from '@/components/sheets/RelevosSheet'
+import AdminPage from '@/components/pages/AdminPage'
+
+import { useAuth } from '@/hooks/useAuth'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const { activePage } = useEstado()
+  const { session, loading, profile } = useAuth()
+  const router = useRouter()
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    if (!loading && !session) {
+      router.push('/login')
+    }
+  }, [session, loading, router])
+
+  if (loading || !session) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--bg)]">
+        <div className="text-[var(--oro)] cinzel text-xl animate-pulse">Iniciando sesión...</div>
+      </div>
+    )
+  }
+
+  const esMando = profile?.role === 'superadmin' || profile?.role === 'capataz' || profile?.role === 'auxiliar'
+
+  return (
+    <div className="shell">
+      <AppHeader />
+
+      <main className="main">
+        {esMando && (
+          <div className={activePage === 'config' ? 'page active' : 'page'}>
+            <ConfigPage />
+          </div>
+        )}
+        
+        <div className={activePage === 'equipo' ? 'page active' : 'page'}>
+          <EquipoPage />
         </div>
+        
+        <div className={activePage === 'plan' ? 'page active' : 'page'}>
+          <PlanPage />
+        </div>
+
+        {esMando && (
+          <>
+            <div className={activePage === 'capataz' ? 'page active' : 'page'}>
+              <CapatazPage />
+            </div>
+            <div className={activePage === 'carga' ? 'page active' : 'page'}>
+              <CargaPage />
+            </div>
+            <div className={activePage === 'admin' ? 'page active' : 'page'}>
+              <AdminPage />
+            </div>
+          </>
+        )}
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+      <BottomNav />
+
+      {/* Bottom Sheets */}
+      <BancoSheet />
+      <PerfilesSheet />
+      <CeldaSheet />
+      <SwapSheet />
+      <SugerenciaSheet />
+      <RelevosSheet />
     </div>
-  );
+  )
 }
