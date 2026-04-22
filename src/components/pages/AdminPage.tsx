@@ -165,9 +165,11 @@ export default function AdminPage() {
     if (!newEntry.email || !newEntry.nombre) return
     setSaving(true)
 
+    const trabajaderaNum = newEntry.trabajadera_sugerida ? parseInt(newEntry.trabajadera_sugerida) : null
+
     const payload = {
       ...newEntry,
-      trabajadera_sugerida: newEntry.trabajadera_sugerida ? parseInt(newEntry.trabajadera_sugerida) : null
+      trabajadera_sugerida: trabajaderaNum
     }
 
     const { data, error } = await supabase
@@ -178,9 +180,101 @@ export default function AdminPage() {
     if (!error && data) {
       setCensus([data[0], ...census])
       setNewEntry({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera_sugerida: '', proyecto_id: newEntry.proyecto_id })
+
+      // Auto-sync: si tiene trabajadera asignada, meterlo en el proyecto
+      if (trabajaderaNum && newEntry.proyecto_id) {
+        const displayName = newEntry.apodo?.trim() || `${newEntry.nombre} ${newEntry.apellidos}`.trim()
+        await syncCostaleroToProject(newEntry.proyecto_id, trabajaderaNum, displayName)
+      }
     } else {
       alert(error?.message || 'Error al añadir al censo')
     }
+    setSaving(false)
+  }
+
+  // Inserta un costalero del censo en la primera posición libre de su trabajadera
+  async function syncCostaleroToProject(proyectoId: string, trabajaderaId: number, displayName: string) {
+    const { data: proj, error } = await supabase
+      .from('proyectos')
+      .select('content')
+      .eq('id', proyectoId)
+      .single()
+
+    if (error || !proj) return
+
+    const content = proj.content as { trabajaderas: { id: number; nombres: string[] }[] }
+    const trab = content.trabajaderas.find(t => t.id === trabajaderaId)
+    if (!trab) return
+
+    // Buscar primer slot genérico libre: "Costalero N"
+    const slotIdx = trab.nombres.findIndex(n => /^Costalero \d+$/.test(n))
+    if (slotIdx === -1) {
+      // No hay slots libres, añadir al final
+      trab.nombres.push(displayName)
+    } else {
+      trab.nombres[slotIdx] = displayName
+    }
+
+    await supabase
+      .from('proyectos')
+      .update({ content })
+      .eq('id', proyectoId)
+  }
+
+  // Sync completo: aplica TODO el censo al proyecto de una vez
+  async function syncTodoCenso(proyectoId: string) {
+    setSaving(true)
+
+    const { data: censusData } = await supabase
+      .from('census')
+      .select('nombre, apellidos, apodo, trabajadera_sugerida')
+      .eq('proyecto_id', proyectoId)
+      .not('trabajadera_sugerida', 'is', null)
+      .order('trabajadera_sugerida', { ascending: true })
+
+    if (!censusData || censusData.length === 0) {
+      alert('No hay costaleros con trabajadera asignada en el censo.')
+      setSaving(false)
+      return
+    }
+
+    const { data: proj, error } = await supabase
+      .from('proyectos')
+      .select('content')
+      .eq('id', proyectoId)
+      .single()
+
+    if (error || !proj) { setSaving(false); return }
+
+    const content = proj.content as { trabajaderas: { id: number; nombres: string[] }[] }
+
+    // Resetear todos los slots a genéricos primero
+    content.trabajaderas.forEach(t => {
+      t.nombres = t.nombres.map((n, i) => /^Costalero \d+$/.test(n) ? `Costalero ${i + 1}` : n)
+    })
+
+    // Agrupar por trabajadera y asignar en orden
+    const byTrab: Record<number, string[]> = {}
+    censusData.forEach(c => {
+      const tid = c.trabajadera_sugerida as number
+      const name = (c.apodo?.trim()) || `${c.nombre} ${c.apellidos}`.trim()
+      if (!byTrab[tid]) byTrab[tid] = []
+      byTrab[tid].push(name)
+    })
+
+    Object.entries(byTrab).forEach(([tidStr, names]) => {
+      const tid = parseInt(tidStr)
+      const trab = content.trabajaderas.find(t => t.id === tid)
+      if (!trab) return
+      names.forEach(name => {
+        const slotIdx = trab.nombres.findIndex(n => /^Costalero \d+$/.test(n))
+        if (slotIdx !== -1) trab.nombres[slotIdx] = name
+        else trab.nombres.push(name)
+      })
+    })
+
+    await supabase.from('proyectos').update({ content }).eq('id', proyectoId)
+    alert('✅ Cuadrilla sincronizada desde el censo.')
     setSaving(false)
   }
 
@@ -419,6 +513,14 @@ export default function AdminPage() {
                   <span className="bg-[var(--oro)] text-black px-2 py-0.5 rounded font-black uppercase">{p.num_trabajaderas} TRABAJADERAS</span>
                   <span>{new Date(p.created_at).toLocaleDateString()}</span>
                 </div>
+                <button
+                  disabled={saving}
+                  onClick={() => syncTodoCenso(p.id)}
+                  className="btn btn-out w-full text-[0.65rem] mt-1"
+                  style={{ borderColor: 'var(--oro)', color: 'var(--oro)' }}
+                >
+                  {saving ? '⏳ Sincronizando...' : '🔄 Sincronizar Cuadrilla desde Censo'}
+                </button>
               </div>
             ))}
           </div>
