@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Profile, UserRole } from '@/hooks/useAuth'
 import { PasoDB } from '../../lib/types'
 import { useCallback } from 'react'
+import { useEstado } from '@/hooks/useEstado'
 
 interface CensusEntry {
   id: string
@@ -31,6 +32,8 @@ export default function AdminPage() {
   
   // Formulario Nuevo Paso
   const [newPaso, setNewPaso] = useState({ nombre_paso: '', nombre_cuadrilla: '', num_trabajaderas: 6 })
+  
+  const { pid } = useEstado()
   
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<CensusEntry>>({})
@@ -77,6 +80,13 @@ export default function AdminPage() {
     else if (activeTab === 'censo') fetchCensus()
     else fetchPasos()
   }, [activeTab, fetchUsuarios, fetchCensus, fetchPasos])
+
+  // Sincronizar pid con el formulario
+  useEffect(() => {
+    if (pid && !newEntry.proyecto_id) {
+      setNewEntry(prev => ({ ...prev, proyecto_id: pid }))
+    }
+  }, [pid, newEntry.proyecto_id])
 
   async function crearPaso(e: React.FormEvent) {
     e.preventDefault()

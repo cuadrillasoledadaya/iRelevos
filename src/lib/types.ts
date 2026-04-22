@@ -92,7 +92,12 @@ export interface BsTarget {
 
 export type ActivePage = 'config' | 'equipo' | 'plan' | 'capataz' | 'carga' | 'admin'
 export type ActiveSheet =
-  | 'banco' | 'perfiles' | 'celda' | 'swap' | 'sugerencia' | 'relevos' | null
+  | 'banco' | 'perfiles' | 'celda' | 'swap' | 'sugerencia' | 'relevos' | 'censo' | null
+
+export interface CensusTarget {
+  tid: number
+  ci: number
+}
 
 export interface PasoDB {
   id: string

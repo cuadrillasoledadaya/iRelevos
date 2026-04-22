@@ -9,7 +9,7 @@ export default function EquipoPage() {
   const {
     S, openEqs, toggleEq, addTrab, setNombre,
     delCost, addCost, toggleBaja, setRolPri, setRolSec, toggleRegla5,
-    setPuntuacion, addCostUltimo,
+    setPuntuacion, addCostUltimo, setCensusTarget, openSheet,
   } = useEstado()
   const { profile } = useAuth()
   const esMando = profile?.role === 'superadmin' || profile?.role === 'capataz' || profile?.role === 'auxiliar'
@@ -24,7 +24,7 @@ export default function EquipoPage() {
           t={t}
           isOpen={openEqs.has(t.id)}
           onToggle={() => toggleEq(t.id)}
-          handlers={{ setNombre, delCost, addCost, toggleBaja, setRolPri, setRolSec, toggleRegla5, setPuntuacion, addCostUltimo }}
+          handlers={{ setNombre, delCost, addCost, toggleBaja, setRolPri, setRolSec, toggleRegla5, setPuntuacion, addCostUltimo, setCensusTarget, openSheet }}
           esMando={esMando}
         />
       ))}
@@ -52,6 +52,8 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
     toggleRegla5: (tid: number) => void;
     setPuntuacion: (tid: number, n: string, p: number) => void;
     addCostUltimo: (tid: number, n: string, rs: string[]) => void;
+    setCensusTarget: (target: { tid: number; ci: number } | null) => void;
+    openSheet: (s: ActiveSheet) => void;
   };
   esMando: boolean;
 }) {
@@ -97,12 +99,24 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
               <div key={i} className={`cost-row ${baja ? 'baja' : ''}`}>
                 <div className="cost-n">{i + 1}</div>
                 {esMando ? (
-                  <input
-                    className="inp f1"
-                    value={nombre}
-                    onChange={e => handlers.setNombre(t.id, i, e.target.value)}
-                    placeholder={`Costalero ${i + 1}`}
-                  />
+                  <div className="f1 flex aic g2">
+                    <input
+                      className="inp f1"
+                      value={nombre}
+                      onChange={e => handlers.setNombre(t.id, i, e.target.value)}
+                      placeholder={`Costalero ${i + 1}`}
+                    />
+                    <button 
+                      className="btn btn-ghost btn-sm btn-icon" 
+                      onClick={() => {
+                        handlers.setCensusTarget({ tid: t.id, ci: i })
+                        handlers.openSheet('censo')
+                      }}
+                      title="Seleccionar del censo"
+                    >
+                      📋
+                    </button>
+                  </div>
                 ) : (
                   <div className="f1 flex aic px2 text-[var(--cre)] font-bold">{nombre}</div>
                 )}

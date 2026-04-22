@@ -14,6 +14,7 @@ import CeldaSheet from '@/components/sheets/CeldaSheet'
 import SwapSheet from '@/components/sheets/SwapSheet'
 import SugerenciaSheet from '@/components/sheets/SugerenciaSheet'
 import RelevosSheet from '@/components/sheets/RelevosSheet'
+import CensusSheet from '@/components/sheets/CensusSheet'
 import AdminPage from '@/components/pages/AdminPage'
 
 import { useAuth } from '@/hooks/useAuth'
@@ -84,6 +85,7 @@ export default function Home() {
       <SwapSheet />
       <SugerenciaSheet />
       <RelevosSheet />
+      <CensusSheet />
     </div>
   )
 }

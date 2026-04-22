@@ -25,7 +25,7 @@ export default function SwapSheet() {
   }
 
   const ws = swapSel as SwapState
-  const { a, b, ambosD, todoOk } = ws
+  const { a, b, ambosD } = ws
   const t = S.trabajaderas.find(x => x.id === a.tid)!
   const estructura = estructuraPaso(t.id)
 

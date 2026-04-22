@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import type {
   ActivePage, ActiveSheet,
-  CellTarget, DatosPerfil, PasoDB,
+  CellTarget, CensusTarget, DatosPerfil, PasoDB,
   PinState, RolCode, SwapState, Trabajadera,
 } from '@/lib/types'
 import {
@@ -56,6 +56,10 @@ export interface EstadoCtx {
   // Banco / sugerencia
   bancoTarget: { tid: number; ti: number } | null
   setBancoTarget: React.Dispatch<React.SetStateAction<{ tid: number; ti: number } | null>>
+
+  // Censo selector
+  censusTarget: CensusTarget | null
+  setCensusTarget: React.Dispatch<React.SetStateAction<CensusTarget | null>>
 
   // Accordion abierto en equipo
   openEqs: Set<number>
@@ -120,7 +124,8 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
   const [swapSel, setSwapSel] = useState<Partial<SwapState> | null>(null)
   const [cellTarget, setCellTarget] = useState<CellTarget | null>(null)
   const [bancoTarget, setBancoTarget] = useState<{ tid: number; ti: number } | null>(null)
-  const [openEqs, setOpenEqs] = useState<Set<number>>(new Set())
+  const [censusTarget, setCensusTarget] = useState<CensusTarget | null>(null)
+  const [openEqs, setOpenEqs] = useState<Set<number>>(new Set([1]))
   const { user, loading: authLoading } = useAuth()
   const inited = useRef(false)
 
@@ -518,6 +523,7 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
       swapSel, setSwapSel,
       cellTarget, setCellTarget,
       bancoTarget, setBancoTarget,
+      censusTarget, setCensusTarget,
       openEqs, toggleEq,
       setNombre, addCost, delCost, toggleBaja, setRolPri, setRolSec, toggleRegla5, addTrab, setPuntuacion, addCostUltimo,
       setNombreTramo, addTramo, delTramo, setSalidas, usarBanco, tramosOptimosFor, sugerirTramos, toggleTramoClave, sugerirYCalcular,
