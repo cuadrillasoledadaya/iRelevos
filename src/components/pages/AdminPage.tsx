@@ -75,11 +75,16 @@ export default function AdminPage() {
     setLoading(false)
   }, [filterPid])
 
+  // Cargar pasos siempre (los necesita el formulario de censo)
+  useEffect(() => {
+    fetchPasos()
+  }, [fetchPasos])
+
+  // Cargar datos de la pestaña activa
   useEffect(() => {
     if (activeTab === 'usuarios') fetchUsuarios()
     else if (activeTab === 'censo') fetchCensus()
-    else fetchPasos()
-  }, [activeTab, fetchUsuarios, fetchCensus, fetchPasos])
+  }, [activeTab, fetchUsuarios, fetchCensus])
 
   // Sincronizar pid con el formulario
   useEffect(() => {
