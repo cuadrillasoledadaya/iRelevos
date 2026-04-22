@@ -194,31 +194,42 @@ export default function AdminPage() {
 
   // Inserta un costalero del censo en la primera posición libre de su trabajadera
   async function syncCostaleroToProject(proyectoId: string, trabajaderaId: number, displayName: string) {
-    const { data: proj, error } = await supabase
+    const { data: proj, error: fetchErr } = await supabase
       .from('proyectos')
       .select('content')
       .eq('id', proyectoId)
       .single()
 
-    if (error || !proj) return
+    if (fetchErr || !proj) {
+      console.error('syncCostalero: no se pudo leer el proyecto', fetchErr)
+      return
+    }
 
     const content = proj.content as { trabajaderas: { id: number; nombres: string[] }[] }
     const trab = content.trabajaderas.find(t => t.id === trabajaderaId)
-    if (!trab) return
+    if (!trab) {
+      console.error(`syncCostalero: no existe trabajadera ${trabajaderaId} en el proyecto`)
+      return
+    }
 
     // Buscar primer slot genérico libre: "Costalero N"
     const slotIdx = trab.nombres.findIndex(n => /^Costalero \d+$/.test(n))
     if (slotIdx === -1) {
-      // No hay slots libres, añadir al final
       trab.nombres.push(displayName)
+      if (trab.roles) trab.roles.push({ pri: 'COR', sec: 'FIJ' })
     } else {
       trab.nombres[slotIdx] = displayName
     }
 
-    await supabase
+    const { error: updateErr } = await supabase
       .from('proyectos')
       .update({ content })
       .eq('id', proyectoId)
+
+    if (updateErr) {
+      console.error('syncCostalero: error al actualizar el proyecto', updateErr)
+      alert(`⚠️ No se pudo actualizar la cuadrilla: ${updateErr.message}.\nUsá el botón "🔄 Sincronizar Cuadrilla" manualmente.`)
+    }
   }
 
   // Sync completo: aplica TODO el censo al proyecto de una vez

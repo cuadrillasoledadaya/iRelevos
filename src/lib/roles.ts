@@ -119,6 +119,15 @@ export function getDentroFisico(t: Trabajadera, slot: TramoSlot): (number | null
     if (disp.length > 0) { fisico.push(disp[0]); usados.add(disp[0]) }
     else fisico.push(null)
   })
+
+  // Evitar perder costaleros: los que no entraron en su rol ideal van a los huecos libres
+  const noUsados = slot.dentro.filter(ci => !usados.has(ci))
+  for (let i = 0; i < fisico.length; i++) {
+    if (fisico[i] === null && noUsados.length > 0) {
+      fisico[i] = noUsados.shift()!
+    }
+  }
+
   slot.dentroFisico = fisico
   return fisico
 }
@@ -144,6 +153,17 @@ export function ordenarDentroFisico(t: Trabajadera, plan: TramoSlot[]): TramoSlo
         nuevoDentro.push(null)
       }
     })
+
+    // Recuperar costaleros que no encajaron en roles y llenar los huecos
+    const noUsados = slot.dentro.filter(ci => !usados.has(ci))
+    for (let i = 0; i < nuevoDentro.length; i++) {
+      if (nuevoDentro[i] === null && noUsados.length > 0) {
+        nuevoDentro[i] = noUsados.shift()!
+      }
+    }
+    // Si aún sobran personas (porque dentro > 5), las metemos al final
+    noUsados.forEach(ci => nuevoDentro.push(ci))
+
     slot.dentro = nuevoDentro.filter((x): x is number => x !== null)
     slot.dentroFisico = nuevoDentro
   })
