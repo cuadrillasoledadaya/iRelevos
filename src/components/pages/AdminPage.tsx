@@ -14,7 +14,7 @@ interface CensusEntry {
   apellidos: string
   apodo?: string
   telefono: string
-  trabajadera_sugerida?: number
+  trabajadera?: number
   proyecto_id: string
   created_at: string
 }
@@ -25,7 +25,9 @@ interface ImportEntry {
   apellidos: string
   apodo: string
   email: string
-  trabajadera_sugerida: number | null
+  trabajadera: number | null
+  external_id: string
+  selected: boolean
   _status?: 'new' | 'exists'
 }
 
@@ -37,7 +39,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
 
   // Formulario Censo
-  const [newEntry, setNewEntry] = useState({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera_sugerida: '', proyecto_id: '' })
+  const [newEntry, setNewEntry] = useState({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: '', proyecto_id: '' })
   const [filterPid, setFilterPid] = useState<string>('all')
   
   // Formulario Nuevo Paso
@@ -46,14 +48,15 @@ export default function AdminPage() {
   const { pid } = useEstado()
   
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState<Partial<CensusEntry>>({})
+  const [editForm, setEditForm] = useState<Partial<CensusEntry>>({
+    email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: 0, proyecto_id: ''
+  })
   const [saving, setSaving] = useState(false)
 
   // Estado de importación desde iCuadrilla
+  const [importPid, setImportPid] = useState<string>('')
   const [importPreview, setImportPreview] = useState<ImportEntry[] | null>(null)
   const [importLoading, setImportLoading] = useState(false)
-  const [importPid, setImportPid] = useState('')
-  const [importResult, setImportResult] = useState<{ inserted: number; updated: number } | null>(null)
 
   const fetchPasos = useCallback(async () => {
     setLoading(true)
@@ -181,11 +184,11 @@ export default function AdminPage() {
     if (!newEntry.email || !newEntry.nombre) return
     setSaving(true)
 
-    const trabajaderaNum = newEntry.trabajadera_sugerida ? parseInt(newEntry.trabajadera_sugerida) : null
+    const trabajaderaNum = newEntry.trabajadera ? parseInt(newEntry.trabajadera) : null
 
     const payload = {
       ...newEntry,
-      trabajadera_sugerida: trabajaderaNum
+      trabajadera: trabajaderaNum
     }
 
     const { data, error } = await supabase
@@ -195,7 +198,7 @@ export default function AdminPage() {
 
     if (!error && data) {
       setCensus([data[0], ...census])
-      setNewEntry({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera_sugerida: '', proyecto_id: newEntry.proyecto_id })
+      setNewEntry({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: '', proyecto_id: newEntry.proyecto_id })
 
       // Auto-sync: si tiene trabajadera asignada, meterlo en el proyecto
       if (trabajaderaNum && newEntry.proyecto_id) {
@@ -232,7 +235,8 @@ export default function AdminPage() {
     const slotIdx = trab.nombres.findIndex(n => /^Costalero \d+$/.test(n))
     if (slotIdx === -1) {
       trab.nombres.push(displayName)
-      if (trab.roles) trab.roles.push({ pri: 'COR', sec: 'FIJ' })
+      const t = trab as { roles?: { pri: string; sec: string }[] }
+      if (t.roles) t.roles.push({ pri: 'COR', sec: 'FIJ' })
     } else {
       trab.nombres[slotIdx] = displayName
     }
@@ -254,10 +258,10 @@ export default function AdminPage() {
 
     const { data: censusData } = await supabase
       .from('census')
-      .select('nombre, apellidos, apodo, trabajadera_sugerida')
+      .select('nombre, apellidos, apodo, trabajadera')
       .eq('proyecto_id', proyectoId)
-      .not('trabajadera_sugerida', 'is', null)
-      .order('trabajadera_sugerida', { ascending: true })
+      .not('trabajadera', 'is', null)
+      .order('trabajadera', { ascending: true })
 
     if (!censusData || censusData.length === 0) {
       alert('No hay costaleros con trabajadera asignada en el censo.')
@@ -275,15 +279,15 @@ export default function AdminPage() {
 
     const content = proj.content as { trabajaderas: { id: number; nombres: string[] }[] }
 
-    // Resetear todos los slots a genéricos primero
+    // Resetear todos los slots a genéricos para esta sincronización limpia
     content.trabajaderas.forEach(t => {
-      t.nombres = t.nombres.map((n, i) => /^Costalero \d+$/.test(n) ? `Costalero ${i + 1}` : n)
+      t.nombres = Array(6).fill("").map((_, i) => `Costalero ${i + 1}`)
     })
 
     // Agrupar por trabajadera y asignar en orden
     const byTrab: Record<number, string[]> = {}
     censusData.forEach(c => {
-      const tid = c.trabajadera_sugerida as number
+      const tid = c.trabajadera as number
       const name = (c.apodo?.trim()) || `${c.nombre} ${c.apellidos}`.trim()
       if (!byTrab[tid]) byTrab[tid] = []
       byTrab[tid].push(name)
@@ -293,10 +297,13 @@ export default function AdminPage() {
       const tid = parseInt(tidStr)
       const trab = content.trabajaderas.find(t => t.id === tid)
       if (!trab) return
-      names.forEach(name => {
-        const slotIdx = trab.nombres.findIndex(n => /^Costalero \d+$/.test(n))
-        if (slotIdx !== -1) trab.nombres[slotIdx] = name
-        else trab.nombres.push(name)
+      
+      names.forEach((name, i) => {
+        if (i < trab.nombres.length) {
+          trab.nombres[i] = name
+        } else {
+          trab.nombres.push(name)
+        }
       })
     })
 
@@ -311,29 +318,30 @@ export default function AdminPage() {
     if (!error) setCensus(prev => prev.filter(c => c.id !== id))
   }
 
-  // ── Importación desde iCuadrilla ─────────────────────────────────
-
   async function fetchFromICuadrilla() {
     setImportLoading(true)
-    setImportResult(null)
     try {
       const res = await fetch('/api/import-costaleros')
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Error desconocido')
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Error desconocido al obtener datos')
+      }
 
-      // Detectar cuáles ya existen en el censo (por email)
-      const { data: existing } = await supabase.from('census').select('email')
-      const existingEmails = new Set(
-        (existing ?? []).map((e: { email: string }) => e.email.toLowerCase())
-      )
+      const importEntries: ImportEntry[] = data
 
-      const preview: ImportEntry[] = (data as ImportEntry[]).map(c => ({
+      const { data: existing } = await supabase.from('census').select('email, external_id')
+      const existingEmails = new Set((existing ?? []).map(e => e.email?.toLowerCase()))
+      const existingIds = new Set((existing ?? []).map(e => e.external_id))
+
+      const preview: ImportEntry[] = importEntries.map((c: ImportEntry) => ({
         ...c,
-        _status: existingEmails.has(c.email.toLowerCase()) ? 'exists' : 'new',
+        selected: true,
+        _status: (c.email && existingEmails.has(c.email.toLowerCase())) || 
+                 (c.external_id && existingIds.has(c.external_id)) ? 'exists' : 'new',
       }))
 
       setImportPreview(preview)
-      // Pre-seleccionar el pid activo
       if (pid && !importPid) setImportPid(pid)
     } catch (err) {
       alert(`❌ Error al conectar con iCuadrilla:\n${err instanceof Error ? err.message : 'desconocido'}`)
@@ -344,48 +352,89 @@ export default function AdminPage() {
   async function ejecutarImportacion() {
     if (!importPid || !importPreview) return
     setSaving(true)
-    setImportResult(null)
-    let inserted = 0
-    let updated = 0
 
-    // Obtener registros existentes en este proyecto para upsert manual
-    const { data: existing } = await supabase
-      .from('census')
-      .select('id, email')
-      .eq('proyecto_id', importPid)
-
-    const existingMap = new Map(
-      (existing ?? []).map((e: { id: string; email: string }) => [e.email.toLowerCase(), e.id])
-    )
-
-    for (const c of importPreview) {
-      const payload = {
-        nombre: c.nombre,
-        apellidos: c.apellidos,
-        apodo: c.apodo,
-        email: c.email,
-        trabajadera_sugerida: c.trabajadera_sugerida,
-        proyecto_id: importPid,
-        telefono: '',
+    try {
+      const aImportar = importPreview.filter(c => c.selected)
+      if (aImportar.length === 0) {
+        alert('No has seleccionado a nadie para importar.')
+        setSaving(false)
+        return
       }
-      const existingId = existingMap.get(c.email.toLowerCase())
-      if (existingId) {
-        await supabase.from('census').update(payload).eq('id', existingId)
-        updated++
-      } else {
-        await supabase.from('census').insert([payload])
-        inserted++
+
+      let nuevos = 0
+      let actualizados = 0
+
+      for (const costalero of aImportar) {
+        if (costalero._status === 'new') nuevos++
+        else actualizados++
+
+        await supabase.rpc('upsert_census_from_external', {
+          p_external_id: costalero.external_id,
+          p_nombre: costalero.nombre,
+          p_apellidos: costalero.apellidos,
+          p_apodo: costalero.apodo,
+          p_email: costalero.email,
+          p_trabajadera: costalero.trabajadera,
+          p_proyecto_id: importPid,
+          p_source: 'icuadrilla'
+        })
       }
+
+      await syncTodoCenso(importPid)
+      setImportPreview(null)
+      alert(`✅ Proceso finalizado:\n- ${nuevos} costaleros nuevos\n- ${actualizados} datos actualizados\n- Cuadrilla sincronizada.`)
+    } catch (err) {
+      console.error(err)
+      alert('❌ Error durante el proceso de importación.')
+    } finally {
+      setSaving(false)
+      fetchCensus()
     }
-
-    // Sincronizar todo el censo al proyecto recién importado
-    await syncTodoCenso(importPid)
-    setImportResult({ inserted, updated })
-    fetchCensus()
-    setSaving(false)
   }
 
-  // ──────────────────────────────────────────────────────────────────
+  async function sincronizacionTotal() {
+    if (!importPid) {
+      alert('Selecciona un paso para sincronizar.')
+      return
+    }
+
+    if (!confirm('⚠️ ATENCIÓN: Esto buscará costaleros en tu App que ya no existen en iCuadrilla y los borrará de tu Censo Local. ¿Proceder?')) return
+    
+    setSaving(true)
+    try {
+      const res = await fetch('/api/import-costaleros')
+      const remoteData: ImportEntry[] = await res.json()
+      const remoteIds = new Set(remoteData.map(r => r.external_id))
+
+      const { data: localData } = await supabase
+        .from('census')
+        .select('id, external_id, nombre, apellidos')
+        .eq('proyecto_id', importPid)
+        .eq('source', 'icuadrilla')
+        .not('external_id', 'is', null)
+
+      if (!localData) return
+
+      const aBorrar = localData.filter(l => !remoteIds.has(l.external_id))
+
+      if (aBorrar.length === 0) {
+        alert('✅ Tu censo ya está perfectamente sincronizado. No hay bajas detectadas.')
+      } else {
+        if (confirm(`Se han detectado ${aBorrar.length} bajas (gente que ya no está en iCuadrilla).\n\n¿Quieres borrarlos de tu App?`)) {
+          for (const item of aBorrar) {
+            await supabase.from('census').delete().eq('id', item.id)
+          }
+          alert(`✅ Se han eliminado ${aBorrar.length} registros del censo local.`)
+        }
+      }
+    } catch (err) {
+      console.error(err)
+      alert('❌ Error durante la sincronización total.')
+    } finally {
+      setSaving(false)
+      fetchCensus()
+    }
+  }
 
   async function saveEdit(id: string) {
     setSaving(true)
@@ -393,7 +442,7 @@ export default function AdminPage() {
       .from('census')
       .update({
         ...editForm,
-        trabajadera_sugerida: editForm.trabajadera_sugerida ? parseInt(String(editForm.trabajadera_sugerida)) : null
+        trabajadera: editForm.trabajadera ? parseInt(String(editForm.trabajadera)) : null
       })
       .eq('id', id)
 
@@ -486,16 +535,26 @@ export default function AdminPage() {
           <div className="bg-[var(--card)] border border-[var(--oro)]/20 p-4 rounded-lg flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="cinzel text-[var(--oro)] text-sm font-bold">📥 Importar desde iCuadrilla</h3>
-                <p className="text-[0.6rem] text-[var(--cre-o)] mt-0.5">Trae todos los costaleros registrados en la otra app. Upsert por email.</p>
+                <h3 className="cinzel text-[var(--oro)] text-sm font-bold">📥 Sincronización iCuadrilla</h3>
+                <p className="text-[0.6rem] text-[var(--cre-o)] mt-0.5">Importa nuevos, actualiza existentes y gestiona bajas.</p>
               </div>
-              <button
-                onClick={fetchFromICuadrilla}
-                disabled={importLoading}
-                className="btn btn-oro btn-sm shrink-0"
-              >
-                {importLoading ? '⏳ Cargando...' : '🔄 Previsualizar'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={sincronizacionTotal}
+                  disabled={saving || importLoading}
+                  className="btn btn-out btn-sm text-[0.6rem] border-red-500/30 text-red-400 hover:bg-red-500/10"
+                  title="Detectar y borrar gente que ya no está en iCuadrilla"
+                >
+                  🧹 Limpiar Bajas
+                </button>
+                <button
+                  onClick={fetchFromICuadrilla}
+                  disabled={importLoading}
+                  className="btn btn-oro btn-sm shrink-0"
+                >
+                  {importLoading ? '⏳ Cargando...' : '🔄 Previsualizar'}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -524,7 +583,7 @@ export default function AdminPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <input className="inp" placeholder="Teléfono" value={newEntry.telefono} onChange={e => setNewEntry({...newEntry, telefono: e.target.value})} />
-              <input className="inp" placeholder="Trabajadera Sugerida (Nº)" type="number" value={newEntry.trabajadera_sugerida} onChange={e => setNewEntry({...newEntry, trabajadera_sugerida: e.target.value})} />
+              <input className="inp" placeholder="Trabajadera (Nº)" type="number" value={newEntry.trabajadera} onChange={e => setNewEntry({...newEntry, trabajadera: e.target.value})} />
             </div>
             <button disabled={saving || !newEntry.proyecto_id} className="btn btn-oro w-full mt-2">
               {saving ? 'Guardando...' : '+ AÑADIR AL CENSO'}
@@ -563,7 +622,7 @@ export default function AdminPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <input className="inp text-xs" placeholder="Tel" value={editForm.telefono} onChange={e => setEditForm({...editForm, telefono: e.target.value})} />
-                      <input className="inp text-xs" type="number" placeholder="Trab" value={editForm.trabajadera_sugerida} onChange={e => setEditForm({...editForm, trabajadera_sugerida: e.target.value ? parseInt(e.target.value) : undefined})} />
+                      <input className="inp text-xs" type="number" placeholder="Trab" value={editForm.trabajadera} onChange={e => setEditForm({...editForm, trabajadera: e.target.value ? parseInt(e.target.value) : undefined})} />
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => saveEdit(c.id)} className="btn btn-oro flex-1 h-8 text-[0.6rem]">GUARDAR</button>
@@ -585,7 +644,7 @@ export default function AdminPage() {
                     <div className="flex justify-between items-center text-[10px] text-[var(--cre-o)] opacity-70">
                       <div className="flex gap-3">
                         {c.telefono && <span>📞 {c.telefono}</span>}
-                        {c.trabajadera_sugerida && <span>🪜 Trab: {c.trabajadera_sugerida}</span>}
+                        {c.trabajadera && <span>🪜 Trab: {c.trabajadera}</span>}
                         <span className="text-[var(--oro)] font-black uppercase text-[8px] bg-[var(--oro)]/10 px-1 rounded">
                           {pasos.find(p => p.id === c.proyecto_id)?.nombre_paso || 'Desconocido'}
                         </span>
@@ -650,89 +709,141 @@ export default function AdminPage() {
       )}
     </div>
 
-    {/* ── Modal de previsualización de importación ── */}
+    {/* ── MODAL DE IMPORTACIÓN PREMIUM (CENTRADO Y LEGIBLE) ── */}
     {importPreview && (
-      <div
-        className="fixed inset-0 z-50 flex items-end justify-center"
-        style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)' }}
-        onClick={e => { if (e.target === e.currentTarget) setImportPreview(null) }}
-      >
-        <div className="w-full max-w-lg bg-[var(--bg)] border-t border-[var(--oro)]/40 rounded-t-2xl p-5 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+      <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="bg-[var(--cre)] w-full max-w-2xl rounded-2xl border-2 border-[var(--oro)]/40 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh]">
           
-          {/* Cabecera */}
-          <div className="flex items-center justify-between">
+          {/* Header del Modal */}
+          <div className="bg-[var(--oro)]/10 p-6 border-b border-[var(--oro)]/20 flex justify-between items-center">
             <div>
-              <h3 className="cinzel text-[var(--oro)] font-bold text-base">📥 Importar desde iCuadrilla</h3>
-              <p className="text-[0.65rem] text-[var(--cre-o)] mt-0.5">
-                {importPreview.filter(c => c._status === 'new').length} nuevos ·{' '}
-                {importPreview.filter(c => c._status === 'exists').length} a actualizar
+              <h3 className="text-[var(--oro)] cinzel text-xl font-bold flex items-center gap-3">
+                <span className="text-2xl">📥</span> IMPORTAR DESDE ICUADRILLA
+              </h3>
+              <p className="text-[var(--oro)]/60 text-[10px] uppercase tracking-widest font-black mt-1">
+                {importPreview.filter(c => c._status === 'new').length} nuevos • {importPreview.filter(c => c._status === 'exists').length} a actualizar
               </p>
             </div>
-            <button onClick={() => { setImportPreview(null); setImportResult(null) }} className="text-[var(--cre-o)] text-xl font-bold">✕</button>
-          </div>
-
-          {/* Resultado */}
-          {importResult && (
-            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-sm text-green-400 font-bold">
-              ✅ {importResult.inserted} insertados · {importResult.updated} actualizados
-            </div>
-          )}
-
-          {/* Selector de paso destino */}
-          <div className="flex flex-col gap-1">
-            <label className="text-[0.6rem] text-[var(--cre-o)] uppercase font-bold tracking-widest">Asignar a cuadrilla / paso:</label>
-            <select
-              className="inp text-[var(--cre)]"
-              value={importPid}
-              onChange={e => setImportPid(e.target.value)}
+            <button 
+              onClick={() => setImportPreview(null)}
+              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--oro)]/20 text-[var(--oro)] transition-colors"
             >
-              <option value="">— Seleccionar paso —</option>
-              {pasos.map(p => (
-                <option key={p.id} value={p.id}>{p.nombre_paso} ({p.nombre_cuadrilla})</option>
-              ))}
-            </select>
+              ✕
+            </button>
           </div>
 
-          {/* Lista de costaleros */}
-          <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
-            {importPreview.map((c, i) => (
-              <div
-                key={i}
-                className={`flex items-center justify-between p-2.5 rounded-lg border text-xs ${
-                  c._status === 'new'
-                    ? 'border-green-500/30 bg-green-500/5'
-                    : 'border-[var(--border)] bg-[var(--card)] opacity-70'
-                }`}
+          <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+            {/* Selector de Paso */}
+            <div className="space-y-2">
+              <label className="text-[var(--oro)] text-[10px] uppercase font-black tracking-widest opacity-70">
+                Asignar a Cuadrilla / Paso Destino:
+              </label>
+              <select 
+                className="inp w-full h-14 text-lg font-bold !bg-[var(--oro)]/5"
+                value={importPid} 
+                onChange={e => setImportPid(e.target.value)}
               >
-                <div className="flex flex-col">
-                  <span className="font-bold text-[var(--cre)]">
-                    {c.apodo || `${c.nombre} ${c.apellidos}`}
-                  </span>
-                  <span className="text-[var(--oro)] text-[10px] font-mono">{c.email}</span>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {c.trabajadera_sugerida && (
-                    <span className="text-[10px] bg-[var(--oro)]/10 text-[var(--oro)] px-1.5 py-0.5 rounded font-bold">T{c.trabajadera_sugerida}</span>
-                  )}
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${
-                    c._status === 'new' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
-                  }`}>
-                    {c._status === 'new' ? 'NUEVO' : 'EXISTE'}
-                  </span>
-                </div>
+                <option value="">-- SELECCIONAR PASO --</option>
+                {pasos.map(p => (
+                  <option key={p.id} value={p.id}>{p.nombre_paso} ({p.nombre_cuadrilla})</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Lista de Costaleros */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-[var(--oro)] text-[10px] uppercase font-black tracking-widest opacity-70">
+                  Previsualización de datos:
+                </label>
+                <button 
+                  onClick={() => {
+                    const allSelected = importPreview.every(c => c.selected)
+                    setImportPreview(importPreview.map(c => ({ ...c, selected: !allSelected })))
+                  }}
+                  className="text-[8px] text-[var(--oro)] uppercase font-bold border border-[var(--oro)]/30 px-2 py-1 rounded hover:bg-[var(--oro)]/10"
+                >
+                  {importPreview.every(c => c.selected) ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                </button>
               </div>
-            ))}
+              
+              <div className="grid grid-cols-1 gap-2">
+                {importPreview.length === 0 && (
+                  <div className="text-center p-12 text-[var(--oro)]/40 italic cinzel">
+                    No se encontraron costaleros.
+                  </div>
+                )}
+                {importPreview.map((c, i) => (
+                  <div 
+                    key={i} 
+                    className={`bg-white/50 border ${c.selected ? 'border-[var(--oro)]/50 bg-[var(--oro)]/5' : 'border-[var(--oro)]/10'} p-4 rounded-xl flex items-center justify-between hover:border-[var(--oro)]/30 transition-all group`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="checkbox" 
+                        checked={c.selected} 
+                        onChange={() => {
+                          const next = [...importPreview]
+                          next[i].selected = !next[i].selected
+                          setImportPreview(next)
+                        }}
+                        className="w-5 h-5 accent-[var(--oro)] cursor-pointer"
+                      />
+                      <div className="flex flex-col">
+                        <span className={`font-bold text-base leading-tight transition-colors ${c.selected ? 'text-[var(--oro)]' : 'text-[var(--cre-o)]'}`}>
+                          {c.nombre} {c.apellidos}
+                        </span>
+                        <span className="text-[var(--oro)] text-[10px] font-mono opacity-60">
+                          {c.email || 'Sin email'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      {c.trabajadera && (
+                        <div className="flex flex-col items-center justify-center bg-[var(--oro)]/10 px-3 py-1 rounded-lg border border-[var(--oro)]/20">
+                          <span className="text-[8px] text-[var(--oro)] uppercase font-black">Trab</span>
+                          <span className="text-sm font-black text-[var(--oro)]">T{c.trabajadera}</span>
+                        </div>
+                      )}
+                      <span className={`text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-wider ${
+                        c._status === 'new' 
+                          ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/20' 
+                          : 'bg-amber-500/20 text-amber-600 border border-amber-500/20'
+                      }`}>
+                        {c._status === 'new' ? 'NUEVO' : 'EXISTE'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Botón de confirmación */}
-          <button
-            onClick={ejecutarImportacion}
-            disabled={saving || !importPid}
-            className="btn btn-oro w-full"
-            style={{ opacity: (!importPid || saving) ? 0.5 : 1 }}
-          >
-            {saving ? '⏳ Importando...' : `✅ CONFIRMAR IMPORTACIÓN (${importPreview.length})`}
-          </button>
+          {/* Footer con Acción */}
+          <div className="p-6 bg-[var(--oro)]/5 border-t border-[var(--oro)]/10">
+            <button 
+              disabled={saving || !importPid}
+              onClick={ejecutarImportacion}
+              className="btn btn-oro w-full h-16 text-lg tracking-[0.2em] shadow-xl disabled:opacity-30 disabled:cursor-not-allowed group"
+            >
+              {saving ? (
+                <span className="flex items-center justify-center gap-3">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  PROCESANDO...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-3">
+                  🚀 CONFIRMAR IMPORTACIÓN
+                </span>
+              )}
+            </button>
+            {!importPid && (
+              <p className="text-center text-[var(--oro)] text-[10px] mt-3 font-bold uppercase animate-pulse">
+                ⚠️ Seleccioná un paso para habilitar la importación
+              </p>
+            )}
+          </div>
         </div>
       </div>
     )}

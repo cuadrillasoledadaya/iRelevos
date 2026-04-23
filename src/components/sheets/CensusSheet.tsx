@@ -9,7 +9,7 @@ interface CensusEntry {
   nombre: string
   apellidos: string
   apodo?: string
-  trabajadera_sugerida?: number
+  trabajadera?: number
 }
 
 export default function CensusSheet() {
@@ -26,7 +26,7 @@ export default function CensusSheet() {
       setLoading(true)
       const { data, error } = await supabase
         .from('census')
-        .select('id, nombre, apellidos, apodo, trabajadera_sugerida')
+        .select('id, nombre, apellidos, apodo, trabajadera')
         .eq('proyecto_id', pid)
         .order('nombre', { ascending: true })
 
@@ -96,9 +96,9 @@ export default function CensusSheet() {
                     </div>
                   )}
                 </div>
-                {c.trabajadera_sugerida && (
-                  <div className="t-badge !w-6 !h-6 !text-[0.6rem]" title="Trabajadera sugerida">
-                    {c.trabajadera_sugerida}
+                {c.trabajadera && (
+                  <div className="t-badge !w-6 !h-6 !text-[0.6rem]" title="Trabajadera">
+                    {c.trabajadera}
                   </div>
                 )}
               </div>

@@ -10,18 +10,19 @@ export default function BottomNav() {
   // Definir pestañas según el rol
   const visibleTabs: { id: ActivePage; label: string; icon: string }[] = []
 
-  if (profile?.role === 'superadmin' || profile?.role === 'capataz' || profile?.role === 'auxiliar') {
+  const role = profile?.role?.toLowerCase()
+  const esMando = role === 'superadmin' || role === 'capataz' || role === 'auxiliar'
+
+  if (esMando) {
     visibleTabs.push({ id: 'config', label: 'Config', icon: '⚙' })
-    visibleTabs.push({ id: 'equipo', label: 'Equipo', icon: '👥' })
+    visibleTabs.push({ id: 'equipo', label: 'Equipo', icon: '🎥' })
     visibleTabs.push({ id: 'plan', label: 'Plan', icon: '🔒' })
     visibleTabs.push({ id: 'capataz', label: 'Capataz', icon: '👁' })
     visibleTabs.push({ id: 'carga', label: 'Carga', icon: '📊' })
-    if (profile?.role === 'superadmin') {
-      visibleTabs.push({ id: 'admin', label: 'Admin', icon: '🛡' })
-    }
+    visibleTabs.push({ id: 'admin', label: 'Admin', icon: '🛡' })
   } else {
     // Vista limitada para Costaleros
-    visibleTabs.push({ id: 'equipo', label: 'Equipo', icon: '👥' })
+    visibleTabs.push({ id: 'equipo', label: 'Equipo', icon: '🎥' })
     visibleTabs.push({ id: 'plan', label: 'Mi Plan', icon: '🔒' })
   }
 
