@@ -82,16 +82,16 @@ export function asignarRolesTramo(
     if (pendientes.size === 0) return
     let elegido: number | null = null
 
-    for (const ci of pendientes) {
+    for (const ci of Array.from(pendientes)) {
       if (getRol(t, ci).pri === rol) { elegido = ci; break }
     }
     if (elegido === null) {
-      for (const ci of pendientes) {
+      for (const ci of Array.from(pendientes)) {
         if (getRol(t, ci).sec === rol) { elegido = ci; break }
       }
     }
     if (elegido === null && (ROL_JERARQUIA[rol] ?? 1) === 1) {
-      elegido = [...pendientes][0] ?? null
+      elegido = Array.from(pendientes)[0] ?? null
     }
     if (elegido !== null) {
       asignados.set(elegido, rol)

@@ -12,6 +12,8 @@ import type {
   CellTarget, CensusTarget, DatosPerfil, PasoDB,
   PinState, RolCode, SwapState, Trabajadera,
 } from '@/lib/types'
+
+export type { ActivePage, ActiveSheet, PasoDB, DatosPerfil, Trabajadera, RolCode, PinState, SwapState, CellTarget, CensusTarget }
 import {
   calcularCiclo, completarAuto, analizar,
   datosVacios, tramosOptimos,

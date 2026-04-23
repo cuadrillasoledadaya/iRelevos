@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useEstado } from '@/hooks/useEstado'
 import { nameAt } from '@/lib/nombres'
 import { estructuraPaso, getRol, rolLabel } from '@/lib/roles'
-import type { RolCode, SwapState } from '@/lib/types'
+import type { RolCode, SwapState, Trabajadera } from '@/lib/types'
 
 export default function SwapSheet() {
   const { S, activeSheet, closeSheet, swapSel, setSwapSel, confirmarSwap } = useEstado()
@@ -26,7 +26,7 @@ export default function SwapSheet() {
 
   const ws = swapSel as SwapState
   const { a, b, ambosD } = ws
-  const t = S.trabajaderas.find(x => x.id === a.tid)!
+  const t = S.trabajaderas.find((x: Trabajadera) => x.id === a.tid)!
   const estructura = estructuraPaso(t.id)
 
   function validarRol(ci: number, rolNuevo: RolCode | null): { ok: boolean; msg: string } {

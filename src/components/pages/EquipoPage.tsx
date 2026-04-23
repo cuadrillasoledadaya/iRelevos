@@ -1,6 +1,6 @@
 'use client'
 
-import { useEstado } from '@/hooks/useEstado'
+import { useEstado, type ActiveSheet } from '@/hooks/useEstado'
 import { rolesDisponibles, getRol } from '@/lib/roles'
 import type { Trabajadera } from '@/lib/types'
 import { useAuth } from '@/hooks/useAuth'
