@@ -20,7 +20,7 @@ export default function LoginPage() {
     console.log('Intentando login en:', process.env.NEXT_PUBLIC_SUPABASE_URL)
     console.log('Con email:', email)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password: password,
     })
