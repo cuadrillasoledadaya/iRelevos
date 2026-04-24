@@ -17,15 +17,20 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    console.log('Intentando login en:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log('Con email:', email)
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: password,
     })
 
     if (error) {
-      setError('Credenciales no válidas')
+      console.error('Error de Supabase:', error)
+      setError(`Error: ${error.message}`)
       setLoading(false)
     } else {
+      console.log('Login exitoso, redirigiendo...')
       router.push('/')
       router.refresh()
     }
