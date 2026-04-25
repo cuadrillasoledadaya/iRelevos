@@ -7,7 +7,10 @@ import { tramosOptimos } from '@/lib/algoritmos'
 import { shortName, pillName } from '@/lib/nombres'
 
 export default function ConfigPage() {
-  const { S, addBanco, delBanco, calcularTodo, resetTodo } = useEstado()
+  const { 
+    S, addBanco, delBanco, calcularTodo, resetTodo,
+    limpiarPlanificacion, limpiarTrabajaderas, limpiarBanco, vaciarCenso
+  } = useEstado()
   const [bancoInp, setBancoInp] = useState('')
 
   function handleAddBanco() {
@@ -63,9 +66,64 @@ export default function ConfigPage() {
         ))}
       </div>
 
+      {/* Mantenimiento y Limpieza */}
+      <div className="spanel mb4" style={{ borderColor: 'rgba(139,26,26,0.3)' }}>
+        <div className="sec !text-red-400 !border-red-900/30">✦ Mantenimiento y Limpieza</div>
+        <p className="sm tcre-o mb4">Acciones de borrado. Úsalas con precaución.</p>
+        
+        <div className="fc gap-3">
+          <div className="flex jb aic g2 border-b border-white/5 pb-3">
+            <div className="fc">
+              <span className="sm font-bold">Limpiar Planificación</span>
+              <span className="xs tcre-o">Borra solo los relevos calculados (mantiene nombres).</span>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => {
+              if (confirm('¿Borrar todos los relevos calculados? Los nombres y equipos se mantendrán.')) limpiarPlanificacion()
+            }}>Limpiar</button>
+          </div>
+
+          <div className="flex jb aic g2 border-b border-white/5 pb-3">
+            <div className="fc">
+              <span className="sm font-bold">Vaciar Equipos</span>
+              <span className="xs tcre-o">Quita todos los nombres y roles de las trabajaderas.</span>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => {
+              if (confirm('¿Vaciar todos los nombres de las trabajaderas? Esto no se puede deshacer.')) limpiarTrabajaderas()
+            }}>Vaciar</button>
+          </div>
+
+          <div className="flex jb aic g2 border-b border-white/5 pb-3">
+            <div className="fc">
+              <span className="sm font-bold">Limpiar Banco</span>
+              <span className="xs tcre-o">Vacía la lista de suplentes (Banco de nombres).</span>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => {
+              if (confirm('¿Borrar todos los nombres del banco de suplentes?')) limpiarBanco()
+            }}>Borrar</button>
+          </div>
+
+          <div className="flex jb aic g2 border-b border-white/5 pb-3">
+            <div className="fc">
+              <span className="sm font-bold">Vaciar Censo</span>
+              <span className="xs tcre-o">Borra la base de datos de personas de este proyecto.</span>
+            </div>
+            <button className="btn btn-ghost btn-sm" onClick={() => {
+              if (confirm('⚠ ATENCIÓN: Esto borrará permanentemente todos los costaleros del CENSO de este proyecto.\n\n¿Estás seguro?')) vaciarCenso()
+            }}>Vaciar</button>
+          </div>
+
+          <div className="flex jb aic g2 pt-1">
+            <div className="fc">
+              <span className="sm font-bold text-red-400">Reset Total</span>
+              <span className="xs tcre-o">Borra TODO y empieza de cero (excepto el censo).</span>
+            </div>
+            <button className="btn btn-danger btn-sm" onClick={handleReset}>↺ Hard Reset</button>
+          </div>
+        </div>
+      </div>
+
       <div className="btn-row mt4">
         <button className="btn btn-oro f1 w100" onClick={calcularTodo}>⚙ Calcular Todas</button>
-        <button className="btn btn-danger w100" onClick={handleReset}>↺ Reset</button>
       </div>
     </div>
   )

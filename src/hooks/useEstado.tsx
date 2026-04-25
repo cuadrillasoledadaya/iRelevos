@@ -106,7 +106,11 @@ export interface EstadoCtx {
   // Capataz
   confirmarSwap: (ws: SwapState) => void
 
-  // Reset
+  // Reset / Limpieza
+  limpiarPlanificacion: () => void
+  limpiarTrabajaderas: () => void
+  limpiarBanco: () => void
+  vaciarCenso: () => Promise<void>
   resetTodo: () => void
 }
 
@@ -492,6 +496,50 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
     setSwapSel(null)
   }, [mutar, getTrab])
 
+  const limpiarPlanificacion = useCallback(() => {
+    mutar(d => {
+      d.trabajaderas.forEach(t => {
+        t.plan = null
+        t.analisis = null
+        t.obj = null
+      })
+    })
+  }, [mutar])
+
+  const limpiarTrabajaderas = useCallback(() => {
+    mutar(d => {
+      d.trabajaderas.forEach(t => {
+        t.nombres = t.nombres.map((_, i) => `Costalero ${i + 1}`)
+        t.bajas = []
+        t.plan = null
+        t.analisis = null
+        t.obj = null
+        t.puntuaciones = {}
+      })
+    })
+  }, [mutar])
+
+  const limpiarBanco = useCallback(() => {
+    mutar(d => {
+      d.banco = []
+    })
+  }, [mutar])
+
+  const vaciarCenso = useCallback(async () => {
+    if (!pid) return
+    const { error } = await supabase
+      .from('census')
+      .delete()
+      .eq('proyecto_id', pid)
+    
+    if (error) {
+      console.error('Error al vaciar censo:', error.message)
+      alert('Error al vaciar el censo: ' + error.message)
+    } else {
+      alert('Censo vaciado correctamente.')
+    }
+  }, [pid])
+
   const resetTodo = useCallback(() => {
     mutar(d => {
       d.trabajaderas = [{
@@ -532,6 +580,10 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
       addBanco, delBanco,
       calcularTodo, calcularTrab, completarPlan, limpiarPlan, quitarBloqueos, setPinned, getErroresPinned,
       confirmarSwap,
+      limpiarPlanificacion,
+      limpiarTrabajaderas,
+      limpiarBanco,
+      vaciarCenso,
       resetTodo,
     }}>
       {children}
