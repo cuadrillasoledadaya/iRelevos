@@ -6,16 +6,15 @@ const serviceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSI
 
 const supabase = createClient(supabaseUrl, serviceKey)
 
-async function update() {
-  console.log('Actualizando Superadmin con nueva clave...')
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ nombre: 'Superadmin', apodo: 'Chiqui' })
-    .eq('id', '3c32dce0-2664-4758-b454-2b4c6f4b0a81')
-    .select()
+async function test() {
+  console.log('Probando NUEVA Service Role Key...')
+  const { data, error } = await supabase.from('profiles').select('nombre').eq('id', '3c32dce0-2664-4758-b454-2b4c6f4b0a81').single()
   
-  if (error) console.log('Error:', error.message)
-  else console.log('¡Superadmin actualizado!', data)
+  if (error) {
+    console.log('Error:', error.message)
+  } else {
+    console.log('¡CONEXIÓN EXITOSA!', data)
+  }
 }
 
-update()
+test()

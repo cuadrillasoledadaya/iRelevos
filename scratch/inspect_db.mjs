@@ -14,7 +14,7 @@ async function inspectFunction() {
     // Si no tenemos la función inspect_function, probamos vía SQL crudo (si se puede)
     // O intentamos leer el esquema de la tabla census
     console.log('No puedo inspeccionar función directamente. Probando esquema de tabla census...')
-    const { data: cols, error: errCols } = await supabase.from('census').select('*').limit(0)
+    const { error: errCols } = await supabase.from('census').select('*').limit(0)
     if (errCols) console.log('Error:', errCols.message)
     else console.log('Esquema census leído con éxito.')
   } else {
