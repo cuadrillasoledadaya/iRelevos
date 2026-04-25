@@ -179,6 +179,40 @@ export default function AdminPage() {
     }
   }
 
+  async function editarPerfil(uid: string) {
+    const u = usuarios.find(x => x.id === uid)
+    if (!u) return
+    
+    const nuevoNombre = prompt('Nuevo Nombre:', u.nombre || '')
+    if (nuevoNombre === null) return
+    const nuevosApellidos = prompt('Apellidos:', u.apellidos || '')
+    if (nuevosApellidos === null) return
+    const nuevoApodo = prompt('Apodo:', u.apodo || '')
+    if (nuevoApodo === null) return
+
+    setSaving(true)
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        nombre: nuevoNombre.trim(), 
+        apellidos: nuevosApellidos.trim(), 
+        apodo: nuevoApodo.trim() 
+      })
+      .eq('id', uid)
+
+    if (!error) {
+      setUsuarios(prev => prev.map(x => x.id === uid ? { 
+        ...x, 
+        nombre: nuevoNombre.trim(), 
+        apellidos: nuevosApellidos.trim(), 
+        apodo: nuevoApodo.trim() 
+      } : x))
+    } else {
+      alert(error.message)
+    }
+    setSaving(false)
+  }
+
   async function addToCensus(e: React.FormEvent) {
     e.preventDefault()
     if (!newEntry.nombre) return
@@ -488,12 +522,22 @@ export default function AdminPage() {
             <div className="p-8 text-center cinzel text-[var(--oro)] animate-pulse">Cargando usuarios...</div>
           ) : usuarios.map((u: Profile) => (
             <div key={u.id} className="bg-[var(--card)] border border-[var(--border)] p-4 rounded-lg flex flex-col gap-3 relative">
-              <button 
-                onClick={() => eliminarUsuario(u.id)}
-                className="absolute top-2 right-2 text-red-500 opacity-30 hover:opacity-100 p-2"
-              >
-                🗑️
-              </button>
+              <div className="absolute top-2 right-2 flex items-center">
+                <button 
+                  onClick={() => editarPerfil(u.id)}
+                  className="text-blue-500 opacity-30 hover:opacity-100 p-2"
+                  title="Editar nombre/apodo"
+                >
+                  ✏️
+                </button>
+                <button 
+                  onClick={() => eliminarUsuario(u.id)}
+                  className="text-red-500 opacity-30 hover:opacity-100 p-2"
+                  title="Eliminar perfil"
+                >
+                  🗑️
+                </button>
+              </div>
               <div className="flex justify-between items-start pr-8">
                 <div>
                   <h3 className="font-bold text-[var(--cre)]">{u.nombre} {u.apellidos}</h3>
