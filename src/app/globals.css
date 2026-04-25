@@ -485,3 +485,34 @@ html.light .swap-card-name{color:var(--cre);}
 html.light .swap-card.PAT,html.light .swap-card.COS{color:#7a0000;}
 html.light .swap-card.FIJ{color:#5a3a00;}
 html.light .swap-card.COR{color:#1a6b3a;}
+
+/* ── RESPONSIVE OVERRIDES ── */
+@media (max-width: 640px) {
+  .cost-row {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    padding: 0.8rem 0 !important;
+    align-items: flex-start !important;
+  }
+  
+  .cost-n {
+    padding-top: 10px;
+  }
+
+  .cost-row > .f1:first-of-type {
+    flex: 1 1 calc(100% - 40px) !important;
+    min-width: calc(100% - 40px) !important;
+  }
+
+  .cost-row > .btn-icon,
+  .cost-row > .fc,
+  .cost-row > .btn-baja {
+    margin-left: 25px;
+  }
+
+  .cost-row .fc.g2 {
+    flex-direction: row !important;
+    width: auto !important;
+    flex-wrap: wrap;
+  }
+}
