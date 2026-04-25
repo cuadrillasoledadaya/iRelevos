@@ -9,7 +9,7 @@ import { useEstado } from '@/hooks/useEstado'
 
 interface CensusEntry {
   id: string
-  email: string
+  email: string | null
   nombre: string
   apellidos: string
   apodo?: string
@@ -24,7 +24,7 @@ interface ImportEntry {
   nombre: string
   apellidos: string
   apodo: string
-  email: string
+  email: string | null
   trabajadera: number | null
   external_id: string
   selected: boolean
@@ -181,7 +181,7 @@ export default function AdminPage() {
 
   async function addToCensus(e: React.FormEvent) {
     e.preventDefault()
-    if (!newEntry.email || !newEntry.nombre) return
+    if (!newEntry.nombre) return
     setSaving(true)
 
     const trabajaderaNum = newEntry.trabajadera ? parseInt(newEntry.trabajadera) : null
@@ -574,7 +574,7 @@ export default function AdminPage() {
             </select>
 
             <div className="grid grid-cols-2 gap-2">
-              <input className="inp" placeholder="Email*" type="email" required value={newEntry.email} onChange={e => setNewEntry({...newEntry, email: e.target.value})} />
+              <input className="inp" placeholder="Email" type="email" value={newEntry.email} onChange={e => setNewEntry({...newEntry, email: e.target.value})} />
               <input className="inp" placeholder="Nombre*" required value={newEntry.nombre} onChange={e => setNewEntry({...newEntry, nombre: e.target.value})} />
             </div>
             <div className="grid grid-cols-2 gap-2">

@@ -50,6 +50,11 @@ export async function GET() {
     const data = await res.json()
     const raw: ICuadrillaRaw[] = Array.isArray(data) ? data : [data]
 
+    console.log(`[Import API] Recibidos ${raw.length} registros de iCuadrilla`)
+    if (raw.length > 0) {
+      console.log(`[Import API] Muestra del primero:`, JSON.stringify(raw[0]))
+    }
+
     const normalized = raw.map((u: ICuadrillaRaw) => {
       const cleanNombre = (u.nombre || u.first_name || u.name || 'Sin Nombre').trim()
       const cleanApellidos = (u.apellidos || u.last_name || u.surname || '').trim()
