@@ -97,33 +97,36 @@ export default function CensusSheet() {
               })
 
               return sortedGroups.map(groupName => (
-                <div key={groupName} className="mb-4">
-                  <div className="px-4 py-1 bg-[rgba(201,168,76,0.15)] text-[var(--oro)] text-[0.65rem] font-black uppercase tracking-[0.2em] border-y border-[var(--oro)]/20">
-                    {groupName}
+                <div key={groupName} className="mb-6">
+                  <div className="px-4 py-2 bg-[rgba(184,151,62,0.2)] text-[var(--oro)] text-[0.7rem] font-black uppercase tracking-[0.3em] border-y-2 border-[var(--oro)]/30 flex justify-between items-center sticky top-0 z-10 backdrop-blur-sm">
+                    <span>{groupName}</span>
+                    <span className="opacity-60 text-[0.6rem]">{groups[groupName].length} PERSONAS</span>
                   </div>
-                  {groups[groupName].map((c) => (
-                    <div
-                      key={c.id}
-                      className="bs-item flex items-center gap-3 cursor-pointer hover:bg-[rgba(201,168,76,0.1)] transition-colors"
-                      onClick={() => handleSelect(c)}
-                    >
-                      <div className="flex-1">
-                        <div className="font-bold text-[var(--cre)]">
-                          {c.nombre} {c.apellidos}
+                  <div className="divide-y divide-[var(--oro)]/10">
+                    {groups[groupName].map((c) => (
+                      <div
+                        key={c.id}
+                        className="bs-item flex items-center gap-3 cursor-pointer hover:bg-[rgba(201,168,76,0.1)] transition-colors py-3"
+                        onClick={() => handleSelect(c)}
+                      >
+                        <div className="flex-1">
+                          <div className="font-bold text-[var(--cre)] text-base">
+                            {c.nombre} {c.apellidos}
+                          </div>
+                          {c.apodo && (
+                            <div className="text-[0.65rem] text-[var(--oro)] uppercase font-black tracking-widest mt-0.5">
+                              @{c.apodo}
+                            </div>
+                          )}
                         </div>
-                        {c.apodo && (
-                          <div className="text-[0.65rem] text-[var(--oro)] uppercase font-black tracking-widest">
-                            @{c.apodo}
+                        {c.trabajadera && (
+                          <div className="t-badge !w-7 !h-7 !text-[0.7rem] border-[var(--oro)]/50" title="Trabajadera">
+                            {c.trabajadera}
                           </div>
                         )}
                       </div>
-                      {c.trabajadera && (
-                        <div className="t-badge !w-6 !h-6 !text-[0.6rem]" title="Trabajadera">
-                          {c.trabajadera}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               ))
             })()
