@@ -382,7 +382,7 @@ export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: 
         </div>
         <div style="margin-top:16px;padding:10px;background:#f5f5f5;border-radius:6px;text-align:center;font-size:9pt;color:#888;">
           <span style="display:inline-block;width:16px;height:16px;background:#c9a84c;vertical-align:middle;margin-right:4px;"></span> = Dentro del paso &nbsp;&nbsp;
-          <span style="display:inline-block;width:16px;height:16px;background:#f0e8d8;border:1px solid #ccc;vertical-align:middle;margin-right:4px;"></span> = Fuera (descansás)
+          <span style="display:inline-block;width:16px;height:16px;background:#cccccc;border:1px solid #999;vertical-align:middle;margin-right:4px;"></span> = Fuera (descansás)
         </div>
       </div>`)
     })

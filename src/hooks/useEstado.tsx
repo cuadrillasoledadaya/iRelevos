@@ -126,7 +126,7 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
   const [pid, setPid] = useState<string>('')
   const [activePage, setActivePage] = useState<ActivePage>('home')
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null)
-  const [tema, setTema] = useState<'dark' | 'light'>('dark')
+  const [tema, setTema] = useState<'dark' | 'light'>('light')
   const [swapSel, setSwapSel] = useState<Partial<SwapState> | null>(null)
   const [cellTarget, setCellTarget] = useState<CellTarget | null>(null)
   const [bancoTarget, setBancoTarget] = useState<{ tid: number; ti: number } | null>(null)
