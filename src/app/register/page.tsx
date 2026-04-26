@@ -22,7 +22,7 @@ export default function RegisterPage() {
     
     setVerificandoCenso(true)
     const { data, error } = await supabase
-      .from('census')
+      .from('costaleros')
       .select('nombre, apellidos, apodo')
       .eq('email', emailToCheck.toLowerCase().trim())
       .single()
