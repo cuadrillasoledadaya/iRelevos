@@ -250,7 +250,8 @@ export function exportarPDF(trabajaderas: Trabajadera[]): void {
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Hoja del Capataz — Costaleros</title>
 <style>
 @page{size:A4 landscape;margin:12mm 10mm}*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Arial',sans-serif;font-size:9pt;color:#111;background:#fff}
+body{font-family:'Arial',sans-serif;font-size:9pt;color:#111;background:#fff;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;}
+tr, td, th { page-break-inside: avoid; break-inside: avoid; }
 section{page-break-after:always;display:flex;flex-direction:column;min-height:calc(100vh - 24mm);padding-bottom:4mm}
 section:last-child{page-break-after:avoid}
 .page-header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #8a6d2f;padding-bottom:3mm;margin-bottom:3mm}
@@ -392,7 +393,12 @@ export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: 
   <style>
     @page { size: A5 portrait; margin: 10mm }
     * { box-sizing: border-box; margin: 0; padding: 0 }
-    body { background: white }
+    body { 
+      background: white; 
+      -webkit-print-color-adjust: exact !important; 
+      print-color-adjust: exact !important; 
+    }
+    tr, td, th { page-break-inside: avoid; break-inside: avoid; }
     @media print { .btn-grupo { display: none } }
   </style>
   </head><body>${paginas.join('')}<script>window.onload=function(){window.print();}<\/script></body></html>`
@@ -407,10 +413,11 @@ function abrirVentanaImpresion(html: string, titulo: string, nombre: string): vo
   const ventana = window.open('', nombre, 'width=900,height=1000')
   if (!ventana) { alert('⚠ Permite ventanas emergentes.'); return }
   ventana.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${titulo}</title>
-<style>body{font-family:Arial,sans-serif;padding:20px;background:#f5f5f5}
+<style>body{font-family:Arial,sans-serif;padding:20px;background:#f5f5f5; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;}
 .btn-grupo{text-align:center;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
 button{padding:10px 16px;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px}
 .btn-print{background:#d4a574}.btn-close{background:#888}
+tr, td, th { page-break-inside: avoid; break-inside: avoid; }
 @media print{.btn-grupo{display:none}}</style></head>
 <body><div class="btn-grupo"><button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button><button class="btn-close" onclick="window.close()">✕ Cerrar</button></div>
 ${html}</body></html>`)
