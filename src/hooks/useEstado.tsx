@@ -286,6 +286,10 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
       if (!t.roles[i]) t.roles[i] = { pri: 'COR', sec: 'FIJ' }
       t.roles[i].pri = rol as RolCode
       if (t.roles[i].sec === rol) t.roles[i].sec = 'COR'
+      
+      // Invalida caché de posiciones y análisis
+      if (t.plan) t.plan.forEach(slot => { delete slot.dentroFisico })
+      t.analisis = null
     })
   }, [mutar, getTrab])
 
@@ -294,6 +298,10 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
       const t = getTrab(d, tid)
       if (!t.roles[i]) t.roles[i] = { pri: 'COR', sec: 'FIJ' }
       t.roles[i].sec = rol as RolCode
+
+      // Invalida caché de posiciones y análisis
+      if (t.plan) t.plan.forEach(slot => { delete slot.dentroFisico })
+      t.analisis = null
     })
   }, [mutar, getTrab])
 
