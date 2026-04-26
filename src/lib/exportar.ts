@@ -285,6 +285,106 @@ tfoot small{font-weight:400;display:block;margin-top:1px;white-space:normal;word
   win.document.close()
 }
 
+// ── PDF MASIVO PARA WHATSAPP ───────────────────────────────────────
+// Una página por costalero, todas las trabajaderas, fila resaltada en dorado
+
+export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: string): void {
+  const conPlan = trabajaderas.filter(t => t.plan && t.analisis)
+  if (!conPlan.length) {
+    alert('⚠ Calcula las rotaciones de al menos una trabajadera primero.')
+    return
+  }
+
+  const hoy = new Date().toLocaleDateString('es-ES', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+  }).replace(/^\w/, c => c.toUpperCase())
+
+  const paginas: string[] = []
+
+  conPlan.forEach(t => {
+    const activos = t.nombres
+      .map((nombre, ci) => ({ nombre, ci }))
+      .filter(({ ci }) => !t.bajas?.includes(ci))
+
+    activos.forEach(({ nombre: nombreCostalero, ci: costaleroIdx }) => {
+      const filas = t.tramos.map((nombreTramo, ti) => {
+        const r = t.plan![ti] ?? { dentro: [], fuera: [] }
+        const esDentro = r.dentro.includes(costaleroIdx)
+        const esFuera = r.fuera.includes(costaleroIdx)
+        const estadoCostalero = esDentro ? 'DENTRO' : esFuera ? 'FUERA' : '—'
+        const colorFila = esDentro
+          ? 'background:#c9a84c;color:#000;font-weight:900;'
+          : esFuera
+          ? 'background:#f0e8d8;color:#555;font-weight:700;'
+          : ''
+        return `<tr style="${colorFila}">
+          <td style="border:1px solid #ccc;padding:8px 10px;font-weight:600;">${esc(nombreTramo)}</td>
+          <td style="border:1px solid #ccc;padding:8px;text-align:center;font-size:13pt;font-weight:900;">${estadoCostalero}</td>
+        </tr>`
+      }).join('')
+
+      const salidas = t.analisis?.conteo[costaleroIdx] ?? 0
+      const objetivo = t.obj?.[costaleroIdx] ?? 0
+      const primerTramo = t.tramos.findIndex((_, ti) => t.plan?.[ti]?.dentro.includes(costaleroIdx))
+      const ultimoTramo = [...t.tramos].reverse().findIndex((_, ti) => {
+        const realTi = t.tramos.length - 1 - ti
+        return t.plan?.[realTi]?.dentro.includes(costaleroIdx)
+      })
+      const ultimoReal = ultimoTramo !== -1 ? t.tramos.length - 1 - ultimoTramo : -1
+
+      paginas.push(`<div style="page-break-after:always;padding:20px;font-family:Arial,sans-serif;">
+        <div style="text-align:center;border-bottom:3px solid #c9a84c;padding-bottom:12px;margin-bottom:16px;">
+          <div style="font-size:10pt;color:#888;letter-spacing:2px;text-transform:uppercase;">Hermandad · ${esc(nombrePaso)}</div>
+          <div style="font-size:22pt;font-weight:900;color:#3d2b1f;letter-spacing:1px;margin:6px 0;">${esc(nombreCostalero)}</div>
+          <div style="font-size:11pt;color:#c9a84c;font-weight:700;">TRABAJADERA ${t.id}</div>
+          <div style="font-size:9pt;color:#888;margin-top:4px;">${hoy}</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+          <thead>
+            <tr style="background:#3d2b1f;color:white;">
+              <th style="padding:10px;text-align:left;border:1px solid #222;">TRAMO</th>
+              <th style="padding:10px;text-align:center;border:1px solid #222;width:120px;">TU ESTADO</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:8px;">
+          <div style="background:#f9f3e3;border:1px solid #c9a84c;border-radius:6px;padding:10px 16px;text-align:center;">
+            <div style="font-size:9pt;color:#888;">Salidas totales</div>
+            <div style="font-size:18pt;font-weight:900;color:#c9a84c;">${salidas}<span style="font-size:10pt;color:#888;">/${objetivo}</span></div>
+          </div>
+          ${primerTramo !== -1 ? `<div style="background:#f9f3e3;border:1px solid #c9a84c;border-radius:6px;padding:10px 16px;text-align:center;">
+            <div style="font-size:9pt;color:#888;">Tu primer tramo</div>
+            <div style="font-size:14pt;font-weight:900;color:#3d2b1f;">T${primerTramo + 1}</div>
+          </div>` : ''}
+          ${ultimoReal !== -1 ? `<div style="background:#f9f3e3;border:1px solid #c9a84c;border-radius:6px;padding:10px 16px;text-align:center;">
+            <div style="font-size:9pt;color:#888;">Tu último tramo</div>
+            <div style="font-size:14pt;font-weight:900;color:#3d2b1f;">T${ultimoReal + 1}</div>
+          </div>` : ''}
+        </div>
+        <div style="margin-top:16px;padding:10px;background:#f5f5f5;border-radius:6px;text-align:center;font-size:9pt;color:#888;">
+          <span style="display:inline-block;width:16px;height:16px;background:#c9a84c;vertical-align:middle;margin-right:4px;"></span> = Dentro del paso &nbsp;&nbsp;
+          <span style="display:inline-block;width:16px;height:16px;background:#f0e8d8;border:1px solid #ccc;vertical-align:middle;margin-right:4px;"></span> = Fuera (descansás)
+        </div>
+      </div>`)
+    })
+  })
+
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Relevos — ${esc(nombrePaso)}</title>
+  <style>
+    @page { size: A5 portrait; margin: 10mm }
+    * { box-sizing: border-box; margin: 0; padding: 0 }
+    body { background: white }
+    @media print { .btn-grupo { display: none } }
+  </style>
+  </head><body>${paginas.join('')}<script>window.onload=function(){window.print();}<\/script></body></html>`
+
+  const win = window.open('', '_blank')
+  if (!win) { alert('⚠ Permite ventanas emergentes para generar el PDF.'); return }
+  win.document.write(html)
+  win.document.close()
+}
+
 function abrirVentanaImpresion(html: string, titulo: string, nombre: string): void {
   const ventana = window.open('', nombre, 'width=900,height=1000')
   if (!ventana) { alert('⚠ Permite ventanas emergentes.'); return }

@@ -11,16 +11,19 @@ export default function PlanPage() {
   const { S, calcularTodo } = useEstado()
   const { profile } = useAuth()
   const esMando = profile?.role === 'superadmin' || profile?.role === 'capataz' || profile?.role === 'auxiliar'
+
+  // Si es costalero, mostrar vista personal
+  if (!esMando) {
+    return <MiPlanPersonal S={S} profile={profile} />
+  }
   
   return (
     <>
       <div className="sec flex jb aic">
-        <span>{esMando ? 'Plan de Rotaciones' : 'Mi Plan Personal'}</span>
-        {esMando && (
-          <button className="btn btn-oro btn-sm" onClick={calcularTodo}>
-            ⚙ Calcular Todos
-          </button>
-        )}
+        <span>Plan de Rotaciones</span>
+        <button className="btn btn-oro btn-sm" onClick={calcularTodo}>
+          ⚙ Calcular Todos
+        </button>
       </div>
       
       {S.trabajaderas.map((t: Trabajadera) => (
@@ -29,6 +32,153 @@ export default function PlanPage() {
     </>
   )
 }
+
+// ── Vista Personal para Costaleros ────────────────────────────────
+
+import type { DatosPerfil } from '@/hooks/useEstado'
+import type { Profile } from '@/hooks/useAuth'
+
+function MiPlanPersonal({ S, profile }: { S: DatosPerfil; profile: Profile | null }) {
+  // 1. Buscar trabajadera por profile.trabajadera (campo explícito)
+  // 2. Fallback: fuzzy match nombre+apellidos en todas las trabajaderas
+  const myName = `${profile?.nombre ?? ''} ${profile?.apellidos ?? ''}`.toLowerCase().trim()
+  const myApodo = profile?.apodo?.toLowerCase().trim() ?? ''
+
+  type Match = { t: Trabajadera; ci: number }
+  let match: Match | null = null
+
+  if (profile?.trabajadera) {
+    const t = S.trabajaderas.find(x => x.id === profile.trabajadera)
+    if (t) {
+      const ci = t.nombres.findIndex((n, i) => {
+        if (t.bajas?.includes(i)) return false
+        const ns = n.toLowerCase()
+        return ns.includes(myName) || myName.includes(ns) || (myApodo && ns.includes(myApodo))
+      })
+      if (ci !== -1) match = { t, ci }
+      else match = { t, ci: -1 } // tiene trabajadera asignada pero no se encontró el nombre
+    }
+  }
+
+  if (!match) {
+    for (const t of S.trabajaderas) {
+      const ci = t.nombres.findIndex((n, i) => {
+        if (t.bajas?.includes(i)) return false
+        const ns = n.toLowerCase()
+        return ns.includes(myName) || myName.includes(ns) || (myApodo && ns.includes(myApodo))
+      })
+      if (ci !== -1) { match = { t, ci }; break }
+    }
+  }
+
+  if (!match || !match.t.plan) {
+    return (
+      <div className="flex flex-col gap-4 p-4">
+        <div className="sec">Mi Plan Personal</div>
+        <div className="alert warn">
+          {!match
+            ? `⚠ No se encontró tu nombre en ninguna trabajadera. Contactá con el administrador para que te asigne.`
+            : `⚠ El plan de tu trabajadera aún no ha sido calculado. Consultá con el capataz.`
+          }
+        </div>
+      </div>
+    )
+  }
+
+  const { t, ci } = match
+  const plan = t.plan!
+  const salidas = t.analisis?.conteo[ci] ?? 0
+  const objetivo = t.obj?.[ci] ?? 0
+  const primerTramo = plan.findIndex(r => r.dentro.includes(ci))
+  const ultimoTramo = [...plan].reverse().findIndex(r => r.dentro.includes(ci))
+  const ultimoReal = ultimoTramo !== -1 ? plan.length - 1 - ultimoTramo : -1
+
+  return (
+    <div className="flex flex-col gap-4 p-1 animate-in fade-in duration-500">
+      {/* Cabecera */}
+      <div className="flex flex-col gap-0.5">
+        <h1 className="text-2xl font-black cinzel text-[var(--oro)]">¡Hola, {profile?.nombre}!</h1>
+        <p className="text-[0.65rem] uppercase tracking-widest text-[var(--cre-o)] font-bold">
+          Trabajadera {t.id} · {t.tramos.length} tramos
+        </p>
+      </div>
+
+      {/* Stats rápidos */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 text-center">
+          <div className="text-2xl font-black cinzel text-[var(--oro)]">{salidas}</div>
+          <div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)] font-bold mt-0.5">Salidas</div>
+        </div>
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 text-center">
+          <div className="text-2xl font-black cinzel text-[var(--oro)]">
+            {primerTramo !== -1 ? `T${primerTramo + 1}` : '—'}
+          </div>
+          <div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)] font-bold mt-0.5">Primera</div>
+        </div>
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 text-center">
+          <div className="text-2xl font-black cinzel text-[var(--oro)]">
+            {ultimoReal !== -1 ? `T${ultimoReal + 1}` : '—'}
+          </div>
+          <div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)] font-bold mt-0.5">Última</div>
+        </div>
+      </div>
+
+      {/* Cuadrícula de tramos */}
+      <div className="flex flex-col gap-2">
+        <h2 className="text-[0.65rem] uppercase tracking-[0.2em] text-[var(--oro)] font-black">Tu relevo</h2>
+        <div className="flex flex-col gap-1.5">
+          {t.tramos.map((nombreTramo, ti) => {
+            const r = plan[ti]
+            const esDentro = r.dentro.includes(ci)
+            const esFuera = r.fuera.includes(ci)
+            const esClave = t.tramosClaves?.includes(ti)
+
+            return (
+              <div
+                key={ti}
+                className={`flex items-center gap-3 rounded-xl px-4 py-3 border transition-all ${
+                  esDentro
+                    ? 'bg-[var(--oro)] border-[var(--oro)] shadow-lg'
+                    : esFuera
+                    ? 'bg-[var(--card)] border-[var(--border)]'
+                    : 'bg-[var(--card)] border-[var(--border)] opacity-40'
+                }`}
+              >
+                <div className={`text-xs font-black cinzel w-8 shrink-0 ${esDentro ? 'text-black' : 'text-[var(--oro)]'}`}>
+                  T{ti + 1}
+                </div>
+                <div className={`flex-1 text-xs font-bold truncate ${esDentro ? 'text-black' : 'text-[var(--cre)]'}`}>
+                  {nombreTramo}
+                  {esClave && <span className="ml-1 text-[0.55rem]">★</span>}
+                </div>
+                <div className={`text-xs font-black uppercase tracking-wider shrink-0 ${
+                  esDentro ? 'text-black' : esFuera ? 'text-[var(--cre-o)]' : 'text-[var(--border)]'
+                }`}>
+                  {esDentro ? '⬇ DENTRO' : esFuera ? 'FUERA' : '—'}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Progreso */}
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-[0.65rem] uppercase tracking-wider text-[var(--cre-o)] font-bold">Objetivo de salidas</span>
+          <span className="text-sm font-black cinzel text-[var(--oro)]">{salidas}/{objetivo}</span>
+        </div>
+        <div className="h-2 bg-[var(--bg)] rounded-full overflow-hidden">
+          <div
+            className="h-full bg-[var(--oro)] rounded-full transition-all"
+            style={{ width: objetivo > 0 ? `${Math.min(100, (salidas / objetivo) * 100)}%` : '0%' }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 function PlanTrabajadera({ t }: { t: Trabajadera }) {
   const {

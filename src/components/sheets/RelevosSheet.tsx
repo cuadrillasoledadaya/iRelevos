@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { useEstado } from '@/hooks/useEstado'
-import { exportarRelevos, exportarRelevosIndividual, exportarPDF, exportarRelevosMultiplesItems } from '@/lib/exportar'
+import { exportarRelevos, exportarRelevosIndividual, exportarPDF, exportarRelevosMultiplesItems, exportarPDFMasivoTodas } from '@/lib/exportar'
 import type { Trabajadera } from '@/lib/types'
 
 export default function RelevosSheet() {
-  const { S, activeSheet, closeSheet } = useEstado()
+  const { S, activeSheet, closeSheet, nombrePaso } = useEstado()
   const isOpen = activeSheet === 'relevos'
   const conPlan = S.trabajaderas.filter((t: Trabajadera): t is Trabajadera & { plan: NonNullable<Trabajadera['plan']>; analisis: NonNullable<Trabajadera['analisis']> } => !!(t.plan && t.analisis))
 
@@ -156,6 +156,24 @@ export default function RelevosSheet() {
                 </p>
                 <button className="btn btn-oro w100" onClick={() => { closeSheet(); exportarPDF(conPlan) }}>
                   ⚙ Generar PDF Capataz
+                </button>
+              </div>
+
+              {/* Opción 4: PDF Masivo para WhatsApp */}
+              <div style={{ borderTop: '1px solid rgba(201,168,76,.2)', paddingTop: '1rem' }}>
+                <div className="sec" style={{ marginBottom: '.6rem' }}>🚀 Opción 4: PDF para WhatsApp</div>
+                <p style={{ fontSize: '.75rem', color: 'var(--cre-o)', marginBottom: '.8rem', lineHeight: 1.5 }}>
+                  Genera <strong>una página por costalero</strong> de todas las trabajaderas. Cada uno ve su nombre y cuándo le toca. Mandá el PDF entero al grupo y que cada uno busque su hoja.
+                </p>
+                <div style={{ background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px', padding: '8px 12px', fontSize: '.7rem', color: 'var(--oro)', marginBottom: '.8rem' }}>
+                  📄 Se generarán {conPlan.reduce((acc, t) => acc + t.nombres.filter((_, i) => !t.bajas?.includes(i)).length, 0)} páginas en total
+                </div>
+                <button
+                  className="btn btn-oro w100"
+                  style={{ background: 'linear-gradient(135deg, #c9a84c, #8a6d2f)' }}
+                  onClick={() => { closeSheet(); exportarPDFMasivoTodas(conPlan, nombrePaso) }}
+                >
+                  🚀 Generar PDF para WhatsApp
                 </button>
               </div>
 
