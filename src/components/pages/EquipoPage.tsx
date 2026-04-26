@@ -4,6 +4,15 @@ import { useEstado, type ActiveSheet } from '@/hooks/useEstado'
 import { rolesDisponibles, getRol } from '@/lib/roles'
 import type { Trabajadera } from '@/lib/types'
 import { useAuth } from '@/hooks/useAuth'
+import type { RolCode } from '@/lib/types'
+
+const getRolColor = (rol: string) => {
+  const r = rol as RolCode
+  if (r === 'PAT' || r === 'COS') return 'rgba(184, 151, 62, 0.25)' // Oro suave
+  if (r === 'FIJ') return 'rgba(34, 197, 94, 0.25)' // Verde suave
+  if (r === 'COR') return 'rgba(107, 114, 128, 0.25)' // Gris suave
+  return 'transparent'
+}
 
 export default function EquipoPage() {
   const {
@@ -144,11 +153,21 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
                 {esMando && !baja && (
                   <div className="fc g2" style={{ flexShrink: 0 }}>
                     <div className="flex g2">
-                      <select className="inp sm" style={{ height: '32px', width: '80px', padding: '0 8px' }} value={r.pri} onChange={e => handlers.setRolPri(t.id, i, e.target.value)}>
-                        {disp.map(rol => <option key={rol} value={rol}>{rol} (P)</option>)}
+                      <select 
+                        className="inp sm font-bold" 
+                        style={{ height: '32px', width: '80px', padding: '0 8px', backgroundColor: getRolColor(r.pri) }} 
+                        value={r.pri} 
+                        onChange={e => handlers.setRolPri(t.id, i, e.target.value)}
+                      >
+                        {disp.map(rol => <option key={rol} value={rol} style={{ backgroundColor: 'var(--card)', color: 'white' }}>{rol} (P)</option>)}
                       </select>
-                      <select className="inp sm" style={{ height: '32px', width: '80px', padding: '0 8px' }} value={r.sec} onChange={e => handlers.setRolSec(t.id, i, e.target.value)}>
-                        {disp.map(rol => <option key={rol} value={rol}>{rol} (S)</option>)}
+                      <select 
+                        className="inp sm font-bold" 
+                        style={{ height: '32px', width: '80px', padding: '0 8px', backgroundColor: getRolColor(r.sec) }} 
+                        value={r.sec} 
+                        onChange={e => handlers.setRolSec(t.id, i, e.target.value)}
+                      >
+                        {disp.map(rol => <option key={rol} value={rol} style={{ backgroundColor: 'var(--card)', color: 'white' }}>{rol} (S)</option>)}
                       </select>
                     </div>
                   </div>
@@ -156,10 +175,10 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
 
                 {/* Solo ver rol para costalero */}
                 {!esMando && !baja && (
-                  <div className="flex g2 text-[0.65rem] font-black text-[var(--oro)] uppercase">
-                    <span>{r.pri}</span>
-                    <span>·</span>
-                    <span>{r.sec}</span>
+                  <div className="flex g1 text-[0.6rem] font-black uppercase">
+                    <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: getRolColor(r.pri), color: 'var(--oro)' }}>{r.pri}</span>
+                    <span className="flex items-center opacity-30">·</span>
+                    <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: getRolColor(r.sec), color: 'var(--oro)' }}>{r.sec}</span>
                   </div>
                 )}
                 

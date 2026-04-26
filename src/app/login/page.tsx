@@ -8,6 +8,7 @@ import Link from 'next/link'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -54,14 +55,23 @@ export default function LoginPage() {
           
           <div>
             <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-2 block font-bold tracking-widest">Contraseña</label>
-            <input 
-              required 
-              type="password" 
-              className="inp w-full h-12" 
-              placeholder="••••••••"
-              value={password} 
-              onChange={e => setPassword(e.target.value)} 
-            />
+            <div className="relative">
+              <input 
+                required 
+                type={showPassword ? "text" : "password"} 
+                className="inp w-full h-12 pr-10" 
+                placeholder="••••••••"
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xl opacity-50 hover:opacity-100 transition-opacity"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
 
           {error && <div className="text-red-500 text-sm bg-red-500/10 p-3 border border-red-500/20 rounded text-center">{error}</div>}
