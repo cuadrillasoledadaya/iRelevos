@@ -657,16 +657,16 @@ export default function AdminPage() {
                 {editingId === c.id ? (
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-2 gap-2">
-                      <input className="inp text-xs" value={editForm.nombre} onChange={e => setEditForm({...editForm, nombre: e.target.value})} />
-                      <input className="inp text-xs" value={editForm.apellidos} onChange={e => setEditForm({...editForm, apellidos: e.target.value})} />
+                      <input className="inp text-xs" value={editForm.nombre ?? ''} onChange={e => setEditForm({...editForm, nombre: e.target.value})} />
+                      <input className="inp text-xs" value={editForm.apellidos ?? ''} onChange={e => setEditForm({...editForm, apellidos: e.target.value})} />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <input className="inp text-xs" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} />
-                      <input className="inp text-xs" placeholder="Apodo" value={editForm.apodo} onChange={e => setEditForm({...editForm, apodo: e.target.value})} />
+                      <input className="inp text-xs" value={editForm.email ?? ''} onChange={e => setEditForm({...editForm, email: e.target.value})} />
+                      <input className="inp text-xs" placeholder="Apodo" value={editForm.apodo ?? ''} onChange={e => setEditForm({...editForm, apodo: e.target.value})} />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <input className="inp text-xs" placeholder="Tel" value={editForm.telefono} onChange={e => setEditForm({...editForm, telefono: e.target.value})} />
-                      <input className="inp text-xs" type="number" placeholder="Trab" value={editForm.trabajadera} onChange={e => setEditForm({...editForm, trabajadera: e.target.value ? parseInt(e.target.value) : undefined})} />
+                      <input className="inp text-xs" placeholder="Tel" value={editForm.telefono ?? ''} onChange={e => setEditForm({...editForm, telefono: e.target.value})} />
+                      <input className="inp text-xs" type="number" placeholder="Trab" value={editForm.trabajadera ?? ''} onChange={e => setEditForm({...editForm, trabajadera: e.target.value ? parseInt(e.target.value) : undefined})} />
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => saveEdit(c.id)} className="btn btn-oro flex-1 h-8 text-[0.6rem]">GUARDAR</button>
