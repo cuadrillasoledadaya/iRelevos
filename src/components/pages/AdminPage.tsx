@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Profile, UserRole } from '@/hooks/useAuth'
 import { PasoDB } from '../../lib/types'
 import { useCallback } from 'react'
-import { useEstado } from '@/hooks/useEstado'
+import { useEstado, Temporada } from '@/hooks/useEstado'
 
 interface CensusEntry {
   id: string
@@ -33,7 +33,7 @@ interface ImportEntry {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'usuarios' | 'censo' | 'pasos'>('usuarios')
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'censo' | 'pasos' | 'temporadas'>('usuarios')
   const [usuarios, setUsuarios] = useState<Profile[]>([])
   const [census, setCensus] = useState<CensusEntry[]>([])
   const [pasos, setPasos] = useState<PasoDB[]>([])
@@ -46,7 +46,10 @@ export default function AdminPage() {
   // Formulario Nuevo Paso
   const [newPaso, setNewPaso] = useState({ nombre_paso: '', nombre_cuadrilla: '', num_trabajaderas: 6 })
   
-  const { pid } = useEstado()
+  // Formulario Nueva Temporada
+  const [newTemp, setNewTemp] = useState({ nombre: '', clonarCenso: true, clonarPasos: true, sourceTempId: '' })
+  
+  const { pid, activeTemporadaId, setActiveTemporadaId, temporadas, refetchPasos } = useEstado()
   
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<CensusEntry>>({
@@ -60,15 +63,17 @@ export default function AdminPage() {
   const [importLoading, setImportLoading] = useState(false)
 
   const fetchPasos = useCallback(async () => {
+    if (!activeTemporadaId) return
     setLoading(true)
     const { data, error } = await supabase
       .from('proyectos')
       .select('*')
+      .eq('temporada_id', activeTemporadaId)
       .order('created_at', { ascending: false })
 
     if (!error && data) setPasos(data as PasoDB[])
     setLoading(false)
-  }, [])
+  }, [activeTemporadaId])
 
   const fetchUsuarios = useCallback(async () => {
     setLoading(true)
@@ -82,18 +87,19 @@ export default function AdminPage() {
   }, [])
 
   const fetchCensus = useCallback(async () => {
+    if (!activeTemporadaId) return
     setLoading(true)
-    let query = supabase.from('census').select('*')
+    let query = supabase.from('census').select('*').eq('temporada_id', activeTemporadaId)
     
     if (filterPid !== 'all') {
       query = query.eq('proyecto_id', filterPid)
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false })
+    const { data, error } = query.order('created_at', { ascending: false })
 
     if (!error && data) setCensus(data as CensusEntry[])
     setLoading(false)
-  }, [filterPid])
+  }, [filterPid, activeTemporadaId])
 
   // Cargar pasos siempre (los necesita el formulario de censo)
   useEffect(() => {
@@ -103,8 +109,10 @@ export default function AdminPage() {
   // Cargar datos de la pestaña activa
   useEffect(() => {
     if (activeTab === 'usuarios') fetchUsuarios()
-    else if (activeTab === 'censo') fetchCensus()
-  }, [activeTab, fetchUsuarios, fetchCensus])
+    if (activeTab === 'censo') fetchCensus()
+    if (activeTab === 'pasos') fetchPasos()
+    if (activeTab === 'temporadas') setNewTemp(p => ({ ...p, sourceTempId: activeTemporadaId || '' }))
+  }, [activeTab, fetchUsuarios, fetchCensus, fetchPasos, activeTemporadaId])
 
   // Sincronizar pid con el formulario
   useEffect(() => {
@@ -113,38 +121,17 @@ export default function AdminPage() {
     }
   }, [pid, newEntry.proyecto_id])
 
-  async function crearPaso(e: React.FormEvent) {
+  async function addPaso(e: React.FormEvent) {
     e.preventDefault()
+    if (!newPaso.nombre_paso || !activeTemporadaId) return
     setSaving(true)
-
-    const { nombre_paso, nombre_cuadrilla, num_trabajaderas } = newPaso
-    
-    const initialData = {
-      trabajaderas: Array.from({ length: num_trabajaderas }, (_, i) => {
-        const id = i + 1
-        return {
-          id,
-          nombres: Array(6).fill('').map((_, idx) => `Costalero ${idx + 1}`),
-          salidas: 2,
-          roles: Array(6).fill('').map((_, idx) => ({ 
-            pri: idx === 0 ? 'COR' : idx === 5 ? 'COR' : 'CEN', 
-            sec: 'FIJ' 
-          })),
-          tramos: [`Tramo 1 (T${id})`, `Tramo 2 (T${id})`, `Tramo 3 (T${id})`],
-          plan: null, obj: null, analisis: null, pinned: null, bajas: [], regla5costaleros: false,
-          puntuaciones: {}, tramosClaves: []
-        }
-      }),
-      banco: []
-    }
 
     const { error } = await supabase
       .from('proyectos')
-      .insert([{
-        nombre_paso,
-        nombre_cuadrilla,
-        num_trabajaderas,
-        content: initialData
+      .insert([{ 
+        ...newPaso, 
+        content: { banco: [], trabajaderas: Array.from({ length: newPaso.num_trabajaderas }, (_, i) => ({ id: i + 1, nombres: [], roles: [], salidas: 1, tramos: ['Inicio', 'Final'], bajas: [], regla5costaleros: false, plan: null, obj: {}, analisis: null, pinned: null, puntuaciones: {}, tramosClaves: [] })) },
+        temporada_id: activeTemporadaId
       }])
 
     if (!error) {
@@ -219,13 +206,14 @@ export default function AdminPage() {
     if (!newEntry.nombre) return
     setSaving(true)
 
-      const trabajaderaNum = newEntry.trabajadera ? parseInt(newEntry.trabajadera) : null
+    const trabajaderaNum = newEntry.trabajadera ? parseInt(newEntry.trabajadera) : null
     const alturaNum = newEntry.altura ? parseFloat(newEntry.altura) : null
 
     const payload = {
       ...newEntry,
-      trabajadera: trabajaderaNum,
-      altura: alturaNum
+      trabajadera: trabajaderaNum || null,
+      altura: alturaNum || null,
+      temporada_id: activeTemporadaId
     }
 
     const { data, error } = await supabase
@@ -237,7 +225,6 @@ export default function AdminPage() {
       setCensus([data[0], ...census])
       setNewEntry({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: '', altura: '', proyecto_id: newEntry.proyecto_id })
 
-      // Auto-sync: si tiene trabajadera asignada, meterlo en el proyecto
       if (trabajaderaNum && newEntry.proyecto_id) {
         const displayName = newEntry.apodo?.trim() || `${newEntry.nombre} ${newEntry.apellidos}`.trim()
         await syncCostaleroToProject(newEntry.proyecto_id, trabajaderaNum, displayName)
@@ -248,7 +235,6 @@ export default function AdminPage() {
     setSaving(false)
   }
 
-  // Inserta un costalero del censo en la primera posición libre de su trabajadera
   async function syncCostaleroToProject(proyectoId: string, trabajaderaId: number, displayName: string) {
     const { data: proj, error: fetchErr } = await supabase
       .from('proyectos')
@@ -268,7 +254,6 @@ export default function AdminPage() {
       return
     }
 
-    // Buscar primer slot genérico libre: "Costalero N"
     const slotIdx = trab.nombres.findIndex(n => /^Costalero \d+$/.test(n))
     if (slotIdx === -1) {
       trab.nombres.push(displayName)
@@ -289,7 +274,6 @@ export default function AdminPage() {
     }
   }
 
-  // Sync completo: aplica TODO el censo al proyecto de una vez
   async function syncTodoCenso(proyectoId: string) {
     setSaving(true)
 
@@ -316,12 +300,10 @@ export default function AdminPage() {
 
     const content = proj.content as { trabajaderas: { id: number; nombres: string[] }[] }
 
-    // Resetear todos los slots a genéricos para esta sincronización limpia
     content.trabajaderas.forEach(t => {
       t.nombres = Array(6).fill("").map((_, i) => `Costalero ${i + 1}`)
     })
 
-    // Agrupar por trabajadera y asignar en orden
     const byTrab: Record<number, string[]> = {}
     censusData.forEach(c => {
       const tid = c.trabajadera as number
@@ -498,25 +480,11 @@ export default function AdminPage() {
     <div className="p-4 flex flex-col gap-6 pb-20">
       <div className="text-center">
         <h2 className="text-2xl font-black cinzel text-[var(--oro)] uppercase tracking-widest">Panel de Control</h2>
-        <div className="flex justify-center gap-4 mt-4 overflow-x-auto pb-2 no-scrollbar">
-          <button 
-            onClick={() => setActiveTab('usuarios')}
-            className={`pb-1 text-xs uppercase font-bold tracking-tighter transition-all whitespace-nowrap ${activeTab === 'usuarios' ? 'text-[var(--oro)] border-b-2 border-[var(--oro)]' : 'text-[var(--cre-o)]'}`}
-          >
-            Usuarios
-          </button>
-          <button 
-            onClick={() => setActiveTab('censo')}
-            className={`pb-1 text-xs uppercase font-bold tracking-tighter transition-all whitespace-nowrap ${activeTab === 'censo' ? 'text-[var(--oro)] border-b-2 border-[var(--oro)]' : 'text-[var(--cre-o)]'}`}
-          >
-            Censo
-          </button>
-          <button 
-            onClick={() => setActiveTab('pasos')}
-            className={`pb-1 text-xs uppercase font-bold tracking-tighter transition-all whitespace-nowrap ${activeTab === 'pasos' ? 'text-[var(--oro)] border-b-2 border-[var(--oro)]' : 'text-[var(--cre-o)]'}`}
-          >
-            Gestión de Pasos
-          </button>
+        <div className="flex bg-black/20 p-1 rounded-xl mb-6 overflow-x-auto no-scrollbar">
+            <button className={`tab-btn ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => setActiveTab('usuarios')}>USUARIOS</button>
+            <button className={`tab-btn ${activeTab === 'censo' ? 'active' : ''}`} onClick={() => setActiveTab('censo')}>CENSO</button>
+            <button className={`tab-btn ${activeTab === 'pasos' ? 'active' : ''}`} onClick={() => setActiveTab('pasos')}>PASOS</button>
+            <button className={`tab-btn ${activeTab === 'temporadas' ? 'active' : ''}`} onClick={() => setActiveTab('temporadas')}>TEMPORADAS</button>
         </div>
       </div>
 
@@ -736,7 +704,7 @@ export default function AdminPage() {
 
       {activeTab === 'pasos' && (
         <div className="flex flex-col gap-6">
-          <form onSubmit={crearPaso} className="bg-[var(--card)] border border-[var(--oro)]/30 p-4 rounded-lg flex flex-col gap-3">
+          <form onSubmit={addPaso} className="bg-[var(--card)] border border-[var(--oro)]/30 p-4 rounded-lg flex flex-col gap-3">
             <h3 className="cinzel text-[var(--oro)] text-sm font-bold">Crear Nuevo Paso</h3>
             <input className="inp" placeholder="Nombre del Paso (ej: Virgen de la Paz)" required value={newPaso.nombre_paso} onChange={e => setNewPaso({...newPaso, nombre_paso: e.target.value})} />
             <input className="inp" placeholder="Nombre de la Cuadrilla" required value={newPaso.nombre_cuadrilla} onChange={e => setNewPaso({...newPaso, nombre_cuadrilla: e.target.value})} />
@@ -782,146 +750,255 @@ export default function AdminPage() {
           </div>
         </div>
       )}
-    </div>
 
-    {/* ── MODAL DE IMPORTACIÓN PREMIUM (CENTRADO Y LEGIBLE) ── */}
-    {importPreview && (
-      <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-        <div className="bg-[var(--cre)] w-full max-w-2xl rounded-2xl border-2 border-[var(--oro)]/40 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh]">
-          
-          {/* Header del Modal */}
-          <div className="bg-[var(--oro)]/10 p-6 border-b border-[var(--oro)]/20 flex justify-between items-center">
-            <div>
-              <h3 className="text-[var(--oro)] cinzel text-xl font-bold flex items-center gap-3">
-                <span className="text-2xl">📥</span> IMPORTAR DESDE ICUADRILLA
-              </h3>
-              <p className="text-[var(--oro)]/60 text-[10px] uppercase tracking-widest font-black mt-1">
-                {importPreview.filter(c => c._status === 'new').length} nuevos • {importPreview.filter(c => c._status === 'exists').length} a actualizar
-              </p>
-            </div>
-            <button 
-              onClick={() => setImportPreview(null)}
-              className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--oro)]/20 text-[var(--oro)] transition-colors"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-            {/* Selector de Paso */}
-            <div className="space-y-2">
-              <label className="text-[var(--oro)] text-[10px] uppercase font-black tracking-widest opacity-70">
-                Asignar a Cuadrilla / Paso Destino:
-              </label>
-              <select 
-                className="inp w-full h-14 text-lg font-bold !bg-[var(--oro)]/5"
-                value={importPid} 
-                onChange={e => setImportPid(e.target.value)}
-              >
-                <option value="">-- SELECCIONAR PASO --</option>
-                {pasos.map(p => (
-                  <option key={p.id} value={p.id}>{p.nombre_paso} ({p.nombre_cuadrilla})</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Lista de Costaleros */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <label className="text-[var(--oro)] text-[10px] uppercase font-black tracking-widest opacity-70">
-                  Previsualización de datos:
-                </label>
-                <button 
-                  onClick={() => {
-                    const allSelected = importPreview.every(c => c.selected)
-                    setImportPreview(importPreview.map(c => ({ ...c, selected: !allSelected })))
-                  }}
-                  className="text-[8px] text-[var(--oro)] uppercase font-bold border border-[var(--oro)]/30 px-2 py-1 rounded hover:bg-[var(--oro)]/10"
-                >
-                  {importPreview.every(c => c.selected) ? 'Deseleccionar todos' : 'Seleccionar todos'}
-                </button>
+      {/* ── MODAL DE IMPORTACIÓN PREMIUM (CENTRADO Y LEGIBLE) ── */}
+      {importPreview && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="bg-[var(--cre)] w-full max-w-2xl rounded-2xl border-2 border-[var(--oro)]/40 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh]">
+            
+            <div className="bg-[var(--oro)]/10 p-6 border-b border-[var(--oro)]/20 flex justify-between items-center">
+              <div>
+                <h3 className="text-[var(--oro)] cinzel text-xl font-bold flex items-center gap-3">
+                  <span className="text-2xl">📥</span> IMPORTAR DESDE ICUADRILLA
+                </h3>
+                <p className="text-[var(--oro)]/60 text-[10px] uppercase tracking-widest font-black mt-1">
+                  {importPreview.filter(c => c._status === 'new').length} nuevos • {importPreview.filter(c => c._status === 'exists').length} a actualizar
+                </p>
               </div>
-              
-              <div className="grid grid-cols-1 gap-2">
-                {importPreview.length === 0 && (
-                  <div className="text-center p-12 text-[var(--oro)]/40 italic cinzel">
-                    No se encontraron costaleros.
-                  </div>
-                )}
-                {importPreview.map((c, i) => (
-                  <div 
-                    key={i} 
-                    className={`bg-white/50 border ${c.selected ? 'border-[var(--oro)]/50 bg-[var(--oro)]/5' : 'border-[var(--oro)]/10'} p-4 rounded-xl flex items-center justify-between hover:border-[var(--oro)]/30 transition-all group`}
+              <button 
+                onClick={() => setImportPreview(null)}
+                className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--oro)]/20 text-[var(--oro)] transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+              <div className="space-y-2">
+                <label className="text-[var(--oro)] text-[10px] uppercase font-black tracking-widest opacity-70">
+                  Asignar a Cuadrilla / Paso Destino:
+                </label>
+                <select 
+                  className="inp w-full h-14 text-lg font-bold !bg-[var(--oro)]/5"
+                  value={importPid} 
+                  onChange={e => setImportPid(e.target.value)}
+                >
+                  <option value="">-- SELECCIONAR PASO --</option>
+                  {pasos.map(p => (
+                    <option key={p.id} value={p.id}>{p.nombre_paso} ({p.nombre_cuadrilla})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-[var(--oro)] text-[10px] uppercase font-black tracking-widest opacity-70">
+                    Previsualización de datos:
+                  </label>
+                  <button 
+                    onClick={() => {
+                      const allSelected = importPreview.every(c => c.selected)
+                      setImportPreview(importPreview.map(c => ({ ...c, selected: !allSelected })))
+                    }}
+                    className="text-[8px] text-[var(--oro)] uppercase font-bold border border-[var(--oro)]/30 px-2 py-1 rounded hover:bg-[var(--oro)]/10"
                   >
-                    <div className="flex items-center gap-4">
-                      <input 
-                        type="checkbox" 
-                        checked={c.selected} 
-                        onChange={() => {
-                          const next = [...importPreview]
-                          next[i].selected = !next[i].selected
-                          setImportPreview(next)
-                        }}
-                        className="w-5 h-5 accent-[var(--oro)] cursor-pointer"
-                      />
-                      <div className="flex flex-col">
-                        <span className={`font-bold text-base leading-tight transition-colors ${c.selected ? 'text-[var(--oro)]' : 'text-[var(--cre-o)]'}`}>
-                          {c.nombre} {c.apellidos}
-                        </span>
-                        <span className="text-[var(--oro)] text-[10px] font-mono opacity-60">
-                          {c.email || 'Sin email'}
+                    {importPreview.every(c => c.selected) ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-2">
+                  {importPreview.length === 0 && (
+                    <div className="text-center p-12 text-[var(--oro)]/40 italic cinzel">
+                      No se encontraron costaleros.
+                    </div>
+                  )}
+                  {importPreview.map((c, i) => (
+                    <div 
+                      key={i} 
+                      className={`bg-white/50 border ${c.selected ? 'border-[var(--oro)]/50 bg-[var(--oro)]/5' : 'border-[var(--oro)]/10'} p-4 rounded-xl flex items-center justify-between hover:border-[var(--oro)]/30 transition-all group`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <input 
+                          type="checkbox" 
+                          checked={c.selected} 
+                          onChange={() => {
+                            const next = [...importPreview]
+                            next[i].selected = !next[i].selected
+                            setImportPreview(next)
+                          }}
+                          className="w-5 h-5 accent-[var(--oro)] cursor-pointer"
+                        />
+                        <div className="flex flex-col">
+                          <span className={`font-bold text-base leading-tight transition-colors ${c.selected ? 'text-[var(--oro)]' : 'text-[var(--cre-o)]'}`}>
+                            {c.nombre} {c.apellidos}
+                          </span>
+                          <span className="text-[var(--oro)] text-[10px] font-mono opacity-60">
+                            {c.email || 'Sin email'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        {c.trabajadera && (
+                          <div className="flex flex-col items-center justify-center bg-[var(--oro)]/10 px-3 py-1 rounded-lg border border-[var(--oro)]/20">
+                            <span className="text-[8px] text-[var(--oro)] uppercase font-black">Trab</span>
+                            <span className="text-sm font-black text-[var(--oro)]">T{c.trabajadera}</span>
+                          </div>
+                        )}
+                        <span className={`text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-wider ${
+                          c._status === 'new' 
+                            ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/20' 
+                            : 'bg-amber-500/20 text-amber-600 border border-amber-500/20'
+                        }`}>
+                          {c._status === 'new' ? 'NUEVO' : 'EXISTE'}
                         </span>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-3">
-                      {c.trabajadera && (
-                        <div className="flex flex-col items-center justify-center bg-[var(--oro)]/10 px-3 py-1 rounded-lg border border-[var(--oro)]/20">
-                          <span className="text-[8px] text-[var(--oro)] uppercase font-black">Trab</span>
-                          <span className="text-sm font-black text-[var(--oro)]">T{c.trabajadera}</span>
-                        </div>
-                      )}
-                      <span className={`text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-wider ${
-                        c._status === 'new' 
-                          ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/20' 
-                          : 'bg-amber-500/20 text-amber-600 border border-amber-500/20'
-                      }`}>
-                        {c._status === 'new' ? 'NUEVO' : 'EXISTE'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
+            </div>
+
+            <div className="p-6 bg-[var(--oro)]/5 border-t border-[var(--oro)]/10">
+              <button 
+                disabled={saving || !importPid}
+                onClick={ejecutarImportacion}
+                className="btn btn-oro w-full h-16 text-lg tracking-[0.2em] shadow-xl disabled:opacity-30 disabled:cursor-not-allowed group"
+              >
+                {saving ? (
+                  <span className="flex items-center justify-center gap-3">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    PROCESANDO...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-3">
+                    🚀 CONFIRMAR IMPORTACIÓN
+                  </span>
+                )}
+              </button>
+              {!importPid && (
+                <p className="text-center text-[var(--oro)] text-[10px] mt-3 font-bold uppercase animate-pulse">
+                  ⚠️ Seleccioná un paso para habilitar la importación
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'temporadas' && (
+        <div className="fc g4">
+          <div className="card p4 bg-[var(--card)] border border-[var(--border)] rounded-lg">
+            <div className="font-bold text-[var(--oro)] mb3">TEMPORADA ACTIVA</div>
+            <div className="fc g2">
+              {temporadas.map(t => (
+                <button 
+                  key={t.id} 
+                  className={`btn flex aic jcb ${t.id === activeTemporadaId ? 'btn-oro' : 'btn-ghost'}`}
+                  onClick={() => setActiveTemporadaId(t.id)}
+                >
+                  <span>{t.nombre}</span>
+                  {t.id === activeTemporadaId && <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded">ACTUAL</span>}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Footer con Acción */}
-          <div className="p-6 bg-[var(--oro)]/5 border-t border-[var(--oro)]/10">
-            <button 
-              disabled={saving || !importPid}
-              onClick={ejecutarImportacion}
-              className="btn btn-oro w-full h-16 text-lg tracking-[0.2em] shadow-xl disabled:opacity-30 disabled:cursor-not-allowed group"
-            >
-              {saving ? (
-                <span className="flex items-center justify-center gap-3">
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  PROCESANDO...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-3">
-                  🚀 CONFIRMAR IMPORTACIÓN
-                </span>
-              )}
-            </button>
-            {!importPid && (
-              <p className="text-center text-[var(--oro)] text-[10px] mt-3 font-bold uppercase animate-pulse">
-                ⚠️ Seleccioná un paso para habilitar la importación
-              </p>
-            )}
+          <div className="card p4 bg-[var(--card)] border border-[var(--border)] rounded-lg">
+            <div className="font-bold text-[var(--oro)] mb3">NUEVA TEMPORADA</div>
+            <div className="fc g3">
+              <input 
+                className="inp" 
+                placeholder="Nombre de la temporada (ej: SS 2025)" 
+                value={newTemp.nombre} 
+                onChange={e => setNewTemp({...newTemp, nombre: e.target.value})}
+              />
+              
+              <div className="fc g2 p3 bg-black/20 rounded border border-white/5">
+                <div className="text-[10px] uppercase opacity-40 font-bold mb1">Opciones de Clonación</div>
+                
+                <label className="flex aic g2 cursor-pointer">
+                  <input type="checkbox" checked={newTemp.clonarCenso} onChange={e => setNewTemp({...newTemp, clonarCenso: e.target.checked})} />
+                  <span className="text-xs">Clonar Censo del año anterior</span>
+                </label>
+
+                <label className="flex aic g2 cursor-pointer">
+                  <input type="checkbox" checked={newTemp.clonarPasos} onChange={e => setNewTemp({...newTemp, clonarPasos: e.target.checked})} />
+                  <span className="text-xs">Clonar estructura de Pasos / Cuadrillas</span>
+                </label>
+
+                {temporadas.length > 0 && (
+                  <div className="mt2">
+                    <div className="text-[9px] opacity-40 mb-1">Origen de los datos:</div>
+                    <select 
+                      className="inp sm h-8 text-[10px]" 
+                      value={newTemp.sourceTempId} 
+                      onChange={e => setNewTemp({...newTemp, sourceTempId: e.target.value})}
+                    >
+                      {temporadas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <button 
+                className="btn btn-oro w100" 
+                onClick={async () => {
+                  if (!newTemp.nombre) return
+                  setSaving(true)
+                  
+                  const { data: nTemp, error: tErr } = await supabase
+                    .from('temporadas')
+                    .insert([{ nombre: newTemp.nombre, activa: false }])
+                    .select()
+                    .single()
+                  
+                  if (tErr || !nTemp) {
+                    alert('Error al crear temporada'); setSaving(false); return
+                  }
+
+                  const newId = nTemp.id
+
+                  if (newTemp.sourceTempId) {
+                    if (newTemp.clonarCenso) {
+                      const { data: oldC } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
+                      if (oldC && oldC.length > 0) {
+                        const newC = oldC.map(c => {
+                          const { id, created_at, ...rest } = c
+                          return { ...rest, temporada_id: newId, proyecto_id: '' }
+                        })
+                        await supabase.from('census').insert(newC)
+                      }
+                    }
+
+                    if (newTemp.clonarPasos) {
+                      const { data: oldP } = await supabase.from('proyectos').select('*').eq('temporada_id', newTemp.sourceTempId)
+                      if (oldP && oldP.length > 0) {
+                        const newP = oldP.map(p => {
+                          const { id, created_at, ...rest } = p
+                          const cleanContent = JSON.parse(JSON.stringify(rest.content))
+                          cleanContent.trabajaderas.forEach((t: any) => {
+                            t.nombres = []; t.plan = null; t.obj = {}; t.analisis = null; t.pinned = null; t.bajas = [];
+                          })
+                          return { ...rest, content: cleanContent, temporada_id: newId }
+                        })
+                        await supabase.from('proyectos').insert(newP)
+                      }
+                    }
+                  }
+
+                  alert('Temporada creada con éxito')
+                  window.location.reload()
+                }}
+                disabled={saving}
+              >
+                {saving ? 'CREANDO...' : 'CREAR NUEVA TEMPORADA'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
+    </div>
     </>
   )
 }

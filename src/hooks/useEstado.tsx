@@ -10,10 +10,10 @@ import React, {
 import type {
   ActivePage, ActiveSheet,
   CellTarget, CensusTarget, DatosPerfil, PasoDB,
-  PinState, RolCode, SwapState, Trabajadera,
+  PinState, RolCode, SwapState, Trabajadera, Temporada
 } from '@/lib/types'
 
-export type { ActivePage, ActiveSheet, PasoDB, DatosPerfil, Trabajadera, RolCode, PinState, SwapState, CellTarget, CensusTarget }
+export type { ActivePage, ActiveSheet, PasoDB, DatosPerfil, Trabajadera, RolCode, PinState, SwapState, CellTarget, CensusTarget, Temporada }
 import {
   calcularCiclo, completarAuto, analizar,
   datosVacios, tramosOptimos,
@@ -113,12 +113,17 @@ export interface EstadoCtx {
   vaciarCenso: () => Promise<void>
   resetTodo: () => void
   censusHeights: Record<string, number>
+  temporadas: Temporada[]
+  activeTemporadaId: string
+  setActiveTemporadaId: (id: string) => void
+  refetchPasos: () => Promise<void>
 }
 
 const EstadoContext = createContext<EstadoCtx | null>(null)
 
 const LS_PID = 'cpwa_active_paso_id'
 const LS_TEMA = 'cpwa_tema'
+const LS_TID = 'cpwa_active_temp_id'
 
 // ── Provider ───────────────────────────────────────────────────────
 
@@ -134,6 +139,8 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
   const [censusTarget, setCensusTarget] = useState<CensusTarget | null>(null)
   const [openEqs, setOpenEqs] = useState<Set<number>>(new Set([1]))
   const [censusHeights, setCensusHeights] = useState<Record<string, number>>({})
+  const [temporadas, setTemporadas] = useState<Temporada[]>([])
+  const [activeTemporadaId, setActiveTemporadaId] = useState<string>('')
   const { user, loading: authLoading } = useAuth()
   const inited = useRef(false)
 
@@ -142,24 +149,20 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
     if (authLoading) return
 
     async function init() {
-      const { data, error } = await supabase
-        .from('proyectos')
-        .select('id, nombre_paso, nombre_cuadrilla, num_trabajaderas, content, created_at')
+      // 1. Cargar Temporadas
+      const { data: temps, error: tErr } = await supabase
+        .from('temporadas')
+        .select('*')
         .order('created_at', { ascending: false })
-
-      if (!error && data && data.length > 0) {
-        setPasos(data)
-        const savedPid = localStorage.getItem(LS_PID)
-        if (savedPid && data.some(p => p.id === savedPid)) {
-          setPid(savedPid)
-        } else {
-          setPid(data[0].id)
-        }
-      }
       
-      const t = localStorage.getItem(LS_TEMA)
-      if (t === 'light' || t === 'dark') setTema(t)
-      inited.current = true
+      if (!tErr && temps && temps.length > 0) {
+        setTemporadas(temps)
+        const savedTid = localStorage.getItem(LS_TID)
+        const currentTemp = (savedTid && temps.find(t => t.id === savedTid)) || temps.find(t => t.activa) || temps[0]
+        setActiveTemporadaId(currentTemp.id)
+      }
+
+      // 2. Cargar Proyectos (será gestionado por el useEffect de activeTemporadaId)
     }
 
     init()
@@ -176,6 +179,35 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, authLoading])
 
+  // Cargar proyectos cuando cambie la temporada
+  const refetchPasos = useCallback(async () => {
+    if (!activeTemporadaId) return
+    const { data, error } = await supabase
+      .from('proyectos')
+      .select('id, nombre_paso, nombre_cuadrilla, num_trabajaderas, content, created_at, temporada_id')
+      .eq('temporada_id', activeTemporadaId)
+      .order('created_at', { ascending: false })
+
+    if (!error && data) {
+      setPasos(data)
+      if (data.length > 0) {
+        const savedPid = localStorage.getItem(LS_PID)
+        if (savedPid && data.some(p => p.id === savedPid)) {
+          setPid(savedPid)
+        } else {
+          setPid(data[0].id)
+        }
+      } else {
+        setPid('')
+      }
+    }
+  }, [activeTemporadaId])
+
+  useEffect(() => {
+    refetchPasos()
+    if (activeTemporadaId) localStorage.setItem(LS_TID, activeTemporadaId)
+  }, [activeTemporadaId, refetchPasos])
+
   // Aplicar tema
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -188,20 +220,20 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
     if (pid) localStorage.setItem(LS_PID, pid)
   }, [pid])
 
-  // Cargar alturas del censo para este proyecto
+  // Cargar alturas del censo para este proyecto y temporada
   useEffect(() => {
-    if (!pid) return
+    if (!activeTemporadaId) return
     const fetchHeights = async () => {
+      // Nota: Aquí filtramos por temporada_id para asegurar que cogemos la altura del censo de este año
       const { data } = await supabase
         .from('census')
         .select('nombre, apellidos, apodo, altura')
-        .eq('proyecto_id', pid)
+        .eq('temporada_id', activeTemporadaId)
       
       if (data) {
         const map: Record<string, number> = {}
         data.forEach(c => {
           if (c.altura) {
-            // Guardamos por nombre completo y por apodo si existe
             const fullName = `${c.nombre} ${c.apellidos}`.trim()
             map[fullName] = c.altura
             if (c.apodo) map[c.apodo.trim()] = c.altura
@@ -211,7 +243,7 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
       }
     }
     fetchHeights()
-  }, [pid])
+  }, [pid, activeTemporadaId])
 
   // Helper para guardar cambios en la nube
   const saveCloud = useCallback(async (content: DatosPerfil, targetPid: string) => {
@@ -621,6 +653,7 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
       vaciarCenso,
       resetTodo,
       censusHeights,
+      temporadas, activeTemporadaId, setActiveTemporadaId, refetchPasos
     }}>
       {children}
     </EstadoContext.Provider>

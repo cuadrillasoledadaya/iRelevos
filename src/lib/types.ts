@@ -99,6 +99,13 @@ export interface CensusTarget {
   ci: number
 }
 
+export interface Temporada {
+  id: string
+  nombre: string
+  activa: boolean
+  created_at: string
+}
+
 export interface PasoDB {
   id: string
   nombre_paso: string
@@ -106,4 +113,5 @@ export interface PasoDB {
   num_trabajaderas: number
   content: DatosPerfil
   created_at: string
+  temporada_id?: string
 }

@@ -13,7 +13,7 @@ interface CensusEntry {
 }
 
 export default function CensusSheet() {
-  const { pid, activeSheet, closeSheet, censusTarget, setCensusTarget, setNombre } = useEstado()
+  const { pid, activeSheet, closeSheet, censusTarget, setCensusTarget, setNombre, activeTemporadaId } = useEstado()
   const [census, setCensus] = useState<CensusEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('')
@@ -22,12 +22,12 @@ export default function CensusSheet() {
 
   useEffect(() => {
     async function fetchCensus() {
-      if (!pid) return
+      if (!activeTemporadaId) return
       setLoading(true)
       const { data, error } = await supabase
         .from('census')
         .select('id, nombre, apellidos, apodo, trabajadera')
-        .eq('proyecto_id', pid)
+        .eq('temporada_id', activeTemporadaId)
         .order('nombre', { ascending: true })
 
       if (!error && data) {
@@ -36,10 +36,10 @@ export default function CensusSheet() {
       setLoading(false)
     }
 
-    if (isOpen && pid) {
+    if (isOpen && activeTemporadaId) {
       fetchCensus()
     }
-  }, [isOpen, pid])
+  }, [isOpen, activeTemporadaId])
 
   function handleSelect(c: CensusEntry) {
     if (censusTarget) {
