@@ -19,6 +19,7 @@ export default function EquipoPage() {
     S, openEqs, toggleEq, addTrab, setNombre,
     delCost, addCost, toggleBaja, setRolPri, setRolSec, toggleRegla5,
     setPuntuacion, addCostUltimo, setCensusTarget, openSheet,
+    censusHeights
   } = useEstado()
   const { profile } = useAuth()
   const esMando = profile?.role === 'superadmin' || profile?.role === 'capataz' || profile?.role === 'auxiliar'
@@ -35,6 +36,7 @@ export default function EquipoPage() {
           onToggle={() => toggleEq(t.id)}
           handlers={{ setNombre, delCost, addCost, toggleBaja, setRolPri, setRolSec, toggleRegla5, setPuntuacion, addCostUltimo, setCensusTarget, openSheet }}
           esMando={esMando}
+          censusHeights={censusHeights}
         />
       ))}
 
@@ -65,6 +67,7 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
     openSheet: (s: ActiveSheet) => void;
   };
   esMando: boolean;
+  censusHeights: Record<string, number>;
 }) {
   const isBaja = (i: number) => t.bajas?.includes(i)
   const total = t.nombres.length
@@ -72,14 +75,44 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
   const nActivos = total - nBajas
   const disp = rolesDisponibles(t.id)
 
+  // 📐 Análisis de Nivelación
+  const alturas = t.nombres
+    .map((n: string, idx: number) => isBaja(idx) ? null : (censusHeights[n.trim()] || null))
+    .filter((h: number | null) => h !== null) as number[]
+  
+  const media = alturas.length > 0 ? (alturas.reduce((a, b) => a + b, 0) / alturas.length).toFixed(1) : null
+  const maxDiff = alturas.length > 1 ? Math.max(...alturas) - Math.min(...alturas) : 0
+  
+  let statusColor = 'transparent'
+  let statusText = ''
+  if (alturas.length > 1) {
+    if (maxDiff <= 1.5) { statusColor = '#22c55e'; statusText = 'Nivelación Óptima' }
+    else if (maxDiff <= 2.5) { statusColor = '#eab308'; statusText = 'Nivelación Aceptable' }
+    else { statusColor = '#ef4444'; statusText = 'Desviación Crítica' }
+  }
+
   return (
     <div className={`card ${isOpen ? 'open' : ''}`}>
       <div className="trab-hdr" onClick={onToggle}>
-        <div className="t-badge">{t.id}</div>
+        <div className="t-badge" style={{ position: 'relative' }}>
+          {t.id}
+          {alturas.length > 1 && (
+            <div 
+              style={{ 
+                position: 'absolute', top: '-2px', right: '-2px', 
+                width: '10px', height: '10px', borderRadius: '50%', 
+                backgroundColor: statusColor, border: '2px solid var(--card)',
+                boxShadow: `0 0 8px ${statusColor}`
+              }} 
+              title={`${statusText} (Dif: ${maxDiff.toFixed(1)}cm)`}
+            />
+          )}
+        </div>
         <div className="t-info">
           <div className="t-name">Trabajadera {t.id}</div>
           <div className="t-meta">
-            {total} inscritos {nBajas > 0 ? `· ${nBajas} baja(s) · ${nActivos} activos` : ''}
+            {total} inscritos {nBajas > 0 ? `· ${nBajas} baja(s)` : ''} 
+            {media && <span className="ml-2 px-1.5 py-0.5 bg-black/20 rounded text-[var(--oro)] font-mono text-[0.65rem]">📏 {media} cm</span>}
           </div>
         </div>
         <div className="t-chev">▼</div>
@@ -106,7 +139,14 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
             const r = getRol(t, i)
             return (
               <div key={i} className={`cost-row ${baja ? 'baja' : ''}`}>
-                <div className="cost-n">{i + 1}</div>
+                <div className="cost-n" style={{ position: 'relative' }}>
+                  {i + 1}
+                  {!baja && censusHeights[nombre.trim()] && (
+                    <div className="absolute -bottom-1 -right-1 text-[0.5rem] font-bold text-[var(--oro)] opacity-40">
+                      {censusHeights[nombre.trim()]}
+                    </div>
+                  )}
+                </div>
                 {esMando ? (
                   <div className="f1 flex aic g2">
                     <input

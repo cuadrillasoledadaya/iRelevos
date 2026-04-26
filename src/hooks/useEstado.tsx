@@ -112,6 +112,7 @@ export interface EstadoCtx {
   limpiarBanco: () => void
   vaciarCenso: () => Promise<void>
   resetTodo: () => void
+  censusHeights: Record<string, number>
 }
 
 const EstadoContext = createContext<EstadoCtx | null>(null)
@@ -132,6 +133,7 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
   const [bancoTarget, setBancoTarget] = useState<{ tid: number; ti: number } | null>(null)
   const [censusTarget, setCensusTarget] = useState<CensusTarget | null>(null)
   const [openEqs, setOpenEqs] = useState<Set<number>>(new Set([1]))
+  const [censusHeights, setCensusHeights] = useState<Record<string, number>>({})
   const { user, loading: authLoading } = useAuth()
   const inited = useRef(false)
 
@@ -184,6 +186,31 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
   // Guardar PID actual
   useEffect(() => {
     if (pid) localStorage.setItem(LS_PID, pid)
+  }, [pid])
+
+  // Cargar alturas del censo para este proyecto
+  useEffect(() => {
+    if (!pid) return
+    const fetchHeights = async () => {
+      const { data } = await supabase
+        .from('census')
+        .select('nombre, apellidos, apodo, altura')
+        .eq('proyecto_id', pid)
+      
+      if (data) {
+        const map: Record<string, number> = {}
+        data.forEach(c => {
+          if (c.altura) {
+            // Guardamos por nombre completo y por apodo si existe
+            const fullName = `${c.nombre} ${c.apellidos}`.trim()
+            map[fullName] = c.altura
+            if (c.apodo) map[c.apodo.trim()] = c.altura
+          }
+        })
+        setCensusHeights(map)
+      }
+    }
+    fetchHeights()
   }, [pid])
 
   // Helper para guardar cambios en la nube
@@ -593,6 +620,7 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
       limpiarBanco,
       vaciarCenso,
       resetTodo,
+      censusHeights,
     }}>
       {children}
     </EstadoContext.Provider>

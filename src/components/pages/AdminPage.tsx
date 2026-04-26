@@ -15,6 +15,7 @@ interface CensusEntry {
   apodo?: string
   telefono: string
   trabajadera?: number
+  altura?: number
   proyecto_id: string
   created_at: string
 }
@@ -39,7 +40,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
 
   // Formulario Censo
-  const [newEntry, setNewEntry] = useState({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: '', proyecto_id: '' })
+  const [newEntry, setNewEntry] = useState({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: '', altura: '', proyecto_id: '' })
   const [filterPid, setFilterPid] = useState<string>('all')
   
   // Formulario Nuevo Paso
@@ -49,7 +50,7 @@ export default function AdminPage() {
   
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<CensusEntry>>({
-    email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: 0, proyecto_id: ''
+    email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: 0, altura: 0, proyecto_id: ''
   })
   const [saving, setSaving] = useState(false)
 
@@ -218,11 +219,13 @@ export default function AdminPage() {
     if (!newEntry.nombre) return
     setSaving(true)
 
-    const trabajaderaNum = newEntry.trabajadera ? parseInt(newEntry.trabajadera) : null
+      const trabajaderaNum = newEntry.trabajadera ? parseInt(newEntry.trabajadera) : null
+    const alturaNum = newEntry.altura ? parseFloat(newEntry.altura) : null
 
     const payload = {
       ...newEntry,
-      trabajadera: trabajaderaNum
+      trabajadera: trabajaderaNum,
+      altura: alturaNum
     }
 
     const { data, error } = await supabase
@@ -476,7 +479,8 @@ export default function AdminPage() {
       .from('census')
       .update({
         ...editForm,
-        trabajadera: editForm.trabajadera ? parseInt(String(editForm.trabajadera)) : null
+        trabajadera: editForm.trabajadera ? parseInt(String(editForm.trabajadera)) : null,
+        altura: editForm.altura ? parseFloat(String(editForm.altura)) : null
       })
       .eq('id', id)
 
@@ -625,9 +629,10 @@ export default function AdminPage() {
               <input className="inp" placeholder="Apellidos" value={newEntry.apellidos} onChange={e => setNewEntry({...newEntry, apellidos: e.target.value})} />
               <input className="inp" placeholder="Apodo" value={newEntry.apodo} onChange={e => setNewEntry({...newEntry, apodo: e.target.value})} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <input className="inp" placeholder="Teléfono" value={newEntry.telefono} onChange={e => setNewEntry({...newEntry, telefono: e.target.value})} />
               <input className="inp" placeholder="Trabajadera (Nº)" type="number" value={newEntry.trabajadera} onChange={e => setNewEntry({...newEntry, trabajadera: e.target.value})} />
+              <input className="inp" placeholder="Altura (cm)" type="number" step="0.1" value={newEntry.altura} onChange={e => setNewEntry({...newEntry, altura: e.target.value})} />
             </div>
             <button disabled={saving || !newEntry.proyecto_id} className="btn btn-oro w-full mt-2">
               {saving ? 'Guardando...' : '+ AÑADIR AL CENSO'}
@@ -684,9 +689,10 @@ export default function AdminPage() {
                               <input className="inp text-xs" value={editForm.email ?? ''} onChange={e => setEditForm({...editForm, email: e.target.value})} />
                               <input className="inp text-xs" placeholder="Apodo" value={editForm.apodo ?? ''} onChange={e => setEditForm({...editForm, apodo: e.target.value})} />
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-3 gap-2">
                               <input className="inp text-xs" placeholder="Tel" value={editForm.telefono ?? ''} onChange={e => setEditForm({...editForm, telefono: e.target.value})} />
                               <input className="inp text-xs" type="number" placeholder="Trab" value={editForm.trabajadera ?? ''} onChange={e => setEditForm({...editForm, trabajadera: e.target.value ? parseInt(e.target.value) : undefined})} />
+                              <input className="inp text-xs" type="number" step="0.1" placeholder="Alt (cm)" value={editForm.altura ?? ''} onChange={e => setEditForm({...editForm, altura: e.target.value ? parseFloat(e.target.value) : undefined})} />
                             </div>
                             <div className="flex gap-2">
                               <button onClick={() => saveEdit(c.id)} className="btn btn-oro flex-1 h-8 text-[0.6rem]">GUARDAR</button>
@@ -709,6 +715,7 @@ export default function AdminPage() {
                               <div className="flex gap-3">
                                 {c.telefono && <span>📞 {c.telefono}</span>}
                                 {c.trabajadera && <span>🪜 Trab: {c.trabajadera}</span>}
+                                {c.altura && <span className="text-[var(--oro)] font-bold">📏 {c.altura} cm</span>}
                                 <span className="text-[var(--oro)] font-black uppercase text-[8px] bg-[var(--oro)]/10 px-1 rounded">
                                   {pasos.find(p => p.id === c.proyecto_id)?.nombre_paso || 'Desconocido'}
                                 </span>
