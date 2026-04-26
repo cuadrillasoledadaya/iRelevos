@@ -21,21 +21,18 @@ export default function RegisterPage() {
     if (!emailToCheck.includes('@') || !emailToCheck.includes('.')) return
     
     setVerificandoCenso(true)
-    try {
-      const res = await fetch(`/api/check-censo?email=${encodeURIComponent(emailToCheck)}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.found) {
-          setNombre(data.nombre)
-          setApellidos(data.apellidos)
-          if (data.apodo) setApodo(data.apodo)
-        }
-      }
-    } catch (err) {
-      console.error('Error verificando censo:', err)
-    } finally {
-      setVerificandoCenso(false)
+    const { data, error } = await supabase
+      .from('census')
+      .select('nombre, apellidos, apodo')
+      .eq('email', emailToCheck.toLowerCase().trim())
+      .single()
+
+    if (!error && data) {
+      setNombre(data.nombre)
+      setApellidos(data.apellidos || '')
+      if (data.apodo) setApodo(data.apodo)
     }
+    setVerificandoCenso(false)
   }
 
   async function handleRegister(e: React.FormEvent) {
