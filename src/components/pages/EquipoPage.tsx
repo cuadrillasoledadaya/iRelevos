@@ -72,7 +72,6 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
   const isBaja = (i: number) => t.bajas?.includes(i)
   const total = t.nombres.length
   const nBajas = t.bajas?.length ?? 0
-  const nActivos = total - nBajas
   const disp = rolesDisponibles(t.id)
 
   // 📐 Análisis de Nivelación
