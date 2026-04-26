@@ -91,22 +91,6 @@ export default function RegisterPage() {
         <p className="text-[var(--cre-o)] text-sm mb-8 text-center uppercase tracking-widest">Registro de perfil</p>
         
         <form onSubmit={handleRegister} className="flex flex-col gap-4">
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Nombre</label>
-              <input required className="inp w-full" value={nombre} onChange={e => setNombre(e.target.value)} />
-            </div>
-            <div className="flex-1">
-              <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Apellidos</label>
-              <input required className="inp w-full" value={apellidos} onChange={e => setApellidos(e.target.value)} />
-            </div>
-          </div>
-          
-          <div>
-            <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Apodo / Nombre en Paso</label>
-            <input className="inp w-full" value={apodo} onChange={e => setApodo(e.target.value)} />
-          </div>
-
           <div>
             <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block flex justify-between">
               Email
@@ -123,6 +107,22 @@ export default function RegisterPage() {
             {nombre && !loading && (
               <p className="text-[0.6rem] text-[var(--oro)] mt-1 uppercase font-bold">✓ Email reconocido por la Hermandad</p>
             )}
+          </div>
+
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Nombre</label>
+              <input required className="inp w-full" value={nombre} onChange={e => setNombre(e.target.value)} />
+            </div>
+            <div className="flex-1">
+              <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Apellidos</label>
+              <input required className="inp w-full" value={apellidos} onChange={e => setApellidos(e.target.value)} />
+            </div>
+          </div>
+          
+          <div>
+            <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Apodo / Nombre en Paso</label>
+            <input className="inp w-full" value={apodo} onChange={e => setApodo(e.target.value)} />
           </div>
           
           <div>
