@@ -59,23 +59,9 @@ export default function RegisterPage() {
       if (authError) throw authError
       if (!data.user) throw new Error('No se pudo crear el usuario')
 
-      // 2. Crear o actualizar perfil en la tabla profiles (upsert evita errores si un trigger ya lo creó)
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert([
-          {
-            id: data.user.id,
-            email,
-            nombre,
-            apellidos,
-            apodo,
-            role: 'costalero' // Rol por defecto
-          }
-        ], { onConflict: 'id' })
-
-      if (profileError && profileError.code !== '23505') {
-        throw profileError
-      }
+      // El perfil se crea automáticamente mediante el trigger de base de datos 'on_auth_user_created'
+      // que configuramos previamente por SQL. Ya no es necesario el upsert manual aquí,
+      // evitando así conflictos de permisos (401) innecesarios.
 
       router.push('/')
       router.refresh()
