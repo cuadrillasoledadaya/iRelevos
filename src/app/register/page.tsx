@@ -47,6 +47,7 @@ export default function RegisterPage() {
         password,
         options: {
           data: {
+            email,
             nombre,
             apellidos,
             apodo,
@@ -64,6 +65,7 @@ export default function RegisterPage() {
         .upsert([
           {
             id: data.user.id,
+            email,
             nombre,
             apellidos,
             apodo,
