@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Profile, UserRole } from '@/hooks/useAuth'
-import { PasoDB } from '../../lib/types'
+import { PasoDB, Trabajadera } from '../../lib/types'
 import { useCallback } from 'react'
 import { useEstado } from '@/hooks/useEstado'
 
@@ -964,9 +964,9 @@ export default function AdminPage() {
                       const { data: oldC } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
                       if (oldC && oldC.length > 0) {
                         const newC = oldC.map(c => {
-                          const rest = { ...c } as any
-                          delete rest.id
-                          delete rest.created_at
+                          const rest = { ...c }
+                          delete (rest as Partial<CensusEntry>).id
+                          delete (rest as Partial<CensusEntry>).created_at
                           return { ...rest, temporada_id: newId, proyecto_id: '' }
                         })
                         await supabase.from('census').insert(newC)
@@ -977,9 +977,9 @@ export default function AdminPage() {
                       const { data: oldP } = await supabase.from('proyectos').select('*').eq('temporada_id', newTemp.sourceTempId)
                       if (oldP && oldP.length > 0) {
                         const newP = oldP.map(p => {
-                          const rest = { ...p } as any
-                          delete rest.id
-                          delete rest.created_at
+                          const rest = { ...p }
+                          delete (rest as Partial<PasoDB>).id
+                          delete (rest as Partial<PasoDB>).created_at
                           const cleanContent = JSON.parse(JSON.stringify(rest.content))
                           cleanContent.trabajaderas.forEach((t: Trabajadera) => {
                             t.nombres = []; t.plan = null; t.obj = {}; t.analisis = null; t.pinned = null; t.bajas = [];
