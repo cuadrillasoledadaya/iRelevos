@@ -16,6 +16,7 @@ import SugerenciaSheet from '@/components/sheets/SugerenciaSheet'
 import RelevosSheet from '@/components/sheets/RelevosSheet'
 import CensusSheet from '@/components/sheets/CensusSheet'
 import AdminPage from '@/components/pages/AdminPage'
+import DashboardPage from '@/components/pages/DashboardPage'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
@@ -47,6 +48,10 @@ export default function Home() {
       <AppHeader />
 
       <main className="main">
+        <div className={activePage === 'home' ? 'page active' : 'page'}>
+          <DashboardPage />
+        </div>
+
         {esMando && (
           <div className={activePage === 'config' ? 'page active' : 'page'}>
             <ConfigPage />

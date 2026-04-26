@@ -90,7 +90,7 @@ export interface BsTarget {
   ti: number
 }
 
-export type ActivePage = 'config' | 'equipo' | 'plan' | 'capataz' | 'carga' | 'admin'
+export type ActivePage = 'home' | 'config' | 'equipo' | 'plan' | 'capataz' | 'carga' | 'admin'
 export type ActiveSheet =
   | 'banco' | 'perfiles' | 'celda' | 'swap' | 'sugerencia' | 'relevos' | 'censo' | null
 

@@ -124,7 +124,7 @@ const LS_TEMA = 'cpwa_tema'
 export function EstadoProvider({ children }: { children: React.ReactNode }) {
   const [pasos, setPasos] = useState<PasoDB[]>([])
   const [pid, setPid] = useState<string>('')
-  const [activePage, setActivePage] = useState<ActivePage>('plan')
+  const [activePage, setActivePage] = useState<ActivePage>('home')
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null)
   const [tema, setTema] = useState<'dark' | 'light'>('dark')
   const [swapSel, setSwapSel] = useState<Partial<SwapState> | null>(null)

@@ -13,6 +13,8 @@ export default function BottomNav() {
   const role = profile?.role?.toLowerCase()
   const esMando = role === 'superadmin' || role === 'capataz' || role === 'auxiliar'
 
+  visibleTabs.push({ id: 'home', label: 'Inicio', icon: '🏠' })
+
   if (esMando) {
     visibleTabs.push({ id: 'config', label: 'Config', icon: '⚙' })
     visibleTabs.push({ id: 'equipo', label: 'Equipo', icon: '🎥' })
