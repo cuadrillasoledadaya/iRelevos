@@ -652,53 +652,77 @@ export default function AdminPage() {
             </div>
             {loading ? (
               <div className="p-8 text-center cinzel text-[var(--oro)] animate-pulse">Cargando censo...</div>
-            ) : census.map((c: CensusEntry) => (
-              <div key={c.id} className={`bg-[var(--card)] border ${editingId === c.id ? 'border-[var(--oro)]' : 'border-[var(--border)]'} p-3 rounded flex flex-col gap-2 transition-all`}>
-                {editingId === c.id ? (
-                  <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <input className="inp text-xs" value={editForm.nombre ?? ''} onChange={e => setEditForm({...editForm, nombre: e.target.value})} />
-                      <input className="inp text-xs" value={editForm.apellidos ?? ''} onChange={e => setEditForm({...editForm, apellidos: e.target.value})} />
+            ) : (
+              (() => {
+                const groups: Record<string, CensusEntry[]> = {}
+                census.forEach(c => {
+                  const t = c.trabajadera ? `TRABAJADERA ${c.trabajadera}` : 'SIN ASIGNAR'
+                  if (!groups[t]) groups[t] = []
+                  groups[t].push(c)
+                })
+
+                const sortedGroups = Object.keys(groups).sort((a, b) => {
+                  if (a === 'SIN ASIGNAR') return 1
+                  if (b === 'SIN ASIGNAR') return -1
+                  return a.localeCompare(b, undefined, { numeric: true })
+                })
+
+                return sortedGroups.map(groupName => (
+                  <div key={groupName} className="flex flex-col gap-3 mb-4">
+                    <div className="text-[var(--oro)] text-[0.65rem] font-black uppercase tracking-[0.3em] border-l-4 border-[var(--oro)] pl-3 py-1 bg-[var(--oro)]/5">
+                      {groupName} ({groups[groupName].length})
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input className="inp text-xs" value={editForm.email ?? ''} onChange={e => setEditForm({...editForm, email: e.target.value})} />
-                      <input className="inp text-xs" placeholder="Apodo" value={editForm.apodo ?? ''} onChange={e => setEditForm({...editForm, apodo: e.target.value})} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input className="inp text-xs" placeholder="Tel" value={editForm.telefono ?? ''} onChange={e => setEditForm({...editForm, telefono: e.target.value})} />
-                      <input className="inp text-xs" type="number" placeholder="Trab" value={editForm.trabajadera ?? ''} onChange={e => setEditForm({...editForm, trabajadera: e.target.value ? parseInt(e.target.value) : undefined})} />
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => saveEdit(c.id)} className="btn btn-oro flex-1 h-8 text-[0.6rem]">GUARDAR</button>
-                      <button onClick={() => setEditingId(null)} className="btn-v h-8 flex-1 text-[0.6rem]">CANCELAR</button>
-                    </div>
+                    {groups[groupName].map((c: CensusEntry) => (
+                      <div key={c.id} className={`bg-[var(--card)] border ${editingId === c.id ? 'border-[var(--oro)]' : 'border-[var(--border)]'} p-3 rounded flex flex-col gap-2 transition-all`}>
+                        {editingId === c.id ? (
+                          <div className="flex flex-col gap-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <input className="inp text-xs" value={editForm.nombre ?? ''} onChange={e => setEditForm({...editForm, nombre: e.target.value})} />
+                              <input className="inp text-xs" value={editForm.apellidos ?? ''} onChange={e => setEditForm({...editForm, apellidos: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <input className="inp text-xs" value={editForm.email ?? ''} onChange={e => setEditForm({...editForm, email: e.target.value})} />
+                              <input className="inp text-xs" placeholder="Apodo" value={editForm.apodo ?? ''} onChange={e => setEditForm({...editForm, apodo: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <input className="inp text-xs" placeholder="Tel" value={editForm.telefono ?? ''} onChange={e => setEditForm({...editForm, telefono: e.target.value})} />
+                              <input className="inp text-xs" type="number" placeholder="Trab" value={editForm.trabajadera ?? ''} onChange={e => setEditForm({...editForm, trabajadera: e.target.value ? parseInt(e.target.value) : undefined})} />
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => saveEdit(c.id)} className="btn btn-oro flex-1 h-8 text-[0.6rem]">GUARDAR</button>
+                              <button onClick={() => setEditingId(null)} className="btn-v h-8 flex-1 text-[0.6rem]">CANCELAR</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex justify-between items-start">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-[var(--cre)] text-sm">{c.nombre} {c.apellidos}</span>
+                                <span className="text-[var(--oro)] text-[10px] font-mono">{c.email}</span>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={() => { setEditingId(c.id); setEditForm(c) }} className="p-1 opacity-50 hover:opacity-100">✏️</button>
+                                <button onClick={() => deleteFromCensus(c.id)} className="p-1 opacity-50 hover:opacity-100">🗑️</button>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center text-[10px] text-[var(--cre-o)] opacity-70">
+                              <div className="flex gap-3">
+                                {c.telefono && <span>📞 {c.telefono}</span>}
+                                {c.trabajadera && <span>🪜 Trab: {c.trabajadera}</span>}
+                                <span className="text-[var(--oro)] font-black uppercase text-[8px] bg-[var(--oro)]/10 px-1 rounded">
+                                  {pasos.find(p => p.id === c.proyecto_id)?.nombre_paso || 'Desconocido'}
+                                </span>
+                              </div>
+                              <span>{new Date(c.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-start">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-[var(--cre)] text-sm">{c.nombre} {c.apellidos}</span>
-                        <span className="text-[var(--oro)] text-[10px] font-mono">{c.email}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => { setEditingId(c.id); setEditForm(c) }} className="p-1 opacity-50 hover:opacity-100">✏️</button>
-                        <button onClick={() => deleteFromCensus(c.id)} className="p-1 opacity-50 hover:opacity-100">🗑️</button>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-[var(--cre-o)] opacity-70">
-                      <div className="flex gap-3">
-                        {c.telefono && <span>📞 {c.telefono}</span>}
-                        {c.trabajadera && <span>🪜 Trab: {c.trabajadera}</span>}
-                        <span className="text-[var(--oro)] font-black uppercase text-[8px] bg-[var(--oro)]/10 px-1 rounded">
-                          {pasos.find(p => p.id === c.proyecto_id)?.nombre_paso || 'Desconocido'}
-                        </span>
-                      </div>
-                      <span>{new Date(c.created_at).toLocaleDateString()}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
+                ))
+              })()
+            )}
           </div>
         </div>
       )}
