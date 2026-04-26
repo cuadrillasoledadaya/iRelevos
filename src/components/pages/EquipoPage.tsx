@@ -155,19 +155,19 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
                     <div className="flex g2">
                       <select 
                         className="inp sm font-bold" 
-                        style={{ height: '32px', width: '80px', padding: '0 8px', backgroundColor: getRolColor(r.pri) }} 
+                        style={{ height: '32px', width: '80px', padding: '0 8px', backgroundColor: getRolColor(r.pri), color: '#1a1a1a' }} 
                         value={r.pri} 
                         onChange={e => handlers.setRolPri(t.id, i, e.target.value)}
                       >
-                        {disp.map(rol => <option key={rol} value={rol} style={{ backgroundColor: 'var(--card)', color: 'white' }}>{rol} (P)</option>)}
+                        {disp.map(rol => <option key={rol} value={rol} style={{ backgroundColor: 'white', color: '#1a1a1a' }}>{rol} (P)</option>)}
                       </select>
                       <select 
                         className="inp sm font-bold" 
-                        style={{ height: '32px', width: '80px', padding: '0 8px', backgroundColor: getRolColor(r.sec) }} 
+                        style={{ height: '32px', width: '80px', padding: '0 8px', backgroundColor: getRolColor(r.sec), color: '#1a1a1a' }} 
                         value={r.sec} 
                         onChange={e => handlers.setRolSec(t.id, i, e.target.value)}
                       >
-                        {disp.map(rol => <option key={rol} value={rol} style={{ backgroundColor: 'var(--card)', color: 'white' }}>{rol} (S)</option>)}
+                        {disp.map(rol => <option key={rol} value={rol} style={{ backgroundColor: 'white', color: '#1a1a1a' }}>{rol} (S)</option>)}
                       </select>
                     </div>
                   </div>
