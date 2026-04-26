@@ -235,7 +235,7 @@ export default function AdminPage() {
 
     if (!error && data) {
       setCensus([data[0], ...census])
-      setNewEntry({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: '', proyecto_id: newEntry.proyecto_id })
+      setNewEntry({ email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: '', altura: '', proyecto_id: newEntry.proyecto_id })
 
       // Auto-sync: si tiene trabajadera asignada, meterlo en el proyecto
       if (trabajaderaNum && newEntry.proyecto_id) {
