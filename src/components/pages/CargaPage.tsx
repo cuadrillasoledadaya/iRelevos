@@ -238,7 +238,7 @@ function HeightAnalysis({ trabajaderas, censusHeights }: { trabajaderas: Trabaja
         </div>
         <div className="flex aic g1">
           <div className="w-2 h-2 rounded-full bg-red-500/40" />
-          <span className="text-[8px] opacity-60 uppercase">> 2.5cm</span>
+          <span className="text-[8px] opacity-60 uppercase">&gt; 2.5cm</span>
         </div>
       </div>
     </div>
