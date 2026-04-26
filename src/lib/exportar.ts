@@ -311,7 +311,21 @@ export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: 
         const r = t.plan![ti] ?? { dentro: [], fuera: [] }
         const esDentro = r.dentro.includes(costaleroIdx)
         const esFuera = r.fuera.includes(costaleroIdx)
-        const estadoCostalero = esDentro ? 'DENTRO' : esFuera ? 'FUERA' : '—'
+
+        // Calcular el rol físico cuando el costalero está dentro
+        let rolTexto = ''
+        if (esDentro) {
+          const dentroF = getDentroFisico(t, r)
+          const posIdx = dentroF.findIndex(ci => ci === costaleroIdx)
+          const estructura = estructuraPaso(t.id)
+          const rolCode = posIdx !== -1 ? estructura[posIdx] : null
+          if (rolCode) rolTexto = ` · ${rolEmoji(rolCode)} ${rolLabel(rolCode, t.id)}`
+        }
+
+        const estadoCostalero = esDentro
+          ? `DENTRO${rolTexto}`
+          : esFuera ? 'FUERA' : '—'
+
         const colorFila = esDentro
           ? 'background:#c9a84c;color:#000;font-weight:900;'
           : esFuera
@@ -319,7 +333,7 @@ export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: 
           : ''
         return `<tr style="${colorFila}">
           <td style="border:1px solid #ccc;padding:8px 10px;font-weight:600;">${esc(nombreTramo)}</td>
-          <td style="border:1px solid #ccc;padding:8px;text-align:center;font-size:13pt;font-weight:900;">${estadoCostalero}</td>
+          <td style="border:1px solid #ccc;padding:8px;text-align:center;font-size:11pt;font-weight:900;">${estadoCostalero}</td>
         </tr>`
       }).join('')
 
