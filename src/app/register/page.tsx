@@ -41,19 +41,27 @@ export default function RegisterPage() {
     setError(null)
 
     try {
-      // 1. Crear usuario en Supabase Auth
+      // 1. Crear usuario en Supabase Auth pasando los metadatos (para que no fallen los triggers)
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            nombre,
+            apellidos,
+            apodo,
+            role: 'costalero'
+          }
+        }
       })
 
       if (authError) throw authError
       if (!data.user) throw new Error('No se pudo crear el usuario')
 
-      // 2. Crear perfil en la tabla profiles
+      // 2. Crear o actualizar perfil en la tabla profiles (upsert evita errores si un trigger ya lo creó)
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert([
+        .upsert([
           {
             id: data.user.id,
             nombre,
@@ -61,9 +69,11 @@ export default function RegisterPage() {
             apodo,
             role: 'costalero' // Rol por defecto
           }
-        ])
+        ], { onConflict: 'id' })
 
-      if (profileError) throw profileError
+      if (profileError && profileError.code !== '23505') {
+        throw profileError
+      }
 
       router.push('/')
       router.refresh()
