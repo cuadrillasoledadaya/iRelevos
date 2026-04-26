@@ -4,7 +4,7 @@
 
 import type { Perfil, Trabajadera } from './types'
 import { esc, pillName } from './nombres'
-import { estructuraPaso, getDentroFisico, rolLabel } from './roles'
+import { estructuraPaso, getDentroFisico, rolEmoji, rolLabel } from './roles'
 import { migrarDatos } from './algoritmos'
 import { newId } from './nombres'
 
