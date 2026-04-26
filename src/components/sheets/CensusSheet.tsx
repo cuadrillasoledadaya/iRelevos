@@ -13,7 +13,7 @@ interface CensusEntry {
 }
 
 export default function CensusSheet() {
-  const { pid, activeSheet, closeSheet, censusTarget, setCensusTarget, setNombre, activeTemporadaId } = useEstado()
+  const { activeSheet, closeSheet, censusTarget, setCensusTarget, setNombre, activeTemporadaId } = useEstado()
   const [census, setCensus] = useState<CensusEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState('')

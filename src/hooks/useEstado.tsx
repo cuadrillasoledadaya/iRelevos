@@ -142,7 +142,6 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
   const [temporadas, setTemporadas] = useState<Temporada[]>([])
   const [activeTemporadaId, setActiveTemporadaId] = useState<string>('')
   const { user, loading: authLoading } = useAuth()
-  const inited = useRef(false)
 
   // 1. Cargar lista de proyectos de Supabase
   useEffect(() => {

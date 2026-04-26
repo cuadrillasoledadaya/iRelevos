@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Profile, UserRole } from '@/hooks/useAuth'
 import { PasoDB } from '../../lib/types'
 import { useCallback } from 'react'
-import { useEstado, Temporada } from '@/hooks/useEstado'
+import { useEstado } from '@/hooks/useEstado'
 
 interface CensusEntry {
   id: string
@@ -33,7 +33,8 @@ interface ImportEntry {
 }
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'usuarios' | 'censo' | 'pasos' | 'temporadas'>('usuarios')
+  const { pid, activeTemporadaId, setActiveTemporadaId, temporadas } = useEstado()
+  
   const [usuarios, setUsuarios] = useState<Profile[]>([])
   const [census, setCensus] = useState<CensusEntry[]>([])
   const [pasos, setPasos] = useState<PasoDB[]>([])
@@ -49,8 +50,8 @@ export default function AdminPage() {
   // Formulario Nueva Temporada
   const [newTemp, setNewTemp] = useState({ nombre: '', clonarCenso: true, clonarPasos: true, sourceTempId: '' })
   
-  const { pid, activeTemporadaId, setActiveTemporadaId, temporadas, refetchPasos } = useEstado()
-  
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'censo' | 'pasos' | 'temporadas'>('usuarios')
+  const { user } = useAuth()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<CensusEntry>>({
     email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: 0, altura: 0, proyecto_id: ''
@@ -95,7 +96,7 @@ export default function AdminPage() {
       query = query.eq('proyecto_id', filterPid)
     }
 
-    const { data, error } = query.order('created_at', { ascending: false })
+    const { data, error } = await query.order('created_at', { ascending: false })
 
     if (!error && data) setCensus(data as CensusEntry[])
     setLoading(false)
@@ -887,14 +888,14 @@ export default function AdminPage() {
       )}
 
       {activeTab === 'temporadas' && (
-        <div className="fc g4">
-          <div className="card p4 bg-[var(--card)] border border-[var(--border)] rounded-lg">
-            <div className="font-bold text-[var(--oro)] mb3">TEMPORADA ACTIVA</div>
-            <div className="fc g2">
+        <div className="flex flex-col gap-4">
+          <div className="card p-4 bg-[var(--card)] border border-[var(--border)] rounded-lg">
+            <div className="font-bold text-[var(--oro)] mb-3">TEMPORADA ACTIVA</div>
+            <div className="flex flex-col gap-2">
               {temporadas.map(t => (
                 <button 
                   key={t.id} 
-                  className={`btn flex aic jcb ${t.id === activeTemporadaId ? 'btn-oro' : 'btn-ghost'}`}
+                  className={`btn flex items-center justify-between ${t.id === activeTemporadaId ? 'btn-oro' : 'btn-ghost'}`}
                   onClick={() => setActiveTemporadaId(t.id)}
                 >
                   <span>{t.nombre}</span>
@@ -904,9 +905,9 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="card p4 bg-[var(--card)] border border-[var(--border)] rounded-lg">
-            <div className="font-bold text-[var(--oro)] mb3">NUEVA TEMPORADA</div>
-            <div className="fc g3">
+          <div className="card p-4 bg-[var(--card)] border border-[var(--border)] rounded-lg">
+            <div className="font-bold text-[var(--oro)] mb-3">NUEVA TEMPORADA</div>
+            <div className="flex flex-col gap-3">
               <input 
                 className="inp" 
                 placeholder="Nombre de la temporada (ej: SS 2025)" 
@@ -914,21 +915,21 @@ export default function AdminPage() {
                 onChange={e => setNewTemp({...newTemp, nombre: e.target.value})}
               />
               
-              <div className="fc g2 p3 bg-black/20 rounded border border-white/5">
-                <div className="text-[10px] uppercase opacity-40 font-bold mb1">Opciones de Clonación</div>
+              <div className="flex flex-col gap-2 p-3 bg-black/20 rounded border border-white/5">
+                <div className="text-[10px] uppercase opacity-40 font-bold mb-1">Opciones de Clonación</div>
                 
-                <label className="flex aic g2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={newTemp.clonarCenso} onChange={e => setNewTemp({...newTemp, clonarCenso: e.target.checked})} />
                   <span className="text-xs">Clonar Censo del año anterior</span>
                 </label>
 
-                <label className="flex aic g2 cursor-pointer">
+                <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={newTemp.clonarPasos} onChange={e => setNewTemp({...newTemp, clonarPasos: e.target.checked})} />
                   <span className="text-xs">Clonar estructura de Pasos / Cuadrillas</span>
                 </label>
 
                 {temporadas.length > 0 && (
-                  <div className="mt2">
+                  <div className="mt-2">
                     <div className="text-[9px] opacity-40 mb-1">Origen de los datos:</div>
                     <select 
                       className="inp sm h-8 text-[10px]" 
@@ -942,7 +943,7 @@ export default function AdminPage() {
               </div>
 
               <button 
-                className="btn btn-oro w100" 
+                className="btn btn-oro w-full" 
                 onClick={async () => {
                   if (!newTemp.nombre) return
                   setSaving(true)
@@ -964,7 +965,7 @@ export default function AdminPage() {
                       const { data: oldC } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
                       if (oldC && oldC.length > 0) {
                         const newC = oldC.map(c => {
-                          const { id, created_at, ...rest } = c
+                          const { id: _id, created_at: _ca, ...rest } = c
                           return { ...rest, temporada_id: newId, proyecto_id: '' }
                         })
                         await supabase.from('census').insert(newC)
@@ -975,9 +976,9 @@ export default function AdminPage() {
                       const { data: oldP } = await supabase.from('proyectos').select('*').eq('temporada_id', newTemp.sourceTempId)
                       if (oldP && oldP.length > 0) {
                         const newP = oldP.map(p => {
-                          const { id, created_at, ...rest } = p
+                          const { id: _id, created_at: _ca, ...rest } = p
                           const cleanContent = JSON.parse(JSON.stringify(rest.content))
-                          cleanContent.trabajaderas.forEach((t: any) => {
+                          cleanContent.trabajaderas.forEach((t: Trabajadera) => {
                             t.nombres = []; t.plan = null; t.obj = {}; t.analisis = null; t.pinned = null; t.bajas = [];
                           })
                           return { ...rest, content: cleanContent, temporada_id: newId }
