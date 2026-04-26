@@ -81,7 +81,7 @@ export function exportarRelevos(trabajaderas: Trabajadera[]): void {
     const estructura = estructuraPaso(t.id)
     const rolesHeaders = estructura.map(rol =>
       `<td style="border:1px solid #000;padding:8px;text-align:center;font-weight:700;background:#d4a574;color:white;"><strong>${rolEmoji(rol)}<br>${rolLabel(rol, t.id).split(' ')[0]}</strong></td>`
-    ).join('')
+    ).join('') + `<td style="border:1px solid #000;padding:8px;text-align:center;font-weight:700;background:#888;color:white;width:150px;"><strong>FUERA<br>(Descansan)</strong></td>`
 
     const filas = t.tramos.map((nombre, ti) => {
       const r = t.plan?.[ti] ?? { dentro: [], fuera: [] }
@@ -91,7 +91,11 @@ export function exportarRelevos(trabajaderas: Trabajadera[]): void {
         const n = ci !== null ? pillName(t, ci) : '—'
         return `<td style="border:1px solid #000;padding:8px;text-align:center;"><strong>${n}</strong></td>`
       }).join('')
-      return `<tr><td style="border:1px solid #000;padding:8px;font-weight:600;text-align:left;background:#f5f5f5;"><strong>${esc(nombre)}</strong></td>${celdas}</tr>`
+      
+      const nombresFuera = r.fuera.length > 0 ? r.fuera.map(ci => pillName(t, ci)).join(', ') : '—'
+      const celdaFuera = `<td style="border:1px solid #000;padding:8px;text-align:center;font-size:11px;color:#555;font-weight:600;">${nombresFuera}</td>`
+
+      return `<tr><td style="border:1px solid #000;padding:8px;font-weight:600;text-align:left;background:#f5f5f5;"><strong>${esc(nombre)}</strong></td>${celdas}${celdaFuera}</tr>`
     }).join('')
 
     return `<div style="page-break-inside:avoid;margin-bottom:30px;"><table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><tr><td style="border:1px solid #000;padding:12px;text-align:center;font-weight:700;background:#d4a574;color:white;font-size:16px;font-family:'Cinzel',serif;letter-spacing:1px;" colspan="100%">COSTALEROS — TRABAJADERA ${t.id}<br><span style="font-size:12px;margin-top:4px;display:block;">${hoy}</span></td></tr><tr><td style="border:1px solid #000;padding:8px;font-weight:700;text-align:center;background:#e8d5c4;"><strong>RELEVOS</strong></td>${rolesHeaders}</tr>${filas}</table></div>`
@@ -108,7 +112,7 @@ export function exportarRelevosIndividual(t: Trabajadera, costaleroIdx: number, 
   const estructura = estructuraPaso(t.id)
   const rolesHeaders = estructura.map(rol =>
     `<td style="border:1px solid #000;padding:8px;text-align:center;font-weight:700;background:#d4a574;color:white;"><strong>${rolEmoji(rol)}<br>${rolLabel(rol, t.id).split(' ')[0]}</strong></td>`
-  ).join('')
+  ).join('') + `<td style="border:1px solid #000;padding:8px;text-align:center;font-weight:700;background:#888;color:white;width:150px;"><strong>FUERA<br>(Descansan)</strong></td>`
 
   const filas = t.tramos.map((nombre, ti) => {
     const r = t.plan?.[ti] ?? { dentro: [], fuera: [] }
@@ -121,7 +125,11 @@ export function exportarRelevosIndividual(t: Trabajadera, costaleroIdx: number, 
       }
       return `<td style="border:1px solid #000;padding:8px;text-align:center;background:white;color:black;"><strong>${n}</strong></td>`
     }).join('')
-    return `<tr><td style="border:1px solid #000;padding:8px;font-weight:600;text-align:left;background:#f5f5f5;"><strong>${esc(nombre)}</strong></td>${celdas}</tr>`
+    
+    const nombresFuera = r.fuera.length > 0 ? r.fuera.map(ci => pillName(t, ci)).join(', ') : '—'
+    const celdaFuera = `<td style="border:1px solid #000;padding:8px;text-align:center;font-size:11px;color:#555;font-weight:600;">${nombresFuera}</td>`
+
+    return `<tr><td style="border:1px solid #000;padding:8px;font-weight:600;text-align:left;background:#f5f5f5;"><strong>${esc(nombre)}</strong></td>${celdas}${celdaFuera}</tr>`
   }).join('')
 
   const html = `<div style="page-break-inside:avoid;"><table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><tr><td style="border:1px solid #000;padding:12px;text-align:center;font-weight:700;background:#d4a574;color:white;font-size:16px;font-family:'Cinzel',serif;letter-spacing:1px;" colspan="100%">COSTALEROS — TRABAJADERA ${t.id}<br><span style="font-size:11px;margin-top:4px;display:block;">COSTALERO: <strong>${esc(nombreCostalero)}</strong> (resaltado en gris)</span><span style="font-size:11px;margin-top:2px;display:block;">${hoy}</span></td></tr><tr><td style="border:1px solid #000;padding:8px;font-weight:700;text-align:center;background:#e8d5c4;"><strong>RELEVOS</strong></td>${rolesHeaders}</tr>${filas}</table></div>`
@@ -137,7 +145,7 @@ export function exportarRelevosMultiplesItems(t: Trabajadera, indices: number[])
   const estructura = estructuraPaso(t.id)
   const rolesHeaders = estructura.map(rol =>
     `<td style="border:1px solid #000;padding:8px;text-align:center;font-weight:700;background:#d4a574;color:white;"><strong>${rolEmoji(rol)}<br>${rolLabel(rol, t.id).split(' ')[0]}</strong></td>`
-  ).join('')
+  ).join('') + `<td style="border:1px solid #000;padding:8px;text-align:center;font-weight:700;background:#888;color:white;width:150px;"><strong>FUERA<br>(Descansan)</strong></td>`
 
   const html = indices.map(costaleroIdx => {
     const nombreCostalero = t.nombres[costaleroIdx]
@@ -152,7 +160,11 @@ export function exportarRelevosMultiplesItems(t: Trabajadera, indices: number[])
         }
         return `<td style="border:1px solid #000;padding:8px;text-align:center;background:white;color:black;"><strong>${n}</strong></td>`
       }).join('')
-      return `<tr><td style="border:1px solid #000;padding:8px;font-weight:600;text-align:left;background:#f5f5f5;"><strong>${esc(nombre)}</strong></td>${celdas}</tr>`
+      
+      const nombresFuera = r.fuera.length > 0 ? r.fuera.map(ci => pillName(t, ci)).join(', ') : '—'
+      const celdaFuera = `<td style="border:1px solid #000;padding:8px;text-align:center;font-size:11px;color:#555;font-weight:600;">${nombresFuera}</td>`
+
+      return `<tr><td style="border:1px solid #000;padding:8px;font-weight:600;text-align:left;background:#f5f5f5;"><strong>${esc(nombre)}</strong></td>${celdas}${celdaFuera}</tr>`
     }).join('')
 
     return `<div style="page-break-after:always; margin-bottom: 40px;"><table style="width:100%;border-collapse:collapse;margin-bottom:10px;"><tr><td style="border:1px solid #000;padding:12px;text-align:center;font-weight:700;background:#d4a574;color:white;font-size:16px;font-family:'Cinzel',serif;letter-spacing:1px;" colspan="100%">COSTALEROS — TRABAJADERA ${t.id}<br><span style="font-size:11px;margin-top:4px;display:block;">COSTALERO: <strong>${esc(nombreCostalero)}</strong> (resaltado en gris)</span><span style="font-size:11px;margin-top:2px;display:block;">${hoy}</span></td></tr><tr><td style="border:1px solid #000;padding:8px;font-weight:700;text-align:center;background:#e8d5c4;"><strong>RELEVOS</strong></td>${rolesHeaders}</tr>${filas}</table></div>`
