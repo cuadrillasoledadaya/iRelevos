@@ -80,29 +80,53 @@ export default function CensusSheet() {
           ) : filtered.length === 0 ? (
             <div className="p-4 text-center tcre-o">No hay costaleros registrados en el censo para este proyecto.</div>
           ) : (
-            filtered.map((c) => (
-              <div
-                key={c.id}
-                className="bs-item flex items-center gap-3 cursor-pointer hover:bg-[rgba(201,168,76,0.1)] transition-colors"
-                onClick={() => handleSelect(c)}
-              >
-                <div className="flex-1">
-                  <div className="font-bold text-[var(--cre)]">
-                    {c.nombre} {c.apellidos}
+            (() => {
+              // Agrupar por trabajadera
+              const groups: Record<string, CensusEntry[]> = {}
+              filtered.forEach(c => {
+                const t = c.trabajadera ? `TRABAJADERA ${c.trabajadera}` : 'SIN ASIGNAR'
+                if (!groups[t]) groups[t] = []
+                groups[t].push(c)
+              })
+
+              // Ordenar grupos (primero TR 1, TR 2... luego SIN ASIGNAR)
+              const sortedGroups = Object.keys(groups).sort((a, b) => {
+                if (a === 'SIN ASIGNAR') return 1
+                if (b === 'SIN ASIGNAR') return -1
+                return a.localeCompare(b, undefined, { numeric: true })
+              })
+
+              return sortedGroups.map(groupName => (
+                <div key={groupName} className="mb-4">
+                  <div className="px-4 py-1 bg-[rgba(201,168,76,0.15)] text-[var(--oro)] text-[0.65rem] font-black uppercase tracking-[0.2em] border-y border-[var(--oro)]/20">
+                    {groupName}
                   </div>
-                  {c.apodo && (
-                    <div className="text-[0.65rem] text-[var(--oro)] uppercase font-black tracking-widest">
-                      @{c.apodo}
+                  {groups[groupName].map((c) => (
+                    <div
+                      key={c.id}
+                      className="bs-item flex items-center gap-3 cursor-pointer hover:bg-[rgba(201,168,76,0.1)] transition-colors"
+                      onClick={() => handleSelect(c)}
+                    >
+                      <div className="flex-1">
+                        <div className="font-bold text-[var(--cre)]">
+                          {c.nombre} {c.apellidos}
+                        </div>
+                        {c.apodo && (
+                          <div className="text-[0.65rem] text-[var(--oro)] uppercase font-black tracking-widest">
+                            @{c.apodo}
+                          </div>
+                        )}
+                      </div>
+                      {c.trabajadera && (
+                        <div className="t-badge !w-6 !h-6 !text-[0.6rem]" title="Trabajadera">
+                          {c.trabajadera}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
-                {c.trabajadera && (
-                  <div className="t-badge !w-6 !h-6 !text-[0.6rem]" title="Trabajadera">
-                    {c.trabajadera}
-                  </div>
-                )}
-              </div>
-            ))
+              ))
+            })()
           )}
         </div>
       </div>
