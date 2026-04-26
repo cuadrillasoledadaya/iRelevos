@@ -49,7 +49,7 @@ export default function EquipoPage() {
   )
 }
 
-function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando }: {
+function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando, censusHeights }: {
   t: Trabajadera;
   isOpen: boolean;
   onToggle: () => void;
