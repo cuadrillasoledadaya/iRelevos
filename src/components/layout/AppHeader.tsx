@@ -8,27 +8,32 @@ import { useAuth } from '@/hooks/useAuth'
 export default function AppHeader() {
   const { S, pasos, nombrePaso, tema, toggleTema, openSheet } = useEstado()
   const { profile, signOut } = useAuth()
+  const esMando = profile?.role === 'superadmin' || profile?.role === 'capataz' || profile?.role === 'auxiliar'
 
   return (
     <header className="app-hdr">
-      {/* Exportar JSON */}
-      <button
-        className="hdr-btn"
-        title="Exportar datos"
-        onClick={() => exportarDatos(pasos)}
-      >
-        ⬇
-      </button>
+      {/* Exportar JSON - Solo Mando */}
+      {esMando && (
+        <button
+          className="hdr-btn"
+          title="Exportar datos"
+          onClick={() => exportarDatos(pasos)}
+        >
+          ⬇
+        </button>
+      )}
 
-      {/* Selector de Paso */}
-      <button
-        className="perfil-selector"
-        onClick={() => openSheet('perfiles')}
-        title="Cambiar Paso"
-      >
-        <span className="perfil-nombre">{nombrePaso}</span>
-        <span className="perfil-chev">▼</span>
-      </button>
+      {/* Selector de Paso - Solo Mando */}
+      {esMando && (
+        <button
+          className="perfil-selector"
+          onClick={() => openSheet('perfiles')}
+          title="Cambiar Paso"
+        >
+          <span className="perfil-nombre">{nombrePaso}</span>
+          <span className="perfil-chev">▼</span>
+        </button>
+      )}
 
       {/* Info Usuario / Apodo */}
       {profile && (
@@ -53,23 +58,27 @@ export default function AppHeader() {
         {tema === 'dark' ? '☀' : '🌙'}
       </button>
 
-      {/* Exportar relevos */}
-      <button
-        className="hdr-btn"
-        title="Exportar relevos"
-        onClick={() => openSheet('relevos')}
-      >
-        📋
-      </button>
+      {/* Exportar relevos - Solo Mando */}
+      {esMando && (
+        <button
+          className="hdr-btn"
+          title="Exportar relevos"
+          onClick={() => openSheet('relevos')}
+        >
+          📋
+        </button>
+      )}
 
-      {/* PDF */}
-      <button
-        className="hdr-btn"
-        title="Hoja del capataz (PDF)"
-        onClick={() => exportarPDF(S.trabajaderas)}
-      >
-        🖨
-      </button>
+      {/* PDF - Solo Mando */}
+      {esMando && (
+        <button
+          className="hdr-btn"
+          title="Hoja del capataz (PDF)"
+          onClick={() => exportarPDF(S.trabajaderas)}
+        >
+          🖨
+        </button>
+      )}
 
       {/* Cerrar Sesión */}
       <button
