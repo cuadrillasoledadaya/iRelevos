@@ -4,7 +4,7 @@
 
 import type { Perfil, Trabajadera } from './types'
 import { esc, pillName } from './nombres'
-import { estructuraPaso, getDentroFisico, rolEmoji, rolLabel } from './roles'
+import { estructuraPaso, getDentroFisico, rolLabel } from './roles'
 import { migrarDatos } from './algoritmos'
 import { newId } from './nombres'
 
@@ -312,28 +312,32 @@ export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: 
         const esDentro = r.dentro.includes(costaleroIdx)
         const esFuera = r.fuera.includes(costaleroIdx)
 
-        // Calcular el rol físico cuando el costalero está dentro
-        let rolTexto = ''
+        // Calcular el rol físico cuando el costalero está dentro (sin emoji)
+        let rolLabel2 = ''
         if (esDentro) {
           const dentroF = getDentroFisico(t, r)
           const posIdx = dentroF.findIndex(ci => ci === costaleroIdx)
           const estructura = estructuraPaso(t.id)
           const rolCode = posIdx !== -1 ? estructura[posIdx] : null
-          if (rolCode) rolTexto = ` · ${rolEmoji(rolCode)} ${rolLabel(rolCode, t.id)}`
+          if (rolCode) rolLabel2 = rolLabel(rolCode, t.id)
         }
 
-        const estadoCostalero = esDentro
-          ? `DENTRO${rolTexto}`
-          : esFuera ? 'FUERA' : '—'
-
         const colorFila = esDentro
-          ? 'background:#c9a84c;color:#000;font-weight:900;'
+          ? 'background:#c9a84c;color:#000;'
           : esFuera
-          ? 'background:#f0e8d8;color:#555;font-weight:700;'
-          : ''
+          ? 'background:#cccccc;color:#333;'
+          : 'background:#f9f9f9;color:#aaa;'
+
+        const celdaEstado = esDentro
+          ? `<div style="font-size:13pt;font-weight:900;line-height:1.2;">DENTRO</div>
+             <div style="font-size:8pt;font-weight:700;margin-top:2px;">${rolLabel2}</div>`
+          : esFuera
+          ? `<div style="font-size:13pt;font-weight:700;">FUERA</div>`
+          : `<div style="font-size:13pt;">—</div>`
+
         return `<tr style="${colorFila}">
-          <td style="border:1px solid #ccc;padding:8px 10px;font-weight:600;">${esc(nombreTramo)}</td>
-          <td style="border:1px solid #ccc;padding:8px;text-align:center;font-size:11pt;font-weight:900;">${estadoCostalero}</td>
+          <td style="border:1px solid #bbb;padding:8px 10px;font-weight:600;">${esc(nombreTramo)}</td>
+          <td style="border:1px solid #bbb;padding:8px;text-align:center;">${celdaEstado}</td>
         </tr>`
       }).join('')
 
