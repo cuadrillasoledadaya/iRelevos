@@ -51,7 +51,6 @@ export default function AdminPage() {
   const [newTemp, setNewTemp] = useState({ nombre: '', clonarCenso: true, clonarPasos: true, sourceTempId: '' })
   
   const [activeTab, setActiveTab] = useState<'usuarios' | 'censo' | 'pasos' | 'temporadas'>('usuarios')
-  const { user } = useAuth()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<CensusEntry>>({
     email: '', nombre: '', apellidos: '', apodo: '', telefono: '', trabajadera: 0, altura: 0, proyecto_id: ''
@@ -965,7 +964,9 @@ export default function AdminPage() {
                       const { data: oldC } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
                       if (oldC && oldC.length > 0) {
                         const newC = oldC.map(c => {
-                          const { id: _id, created_at: _ca, ...rest } = c
+                          const rest = { ...c } as any
+                          delete rest.id
+                          delete rest.created_at
                           return { ...rest, temporada_id: newId, proyecto_id: '' }
                         })
                         await supabase.from('census').insert(newC)
@@ -976,7 +977,9 @@ export default function AdminPage() {
                       const { data: oldP } = await supabase.from('proyectos').select('*').eq('temporada_id', newTemp.sourceTempId)
                       if (oldP && oldP.length > 0) {
                         const newP = oldP.map(p => {
-                          const { id: _id, created_at: _ca, ...rest } = p
+                          const rest = { ...p } as any
+                          delete rest.id
+                          delete rest.created_at
                           const cleanContent = JSON.parse(JSON.stringify(rest.content))
                           cleanContent.trabajaderas.forEach((t: Trabajadera) => {
                             t.nombres = []; t.plan = null; t.obj = {}; t.analisis = null; t.pinned = null; t.bajas = [];
