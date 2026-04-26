@@ -478,9 +478,9 @@ export default function AdminPage() {
   return (
     <>
     <div className="p-4 flex flex-col gap-6 pb-20">
-      <div className="text-center">
-        <h2 className="text-2xl font-black cinzel text-[var(--oro)] uppercase tracking-widest">Panel de Control</h2>
-        <div className="flex bg-black/20 p-1 rounded-xl mb-6 overflow-x-auto no-scrollbar">
+      <div className="text-center max-w-md mx-auto w-full">
+        <h2 className="text-2xl font-black cinzel text-[var(--oro)] uppercase tracking-widest mb-6">Panel de Control</h2>
+        <div className="flex bg-black/30 p-1.5 rounded-2xl mb-8 border border-[var(--oro)]/10 shadow-inner">
             <button className={`tab-btn ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => setActiveTab('usuarios')}>USUARIOS</button>
             <button className={`tab-btn ${activeTab === 'censo' ? 'active' : ''}`} onClick={() => setActiveTab('censo')}>CENSO</button>
             <button className={`tab-btn ${activeTab === 'pasos' ? 'active' : ''}`} onClick={() => setActiveTab('pasos')}>PASOS</button>
