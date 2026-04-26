@@ -5,7 +5,7 @@
 
 import React, {
   createContext, useCallback, useContext,
-  useEffect, useRef, useState,
+  useEffect, useState,
 } from 'react'
 import type {
   ActivePage, ActiveSheet,
