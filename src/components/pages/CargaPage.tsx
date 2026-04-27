@@ -172,74 +172,187 @@ function CargaTrabajadera({ t, isOpen, onToggle }: { t: Trabajadera; isOpen: boo
   )
 }
 function HeightAnalysis({ trabajaderas, censusHeights }: { trabajaderas: Trabajadera[], censusHeights: Record<string, number> }) {
+  // Datos enriquecidos por trabajadera
+  const data = trabajaderas.map(t => {
+    const isBaja = (i: number) => t.bajas?.includes(i)
+    const entries = t.nombres.map((n: string, idx: number) => ({
+      idx,
+      nombre: n.trim(),
+      baja: isBaja(idx),
+      altura: (!isBaja(idx) && censusHeights[n.trim()]) ? censusHeights[n.trim()] : null,
+    }))
+    const conAltura = entries.filter(e => !e.baja && e.altura !== null).map(e => e.altura as number)
+    const maxH = conAltura.length > 0 ? Math.max(...conAltura) : null
+    const minH = conAltura.length > 0 ? Math.min(...conAltura) : null
+    const media = conAltura.length > 0 ? conAltura.reduce((a, b) => a + b, 0) / conAltura.length : null
+    const delta = (maxH !== null && minH !== null) ? maxH - minH : null
+    const sinDatos = conAltura.length === 0
+    let estado: 'ok' | 'warn' | 'err' | 'nd' = 'nd'
+    if (!sinDatos && delta !== null) {
+      if (delta <= 1.5) estado = 'ok'
+      else if (delta <= 2.5) estado = 'warn'
+      else estado = 'err'
+    }
+    return { t, entries, maxH, minH, media, delta, estado, sinDatos }
+  })
+
+  const criticas = data.filter(d => d.estado === 'err')
+  const aceptables = data.filter(d => d.estado === 'warn')
+  const optimas = data.filter(d => d.estado === 'ok')
+  const sinInfo = data.filter(d => d.estado === 'nd')
+
+  const colorCell = (h: number | null, maxH: number | null, minH: number | null) => {
+    if (!h || !maxH || !minH) return { bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.08)', text: 'var(--cre-o)' }
+    const diff = maxH - h
+    if (diff <= 1.5) return { bg: 'rgba(34,197,94,0.18)', border: 'rgba(34,197,94,0.5)', text: '#7dcea0' }
+    if (diff <= 2.5) return { bg: 'rgba(234,179,8,0.18)', border: 'rgba(234,179,8,0.5)', text: '#e8c97a' }
+    return { bg: 'rgba(239,68,68,0.18)', border: 'rgba(239,68,68,0.5)', text: '#ec9e9e' }
+  }
+
   return (
-    <div className="card p4 mb4">
-      <div className="flex aic g2 mb4">
-        <span className="text-xl">📐</span>
-        <div>
-          <div className="font-bold text-[var(--oro)] uppercase text-xs tracking-widest">Análisis de Nivelación</div>
-          <div className="text-[10px] opacity-60">Vista aérea del paso (Frontal arriba)</div>
-        </div>
+    <div style={{ marginBottom: '1.5rem' }}>
+      {/* — Resumen ejecutivo — */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem', marginBottom: '1rem'
+      }}>
+        {[
+          { label: 'Óptimas', val: optimas.length, col: '#22c55e', bg: 'rgba(34,197,94,0.12)', icon: '✓' },
+          { label: 'Aceptables', val: aceptables.length, col: '#eab308', bg: 'rgba(234,179,8,0.12)', icon: '⚠' },
+          { label: 'Críticas', val: criticas.length, col: '#ef4444', bg: 'rgba(239,68,68,0.12)', icon: '✗' },
+          { label: 'Sin datos', val: sinInfo.length, col: 'var(--cre-o)', bg: 'rgba(255,255,255,0.04)', icon: '—' },
+        ].map(({ label, val, col, bg, icon }) => (
+          <div key={label} style={{
+            background: bg, border: `1px solid ${col}40`, borderRadius: '8px',
+            padding: '0.6rem 0.4rem', textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '1.3rem', fontWeight: 900, color: col, fontFamily: 'Cinzel, serif' }}>{icon} {val}</div>
+            <div style={{ fontSize: '0.6rem', color: 'var(--cre-o)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: '2px' }}>{label}</div>
+          </div>
+        ))}
       </div>
 
-      <div className="flex flex-col gap-1.5 max-w-[280px] mx-auto">
-        {trabajaderas.map(t => {
-          const isBaja = (i: number) => t.bajas?.includes(i)
-          const alturas = t.nombres
-            .map((n: string, idx: number) => isBaja(idx) ? null : (censusHeights[n.trim()] || null))
-            .filter((h: number | null) => h !== null) as number[]
-          
-          const media = alturas.length > 0 ? (alturas.reduce((a, b) => a + b, 0) / alturas.length) : 0
-          const maxDiff = alturas.length > 1 ? Math.max(...alturas) - Math.min(...alturas) : 0
-          
-          let color = 'rgba(255,255,255,0.05)'
-          let label = 'Sin datos'
-          
-          if (alturas.length > 1) {
-            if (maxDiff <= 1.5) { color = 'rgba(34,197,94,0.3)'; label = 'Óptima' }
-            else if (maxDiff <= 2.5) { color = 'rgba(234,179,8,0.3)'; label = 'Aceptable' }
-            else { color = 'rgba(239,68,68,0.3)'; label = 'Crítica' }
-          }
+      {/* — Alerta de críticas — */}
+      {criticas.length > 0 && (
+        <div style={{
+          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)',
+          borderRadius: '8px', padding: '0.6rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: '#ec9e9e'
+        }}>
+          <strong style={{ color: '#ef4444' }}>⚠ Corrección urgente:</strong> Trabajadera{criticas.length > 1 ? 's' : ''}{' '}
+          <strong>{criticas.map(d => d.t.id).join(', ')}</strong> — diferencia superior a 2.5 cm entre costaleros.
+        </div>
+      )}
+
+      {/* — Mapa por trabajadera — */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        {data.map(({ t, entries, maxH, minH, media, delta, estado, sinDatos }) => {
+          const borderColor = estado === 'ok' ? 'rgba(34,197,94,0.35)'
+            : estado === 'warn' ? 'rgba(234,179,8,0.35)'
+            : estado === 'err' ? 'rgba(239,68,68,0.35)'
+            : 'rgba(255,255,255,0.08)'
 
           return (
-            <div key={t.id} className="flex aic g2">
-              <div className="text-[9px] font-bold opacity-40 w-4">{t.id}</div>
-              <div 
-                className="f1 h-8 rounded flex aic jcc border relative overflow-hidden"
-                style={{ 
-                  backgroundColor: color, 
-                  borderColor: color.replace('0.3', '0.5'),
-                }}
-              >
-                {media > 0 && (
-                  <div className="flex flex-col aic">
-                    <span className="text-[10px] font-bold text-[var(--cre)]">{media.toFixed(1)} cm</span>
-                    <span className="text-[7px] uppercase opacity-60 font-black tracking-tighter">Dif: {maxDiff.toFixed(1)}cm</span>
+            <div key={t.id} style={{
+              background: 'var(--neg-m)', border: `1px solid ${borderColor}`,
+              borderRadius: '10px', overflow: 'hidden'
+            }}>
+              {/* Cabecera de trabajadera */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '0.6rem',
+                padding: '0.5rem 0.85rem', background: 'rgba(201,168,76,0.04)',
+                borderBottom: '1px solid rgba(201,168,76,0.08)'
+              }}>
+                <div style={{
+                  width: '26px', height: '26px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--oro-o), var(--oro))',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'Cinzel, serif', fontWeight: 900, fontSize: '0.72rem', color: 'var(--neg)',
+                  flexShrink: 0
+                }}>{t.id}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: 'Cinzel, serif', fontSize: '0.72rem', color: 'var(--cre)', fontWeight: 700 }}>
+                    Trabajadera {t.id}
+                  </div>
+                  {!sinDatos && media && (
+                    <div style={{ fontSize: '0.62rem', color: 'var(--cre-o)', marginTop: '1px' }}>
+                      Media <strong style={{ color: 'var(--oro)' }}>{media.toFixed(1)} cm</strong>
+                      {' · '}Rango <strong style={{ color: 'var(--cre)' }}>{minH?.toFixed(1)} – {maxH?.toFixed(1)} cm</strong>
+                    </div>
+                  )}
+                  {sinDatos && <div style={{ fontSize: '0.62rem', color: 'var(--cre-o)', opacity: 0.6 }}>Sin datos de altura en el censo</div>}
+                </div>
+                {delta !== null && (
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    padding: '0.25rem 0.5rem', borderRadius: '6px', background: borderColor.replace('0.35', '0.15'),
+                    border: `1px solid ${borderColor}`
+                  }}>
+                    <span style={{
+                      fontFamily: 'Cinzel, serif', fontWeight: 900, fontSize: '0.9rem',
+                      color: estado === 'ok' ? '#22c55e' : estado === 'warn' ? '#eab308' : '#ef4444'
+                    }}>Δ {delta.toFixed(1)}</span>
+                    <span style={{ fontSize: '0.52rem', color: 'var(--cre-o)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>cm</span>
                   </div>
                 )}
-                {/* Indicador visual de la trabajadera */}
-                <div className="absolute top-0 left-0 w-1 h-full bg-white/10" />
-                <div className="absolute top-0 right-0 w-1 h-full bg-white/10" />
               </div>
-              <div className="text-[8px] font-bold opacity-40 w-10 text-right uppercase tracking-tighter">{label}</div>
+
+              {/* Celdas de costaleros */}
+              {!sinDatos && (
+                <div style={{
+                  display: 'flex', flexWrap: 'wrap', gap: '0.4rem',
+                  padding: '0.6rem 0.75rem'
+                }}>
+                  {entries.filter(e => !e.baja).map(e => {
+                    const c = colorCell(e.altura, maxH, minH)
+                    const isMax = e.altura !== null && e.altura === maxH
+                    const isMin = e.altura !== null && e.altura === minH && maxH !== minH
+                    return (
+                      <div key={e.idx} style={{
+                        background: c.bg, border: `1.5px solid ${c.border}`,
+                        borderRadius: '7px', padding: '0.35rem 0.5rem',
+                        minWidth: '54px', textAlign: 'center', position: 'relative'
+                      }}>
+                        {(isMax || isMin) && (
+                          <div style={{
+                            position: 'absolute', top: '-5px', right: '-4px',
+                            fontSize: '0.55rem', lineHeight: 1
+                          }}>{isMax ? '⬆' : '⬇'}</div>
+                        )}
+                        <div style={{
+                          fontFamily: 'Cinzel, serif', fontWeight: 900,
+                          fontSize: '0.82rem', color: c.text
+                        }}>
+                          {e.altura !== null ? `${e.altura}` : '?'}
+                          <span style={{ fontSize: '0.55rem', opacity: 0.7 }}>cm</span>
+                        </div>
+                        <div style={{
+                          fontSize: '0.58rem', color: 'var(--cre-o)', whiteSpace: 'nowrap',
+                          overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '54px',
+                          marginTop: '1px'
+                        }}>
+                          {e.nombre.split(' ')[0] || `#${e.idx + 1}`}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )
         })}
       </div>
 
-      <div className="mt4 pt3 border-t border-white/5 flex jcc gap-4">
-        <div className="flex aic g1">
-          <div className="w-2 h-2 rounded-full bg-green-500/40" />
-          <span className="text-[8px] opacity-60 uppercase">≤ 1.5cm</span>
-        </div>
-        <div className="flex aic g1">
-          <div className="w-2 h-2 rounded-full bg-yellow-500/40" />
-          <span className="text-[8px] opacity-60 uppercase">≤ 2.5cm</span>
-        </div>
-        <div className="flex aic g1">
-          <div className="w-2 h-2 rounded-full bg-red-500/40" />
-          <span className="text-[8px] opacity-60 uppercase">&gt; 2.5cm</span>
-        </div>
+      {/* — Leyenda — */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '0.75rem' }}>
+        {[
+          { col: '#22c55e', label: '≤ 1.5 cm · Óptima' },
+          { col: '#eab308', label: '≤ 2.5 cm · Aceptable' },
+          { col: '#ef4444', label: '> 2.5 cm · Crítica' },
+        ].map(({ col, label }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: col, opacity: 0.8 }} />
+            <span style={{ fontSize: '0.62rem', color: 'var(--cre-o)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
+          </div>
+        ))}
       </div>
     </div>
   )

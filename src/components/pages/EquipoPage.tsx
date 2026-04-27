@@ -110,8 +110,7 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando, censusHeights
         <div className="t-info">
           <div className="t-name">Trabajadera {t.id}</div>
           <div className="t-meta">
-            {total} inscritos {nBajas > 0 ? `· ${nBajas} baja(s)` : ''} 
-            {media && <span className="ml-2 px-1.5 py-0.5 bg-black/20 rounded text-[var(--oro)] font-mono text-[0.65rem]">📏 {media} cm</span>}
+            {total} inscritos {nBajas > 0 ? `· ${nBajas} baja(s)` : ''}
           </div>
         </div>
         <div className="t-chev">▼</div>
@@ -138,13 +137,8 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando, censusHeights
             const r = getRol(t, i)
             return (
               <div key={i} className={`cost-row ${baja ? 'baja' : ''}`}>
-                <div className="cost-n" style={{ position: 'relative' }}>
+                <div className="cost-n">
                   {i + 1}
-                  {!baja && censusHeights[nombre.trim()] && (
-                    <div className="absolute -bottom-1 -right-1 text-[0.5rem] font-bold text-[var(--oro)] opacity-40">
-                      {censusHeights[nombre.trim()]}
-                    </div>
-                  )}
                 </div>
                 {esMando ? (
                   <div className="f1 flex aic g2">
