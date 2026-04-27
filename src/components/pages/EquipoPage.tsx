@@ -74,12 +74,11 @@ function TrabajaderaCard({ t, isOpen, onToggle, handlers, esMando, censusHeights
   const nBajas = t.bajas?.length ?? 0
   const disp = rolesDisponibles(t.id)
 
-  // 📐 Análisis de Nivelación
+  // 📐 Solo semáforo de nivelación en el badge (análisis completo en Carga)
   const alturas = t.nombres
     .map((n: string, idx: number) => isBaja(idx) ? null : (censusHeights[n.trim()] || null))
     .filter((h: number | null) => h !== null) as number[]
   
-  const media = alturas.length > 0 ? (alturas.reduce((a, b) => a + b, 0) / alturas.length).toFixed(1) : null
   const maxDiff = alturas.length > 1 ? Math.max(...alturas) - Math.min(...alturas) : 0
   
   let statusColor = 'transparent'
