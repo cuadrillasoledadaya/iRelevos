@@ -96,6 +96,10 @@ export default function AdminPage() {
     }
 
     const { data, error } = await query.order('created_at', { ascending: false })
+    if (error) {
+      console.error('Error fetching census:', error)
+      alert('Error al cargar el censo: ' + error.message)
+    }
 
     if (!error && data) setCensus(data as CensusEntry[])
     setLoading(false)
@@ -505,7 +509,10 @@ export default function AdminPage() {
     <>
     <div className="p-4 flex flex-col gap-6 pb-20">
       <div className="text-center max-w-md mx-auto w-full">
-        <h2 className="text-2xl font-black cinzel text-[var(--oro)] uppercase tracking-widest mb-6">Panel de Control</h2>
+        <h2 className="text-2xl font-black cinzel text-[var(--oro)] uppercase tracking-widest mb-2">Panel de Control</h2>
+        <p className="text-[var(--cre-o)] text-[0.6rem] uppercase font-bold tracking-[0.2em] mb-6">
+          Temporada: <span className="text-[var(--oro)]">{temporadas.find(t => t.id === activeTemporadaId)?.nombre || 'Cargando...'}</span>
+        </p>
         <div className="flex bg-black/30 p-1.5 rounded-2xl mb-8 border border-[var(--oro)]/10 shadow-inner">
             <button className={`tab-btn ${activeTab === 'usuarios' ? 'active' : ''}`} onClick={() => setActiveTab('usuarios')}>USUARIOS</button>
             <button className={`tab-btn ${activeTab === 'censo' ? 'active' : ''}`} onClick={() => setActiveTab('censo')}>CENSO</button>
@@ -1018,7 +1025,13 @@ export default function AdminPage() {
                             .select()
                             .single()
                           
-                          if (!pErr && nP) {
+                          if (pErr) {
+                            console.error('Error al clonar paso:', pErr)
+                            alert('Error al clonar uno de los pasos: ' + pErr.message)
+                            setSaving(false)
+                            return
+                          }
+                          if (nP) {
                             projectIdMap[oldPid] = nP.id
                           }
                         }
@@ -1026,8 +1039,11 @@ export default function AdminPage() {
                     }
 
                     if (newTemp.clonarCenso) {
-                      const { data: oldC } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
-                      if (oldC && oldC.length > 0) {
+                      const { data: oldC, error: cFetchErr } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
+                      if (cFetchErr) {
+                        console.error('Error al leer censo original:', cFetchErr)
+                        alert('Error al leer el censo de la temporada origen')
+                      } else if (oldC && oldC.length > 0) {
                         const newC = oldC.map(c => {
                           const rest: Record<string, unknown> = { ...c }
                           delete rest.id
@@ -1035,10 +1051,14 @@ export default function AdminPage() {
                           return { 
                             ...rest, 
                             temporada_id: newId, 
-                            proyecto_id: projectIdMap[c.proyecto_id] || '' 
+                            proyecto_id: projectIdMap[c.proyecto_id] || null 
                           }
                         })
-                        await supabase.from('census').insert(newC)
+                        const { error: cInsErr } = await supabase.from('census').insert(newC)
+                        if (cInsErr) {
+                          console.error('Error al insertar nuevo censo:', cInsErr)
+                          alert('Error al clonar el censo: ' + cInsErr.message)
+                        }
                       }
                     }
                   }
