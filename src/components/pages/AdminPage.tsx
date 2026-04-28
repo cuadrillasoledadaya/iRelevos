@@ -411,6 +411,32 @@ export default function AdminPage() {
     }
   }
 
+  const eliminarTemporada = async (id: string) => {
+    if (!confirm('⚠️ ¿Seguro que quieres borrar esta temporada? Se borrarán todos los pasos y el censo asociado de forma irreversible.')) return
+    setSaving(true)
+    try {
+      // 1. Borrar Censo
+      await supabase.from('census').delete().eq('temporada_id', id)
+      // 2. Borrar Proyectos
+      await supabase.from('proyectos').delete().eq('temporada_id', id)
+      // 3. Borrar Temporada
+      const { error } = await supabase.from('temporadas').delete().eq('id', id)
+      
+      if (!error) {
+        if (id === activeTemporadaId) setActiveTemporadaId('')
+        alert('Temporada eliminada con éxito')
+        window.location.reload()
+      } else {
+        alert('Error: ' + error.message)
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Error inesperado al eliminar temporada')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function sincronizacionTotal() {
     if (!importPid) {
       alert('Selecciona un paso para sincronizar.')
@@ -892,14 +918,22 @@ export default function AdminPage() {
             <div className="font-bold text-[var(--oro)] mb-3">TEMPORADA ACTIVA</div>
             <div className="flex flex-col gap-2">
               {temporadas.map(t => (
-                <button 
-                  key={t.id} 
-                  className={`btn flex items-center justify-between ${t.id === activeTemporadaId ? 'btn-oro' : 'btn-ghost'}`}
-                  onClick={() => setActiveTemporadaId(t.id)}
-                >
-                  <span>{t.nombre}</span>
-                  {t.id === activeTemporadaId && <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded">ACTUAL</span>}
-                </button>
+                <div key={t.id} className="flex gap-2">
+                  <button 
+                    className={`btn flex-1 flex items-center justify-between ${t.id === activeTemporadaId ? 'btn-oro' : 'btn-ghost'}`}
+                    onClick={() => setActiveTemporadaId(t.id)}
+                  >
+                    <span>{t.nombre}</span>
+                    {t.id === activeTemporadaId && <span className="text-[10px] bg-black/20 px-2 py-0.5 rounded">ACTUAL</span>}
+                  </button>
+                  <button 
+                    title="Eliminar Temporada"
+                    className="btn btn-ghost text-red-500 p-2"
+                    onClick={() => eliminarTemporada(t.id)}
+                  >
+                    🗑️
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -960,33 +994,47 @@ export default function AdminPage() {
                   const newId = nTemp.id
 
                   if (newTemp.sourceTempId) {
-                    if (newTemp.clonarCenso) {
-                      const { data: oldC } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
-                      if (oldC && oldC.length > 0) {
-                        const newC = oldC.map(c => {
-                          const rest = { ...c }
-                          delete (rest as Partial<CensusEntry>).id
-                          delete (rest as Partial<CensusEntry>).created_at
-                          return { ...rest, temporada_id: newId, proyecto_id: '' }
-                        })
-                        await supabase.from('census').insert(newC)
-                      }
-                    }
+                    const projectIdMap: Record<string, string> = {}
 
                     if (newTemp.clonarPasos) {
                       const { data: oldP } = await supabase.from('proyectos').select('*').eq('temporada_id', newTemp.sourceTempId)
                       if (oldP && oldP.length > 0) {
-                        const newP = oldP.map(p => {
-                          const rest = { ...p }
-                          delete (rest as Partial<PasoDB>).id
-                          delete (rest as Partial<PasoDB>).created_at
+                        for (const p of oldP) {
+                          const oldPid = p.id
+                          const { id: _id, created_at: _ca, ...rest } = p as PasoDB
                           const cleanContent = JSON.parse(JSON.stringify(rest.content))
+                          
+                          // Limpiamos el estado operativo pero mantenemos nombres si clonamos censo
                           cleanContent.trabajaderas.forEach((t: Trabajadera) => {
-                            t.nombres = []; t.plan = null; t.obj = {}; t.analisis = null; t.pinned = null; t.bajas = [];
+                            if (!newTemp.clonarCenso) t.nombres = []
+                            t.plan = null; t.obj = {}; t.analisis = null; t.pinned = null; t.bajas = [];
                           })
-                          return { ...rest, content: cleanContent, temporada_id: newId }
+
+                          const { data: nP, error: pErr } = await supabase
+                            .from('proyectos')
+                            .insert([{ ...rest, content: cleanContent, temporada_id: newId }])
+                            .select()
+                            .single()
+                          
+                          if (!pErr && nP) {
+                            projectIdMap[oldPid] = nP.id
+                          }
+                        }
+                      }
+                    }
+
+                    if (newTemp.clonarCenso) {
+                      const { data: oldC } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
+                      if (oldC && oldC.length > 0) {
+                        const newC = oldC.map(c => {
+                          const { id: _id, created_at: _ca, ...rest } = c as CensusEntry
+                          return { 
+                            ...rest, 
+                            temporada_id: newId, 
+                            proyecto_id: projectIdMap[c.proyecto_id] || '' 
+                          }
                         })
-                        await supabase.from('proyectos').insert(newP)
+                        await supabase.from('census').insert(newC)
                       }
                     }
                   }
