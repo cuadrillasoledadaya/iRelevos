@@ -1001,7 +1001,7 @@ export default function AdminPage() {
                       if (oldP && oldP.length > 0) {
                         for (const p of oldP) {
                           const oldPid = p.id
-                          const rest = { ...p } as any
+                          const rest: Record<string, unknown> = { ...p }
                           delete rest.id
                           delete rest.created_at
                           const cleanContent = JSON.parse(JSON.stringify(rest.content))
@@ -1029,7 +1029,7 @@ export default function AdminPage() {
                       const { data: oldC } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
                       if (oldC && oldC.length > 0) {
                         const newC = oldC.map(c => {
-                          const rest = { ...c } as any
+                          const rest: Record<string, unknown> = { ...c }
                           delete rest.id
                           delete rest.created_at
                           return { 
