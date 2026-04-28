@@ -1001,7 +1001,9 @@ export default function AdminPage() {
                       if (oldP && oldP.length > 0) {
                         for (const p of oldP) {
                           const oldPid = p.id
-                          const { id: _id, created_at: _ca, ...rest } = p as PasoDB
+                          const rest = { ...p } as any
+                          delete rest.id
+                          delete rest.created_at
                           const cleanContent = JSON.parse(JSON.stringify(rest.content))
                           
                           // Limpiamos el estado operativo pero mantenemos nombres si clonamos censo
@@ -1027,7 +1029,9 @@ export default function AdminPage() {
                       const { data: oldC } = await supabase.from('census').select('*').eq('temporada_id', newTemp.sourceTempId)
                       if (oldC && oldC.length > 0) {
                         const newC = oldC.map(c => {
-                          const { id: _id, created_at: _ca, ...rest } = c as CensusEntry
+                          const rest = { ...c } as any
+                          delete rest.id
+                          delete rest.created_at
                           return { 
                             ...rest, 
                             temporada_id: newId, 
