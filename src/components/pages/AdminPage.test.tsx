@@ -106,7 +106,6 @@ describe('AdminPage - Seasons Deletion', () => {
     
     await waitFor(() => {
       expect(supabase.from).toHaveBeenCalledWith('census')
-      // @ts-expect-error - delete() returns a builder that has eq() in reality
       expect(supabase.from('census').delete().eq).toBeDefined()
     })
   })
