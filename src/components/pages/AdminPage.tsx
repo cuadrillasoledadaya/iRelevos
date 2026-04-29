@@ -335,6 +335,54 @@ export default function AdminPage() {
     setSaving(false)
   }
 
+  async function syncCensoDesdeProyecto(proyectoId: string) {
+    if (!confirm('⚠️ Esto buscará todos los nombres en el diseño de la cuadrilla y los añadirá al Censo de esta temporada si no existen. ¿Continuar?')) return
+    setSaving(true)
+
+    const { data: proj } = await supabase.from('proyectos').select('content').eq('id', proyectoId).single()
+    if (!proj) { setSaving(false); return }
+
+    const { data: existingCensus } = await supabase.from('census').select('nombre, apellidos, apodo').eq('proyecto_id', proyectoId)
+    const existingNames = new Set((existingCensus || []).map(c => 
+      (c.apodo || `${c.nombre} ${c.apellidos}`).trim().toLowerCase()
+    ))
+
+    const content = proj.content as { trabajaderas: { id: number; nombres: string[] }[] }
+    const newEntries: Record<string, unknown>[] = []
+
+    content.trabajaderas.forEach(t => {
+      t.nombres.forEach(n => {
+        const name = n.trim()
+        if (!name || name.startsWith('Costalero ')) return
+        
+        if (!existingNames.has(name.toLowerCase())) {
+          newEntries.push({
+            temporada_id: activeTemporadaId,
+            proyecto_id: proyectoId,
+            nombre: name,
+            apellidos: '',
+            apodo: name,
+            trabajadera: t.id
+          })
+          existingNames.add(name.toLowerCase())
+        }
+      })
+    })
+
+    if (newEntries.length > 0) {
+      const { error } = await supabase.from('census').insert(newEntries)
+      if (error) {
+        alert('Error al insertar en el censo: ' + error.message)
+      } else {
+        alert(`✅ Se han añadido ${newEntries.length} costaleros al censo.`)
+      }
+    } else {
+      alert('ℹ️ Todos los costaleros de la cuadrilla ya estaban en el censo (o estaban vacíos).')
+    }
+    setSaving(false)
+    fetchCensus()
+  }
+
   async function deleteFromCensus(id: string) {
     if (!confirm('¿Seguro que quieres borrar a este costalero del censo?')) return
     const { error } = await supabase.from('census').delete().eq('id', id)
@@ -423,15 +471,19 @@ export default function AdminPage() {
       await supabase.from('census').delete().eq('temporada_id', id)
       // 2. Borrar Proyectos
       await supabase.from('proyectos').delete().eq('temporada_id', id)
-      // 3. Borrar Temporada
-      const { error } = await supabase.from('temporadas').delete().eq('id', id)
+      // 3. Borrar Temporada (con .select() para verificar que realmente se borró y no fue bloqueado por RLS)
+      const { data, error } = await supabase.from('temporadas').delete().eq('id', id).select()
       
-      if (!error) {
+      if (error) {
+        alert('Error: ' + error.message)
+      } else if (!data || data.length === 0) {
+        alert('❌ No se pudo borrar la temporada de la base de datos. Es posible que no tengas los permisos necesarios (RLS) o la temporada ya no exista.')
+        // Recargar igual para sincronizar UI con DB
+        window.location.reload()
+      } else {
         if (id === activeTemporadaId) setActiveTemporadaId('')
         alert('Temporada eliminada con éxito')
         window.location.reload()
-      } else {
-        alert('Error: ' + error.message)
       }
     } catch (err) {
       console.error(err)
@@ -770,14 +822,23 @@ export default function AdminPage() {
                   <span className="bg-[var(--oro)] text-black px-2 py-0.5 rounded font-black uppercase">{p.num_trabajaderas} TRABAJADERAS</span>
                   <span>{new Date(p.created_at).toLocaleDateString()}</span>
                 </div>
-                <button
-                  disabled={saving}
-                  onClick={() => syncTodoCenso(p.id)}
-                  className="btn btn-out w-full text-[0.65rem] mt-1"
-                  style={{ borderColor: 'var(--oro)', color: 'var(--oro)' }}
-                >
-                  {saving ? '⏳ Sincronizando...' : '🔄 Sincronizar Cuadrilla desde Censo'}
-                </button>
+                <div className="flex flex-col gap-1 mt-1">
+                  <button
+                    disabled={saving}
+                    onClick={() => syncTodoCenso(p.id)}
+                    className="btn btn-out w-full text-[0.65rem]"
+                    style={{ borderColor: 'var(--oro)', color: 'var(--oro)' }}
+                  >
+                    {saving ? '⏳ Sincronizando...' : '🔄 Sincronizar Cuadrilla desde Censo'}
+                  </button>
+                  <button
+                    disabled={saving}
+                    onClick={() => syncCensoDesdeProyecto(p.id)}
+                    className="btn btn-ghost w-full text-[0.65rem] border border-blue-400/30 text-blue-400 hover:bg-blue-400/10"
+                  >
+                    {saving ? '⏳ Generando...' : '➡️ Generar Censo desde Cuadrilla'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
