@@ -124,6 +124,7 @@ const EstadoContext = createContext<EstadoCtx | null>(null)
 const LS_PID = 'cpwa_active_paso_id'
 const LS_TEMA = 'cpwa_tema'
 const LS_TID = 'cpwa_active_temp_id'
+const LS_PAGE = 'cpwa_active_page'
 
 // ── Provider ───────────────────────────────────────────────────────
 
@@ -131,6 +132,19 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
   const [pasos, setPasos] = useState<PasoDB[]>([])
   const [pid, setPid] = useState<string>('')
   const [activePage, setActivePage] = useState<ActivePage>('home')
+  
+  // 1. Cargar página guardada al inicio
+  useEffect(() => {
+    const saved = localStorage.getItem(LS_PAGE) as ActivePage
+    if (saved && ['home', 'config', 'equipo', 'plan', 'capataz', 'carga', 'admin'].includes(saved)) {
+      setActivePage(saved)
+    }
+  }, [])
+
+  // 2. Guardar página cuando cambie
+  useEffect(() => {
+    localStorage.setItem(LS_PAGE, activePage)
+  }, [activePage])
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null)
   const [tema, setTema] = useState<'dark' | 'light'>('light')
   const [swapSel, setSwapSel] = useState<Partial<SwapState> | null>(null)
