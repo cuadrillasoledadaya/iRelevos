@@ -471,23 +471,31 @@ export default function AdminPage() {
       await supabase.from('census').delete().eq('temporada_id', id)
       // 2. Borrar Proyectos
       await supabase.from('proyectos').delete().eq('temporada_id', id)
-      // 3. Borrar Temporada (con .select() para verificar que realmente se borró y no fue bloqueado por RLS)
+      // 3. Borrar Temporada
       const { data, error } = await supabase.from('temporadas').delete().eq('id', id).select()
       
       if (error) {
-        alert('Error: ' + error.message)
-      } else if (!data || data.length === 0) {
-        alert('❌ No se pudo borrar la temporada de la base de datos. Es posible que no tengas los permisos necesarios (RLS) o la temporada ya no exista.')
-        // Recargar igual para sincronizar UI con DB
-        window.location.reload()
-      } else {
-        if (id === activeTemporadaId) setActiveTemporadaId('')
-        alert('Temporada eliminada con éxito')
-        window.location.reload()
+        throw new Error(error.message)
       }
+      
+      if (!data || data.length === 0) {
+        throw new Error('No se pudo borrar la temporada de la base de datos. Es posible que no tengas los permisos necesarios (RLS) o la temporada ya no exista.')
+      }
+      
+      // Actualizar estado local
+      if (id === activeTemporadaId) {
+        setActiveTemporadaId('')
+      }
+      
+      // El hook useEstado se suscribe a cambios en la tabla temporadas
+      // y actualizará automáticamente el estado temporadas
+      // No necesitamos actualizar manualmente el array temporadas
+      
+      alert('Temporada eliminada con éxito')
+      
     } catch (err) {
       console.error(err)
-      alert('Error inesperado al eliminar temporada')
+      alert(`Error al eliminar temporada: ${err instanceof Error ? err.message : 'desconocido'}`)
     } finally {
       setSaving(false)
     }
