@@ -81,7 +81,6 @@ export function asignarRolesTramo(
   // o una heurística fuerte. Para 5 costaleros, 5! = 120 combinaciones.
   
   let mejorPuntuacion = -1
-  let mejorAsignacion: RolCode[] = []
 
   function calcularPuntuacion(permutacion: number[]): number {
     let score = 0
