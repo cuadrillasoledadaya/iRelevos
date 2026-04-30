@@ -1,0 +1,111 @@
+name: Bug Report
+description: Report a bug in the Relevos App
+title: "[BUG] "
+labels: ["bug", "status:needs-review"]
+assignees: []
+body:
+  - type: checkboxes
+    id: pre-flight
+    attributes:
+      label: Pre-flight Checks
+      description: Please complete these checks before submitting
+      options:
+        - label: I have searched existing issues and this is not a duplicate
+          required: true
+        - label: I understand this issue needs status:approved before a PR can be opened
+          required: true
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description
+      description: A clear description of what the bug is
+      placeholder: Describe the bug in detail
+    validations:
+      required: true
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: A clear and concise description of what you expected to happen
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What happened instead? (Include errors, logs, screenshots)
+      placeholder: A clear and concise description of what actually happened
+    validations:
+      required: true
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating System
+      description: What operating system are you using?
+      options:
+        - macOS
+        - Linux (Ubuntu)
+        - Linux (Other)
+        - Windows
+        - WSL
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: agent-client
+    attributes:
+      label: Agent / Client
+      description: What AI agent or client are you using?
+      options:
+        - Claude Code
+        - OpenCode
+        - Gemini CLI
+        - Cursor
+        - Windsurf
+        - Codex
+        - Other
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
+    id: shell
+    attributes:
+      label: Shell
+      description: What shell are you using?
+      options:
+        - bash
+        - zsh
+        - fish
+        - Other
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: relevant-logs
+    attributes:
+      label: Relevant Logs
+      description: Error logs or debug output (auto-formatted as code)
+      placeholder: Paste error logs here
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or workarounds
+      placeholder: Screenshots, additional info, workarounds
+    validations:
+      required: false

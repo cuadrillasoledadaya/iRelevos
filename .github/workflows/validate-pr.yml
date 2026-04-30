@@ -1,0 +1,71 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  validate-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check issue reference
+        if: github.event_name != 'pull_request_synchronize'
+        run: |
+          # Check if PR body contains Closes/Fixes/Resolves #N
+          if ! grep -qiE "(closes|fixes|resolves) #[0-9]+" "$GITHUB_EVENT_PATH"; then
+            echo "::error::PR body must contain 'Closes #N', 'Fixes #N', or 'Resolves #N'"
+            exit 1
+          fi
+
+      - name: Check issue has status:approved
+        if: github.event_name != 'pull_request_synchronize'
+        run: |
+          # Extract issue number from PR body
+          ISSUE_NUMBER=$(grep -oE '#[0-9]+' "$GITHUB_EVENT_PATH" | head -1 | tr -d '#')
+          
+          # Check if issue has status:approved label
+          if ! gh issue view "$ISSUE_NUMBER" --json labels --jq '.labels[] | select(.name == "status:approved")' 2>/dev/null | grep -q .; then
+            echo "::error::Issue #$ISSUE_NUMBER must have 'status:approved' label before PR can be opened"
+            exit 1
+          fi
+
+      - name: Check PR has type:* label
+        if: github.event_name != 'pull_request_synchronize'
+        run: |
+          # Check if PR has exactly one type:* label
+          TYPE_LABELS=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[] | select(.name | startswith("type:"))' 2>/dev/null | wc -l)
+          
+          if [ "$TYPE_LABELS" -ne 1 ]; then
+            echo "::error::PR must have exactly one type:* label"
+            exit 1
+          fi
+
+      - name: Validate conventional commit format
+        if: github.event_name != 'pull_request_synchronize'
+        run: |
+          # Get commit message
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          
+          # Check conventional commit regex
+          if ! echo "$COMMIT_MSG" | grep -E '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._-]+\))?!?: .+'; then
+            echo "::error::Commit message must follow conventional commits format"
+            echo "Example: feat(scope): description"
+            echo "         fix: description"
+            exit 1
+          fi
+
+      - name: Check branch naming convention
+        if: github.event_name != 'pull_request_synchronize'
+        run: |
+          BRANCH_NAME="$GITHUB_REF_NAME"
+          
+          # Check branch name regex
+          if ! echo "$BRANCH_NAME" | grep -E '^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)\/[a-z0-9._-]+$'; then
+            echo "::error::Branch name must follow format: type/description"
+            echo "Valid types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert"
+            echo "Example: feat/user-login"
+            exit 1
+          fi
