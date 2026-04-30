@@ -138,7 +138,7 @@ export default function AdminPage() {
         ))
 
         const content = p.content as { trabajaderas: { id: number; nombres: string[] }[] }
-        const toInsert: any[] = []
+        const toInsert: Partial<CensusEntry>[] = []
 
         content.trabajaderas.forEach(t => {
           t.nombres.forEach(n => {
