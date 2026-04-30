@@ -89,7 +89,19 @@ export default function AdminPage() {
   const fetchCensus = useCallback(async () => {
     if (!activeTemporadaId) return
     setLoading(true)
-    let query = supabase.from('census').select('*').eq('temporada_id', activeTemporadaId)
+    
+    // Obtenemos los IDs de los proyectos de esta temporada para asegurar visibilidad
+    const { data: projIds } = await supabase.from('proyectos').select('id').eq('temporada_id', activeTemporadaId)
+    const validPids = (projIds || []).map(p => p.id)
+
+    let query = supabase.from('census').select('*')
+    
+    // Filtramos: o tiene la temporada_id o pertenece a un proyecto de esta temporada
+    if (validPids.length > 0) {
+      query = query.or(`temporada_id.eq.${activeTemporadaId},proyecto_id.in.(${validPids.join(',')})`)
+    } else {
+      query = query.eq('temporada_id', activeTemporadaId)
+    }
     
     if (filterPid !== 'all') {
       query = query.eq('proyecto_id', filterPid)
@@ -104,6 +116,63 @@ export default function AdminPage() {
     if (!error && data) setCensus(data as CensusEntry[])
     setLoading(false)
   }, [filterPid, activeTemporadaId])
+
+  async function reconstruirCensoCompleto() {
+    if (!activeTemporadaId) return
+    if (!confirm('Esto buscará en TODOS los proyectos de esta temporada y creará las fichas de censo para cada nombre que encuentre. ¿Continuar?')) return
+    
+    setSaving(true)
+    try {
+      const { data: projects } = await supabase.from('proyectos').select('*').eq('temporada_id', activeTemporadaId)
+      if (!projects || projects.length === 0) {
+        alert('No hay proyectos en esta temporada.')
+        return
+      }
+
+      let totalNuevos = 0
+
+      for (const p of projects) {
+        const { data: existing } = await supabase.from('census').select('nombre, apellidos, apodo').eq('proyecto_id', p.id)
+        const existingNames = new Set((existing || []).map(c => 
+          (c.apodo || `${c.nombre} ${c.apellidos}`).trim().toLowerCase()
+        ))
+
+        const content = p.content as { trabajaderas: { id: number; nombres: string[] }[] }
+        const toInsert: any[] = []
+
+        content.trabajaderas.forEach(t => {
+          t.nombres.forEach(n => {
+            const name = n.trim()
+            if (!name || name.startsWith('Costalero ')) return
+            if (!existingNames.has(name.toLowerCase())) {
+              toInsert.push({
+                temporada_id: activeTemporadaId,
+                proyecto_id: p.id,
+                nombre: name,
+                apellidos: '',
+                apodo: name,
+                trabajadera: t.id
+              })
+              existingNames.add(name.toLowerCase())
+            }
+          })
+        })
+
+        if (toInsert.length > 0) {
+          await supabase.from('census').insert(toInsert)
+          totalNuevos += toInsert.length
+        }
+      }
+
+      alert(`✅ Sincronización completa. Se han creado ${totalNuevos} nuevas fichas de censo.`)
+      fetchCensus()
+    } catch (err) {
+      console.error(err)
+      alert('Error durante la reconstrucción.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   // Cargar pasos siempre (los necesita el formulario de censo)
   useEffect(() => {
@@ -654,10 +723,18 @@ export default function AdminPage() {
           <div className="bg-[var(--card)] border border-[var(--oro)]/20 p-4 rounded-lg flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="cinzel text-[var(--oro)] text-sm font-bold">📥 Sincronización iCuadrilla</h3>
-                <p className="text-[0.6rem] text-[var(--cre-o)] mt-0.5">Importa nuevos, actualiza existentes y gestiona bajas.</p>
+                <h3 className="cinzel text-[var(--oro)] text-sm font-bold">📥 Sincronización</h3>
+                <p className="text-[0.6rem] text-[var(--cre-o)] mt-0.5">Importa desde iCuadrilla o reconstruye desde planificación.</p>
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={reconstruirCensoCompleto}
+                  disabled={saving}
+                  className="btn btn-out btn-sm text-[0.6rem] border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+                  title="Busca nombres en la planificación y los añade al censo"
+                >
+                  ⚡ Reconstruir Censo
+                </button>
                 <button
                   onClick={sincronizacionTotal}
                   disabled={saving || importLoading}
