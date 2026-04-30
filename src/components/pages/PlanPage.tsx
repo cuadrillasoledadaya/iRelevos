@@ -109,18 +109,27 @@ function MiPlanPersonal({ S, profile }: { S: DatosPerfil; profile: Profile | nul
           <div className="text-2xl font-black cinzel text-[var(--oro)]">{salidas}</div>
           <div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)] font-bold mt-0.5">Salidas</div>
         </div>
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 text-center">
-          <div className="text-2xl font-black cinzel text-[var(--oro)]">
-            {primerTramo !== -1 ? `T${primerTramo + 1}` : '—'}
-          </div>
-          <div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)] font-bold mt-0.5">Primera</div>
-        </div>
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 text-center">
-          <div className="text-2xl font-black cinzel text-[var(--oro)]">
-            {ultimoReal !== -1 ? `T${ultimoReal + 1}` : '—'}
-          </div>
-          <div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)] font-bold mt-0.5">Última</div>
-        </div>
+          const firstTramoObj = t.tramos[primerTramo]
+          return (
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 text-center">
+              <div className="text-2xl font-black cinzel text-[var(--oro)] truncate px-1" title={firstTramoObj}>
+                {primerTramo !== -1 ? (firstTramoObj || `T${primerTramo + 1}`) : '—'}
+              </div>
+              <div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)] font-bold mt-0.5">Primera</div>
+            </div>
+          )
+        })()}
+        {(() => {
+          const lastTramoObj = t.tramos[ultimoReal]
+          return (
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 text-center">
+              <div className="text-2xl font-black cinzel text-[var(--oro)] truncate px-1" title={lastTramoObj}>
+                {ultimoReal !== -1 ? (lastTramoObj || `T${ultimoReal + 1}`) : '—'}
+              </div>
+              <div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)] font-bold mt-0.5">Última</div>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Cuadrícula de tramos */}
@@ -144,8 +153,8 @@ function MiPlanPersonal({ S, profile }: { S: DatosPerfil; profile: Profile | nul
                     : 'bg-[var(--card)] border-[var(--border)] opacity-40'
                 }`}
               >
-                <div className={`text-xs font-black cinzel w-8 shrink-0 ${esDentro ? 'text-black' : 'text-[var(--oro)]'}`}>
-                  T{ti + 1}
+                <div className={`text-[10px] font-black cinzel w-12 shrink-0 ${esDentro ? 'text-black' : 'text-[var(--oro)]'}`}>
+                  {t.tramos[ti] || `T${ti + 1}`}
                 </div>
                 <div className={`flex-1 text-xs font-bold truncate ${esDentro ? 'text-black' : 'text-[var(--cre)]'}`}>
                   {nombreTramo}
@@ -297,7 +306,9 @@ function PlanTrabajadera({ t }: { t: Trabajadera }) {
                           {esClave ? (
                             <span className="flex aic jcc text-[10px]" style={{ width: '16px', height: '16px', backgroundColor: 'var(--oro)', color: '#000', borderRadius: '50%', boxShadow: '0 0 5px rgba(201,168,76,0.5)' }}>★</span>
                           ) : null}
-                          <span style={esClave ? { color: 'var(--oro)', fontWeight: 'bold' } : {}}>T{ti+1}</span>
+                          <span style={esClave ? { color: 'var(--oro)', fontWeight: 'bold' } : {}} className="truncate max-w-[60px]" title={t.tramos[ti] || `T${ti+1}`}>
+                            {t.tramos[ti] || `T${ti+1}`}
+                          </span>
                         </span>
                         <span className="xs toro-o" style={{ textTransform: 'none', fontWeight: 400 }}>✎</span>
                       </div>
