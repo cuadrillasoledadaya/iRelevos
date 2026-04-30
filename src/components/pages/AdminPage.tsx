@@ -464,38 +464,41 @@ export default function AdminPage() {
   }
 
   const eliminarTemporada = async (id: string) => {
-    if (!confirm('⚠️ ¿Seguro que quieres borrar esta temporada? Se borrarán todos los pasos y el censo asociado de forma irreversible.')) return
+    if (!confirm('⚠️ ¿Seguro que quieres borrar esta temporada? Se borrarán todos los proyectos y el censo asociado de forma irreversible.')) return
     setSaving(true)
     try {
       // 1. Borrar Censo
-      await supabase.from('census').delete().eq('temporada_id', id)
+      const { data: cDeleted, error: cErr } = await supabase.from('census').delete().eq('temporada_id', id).select()
+      if (cErr) console.warn('Error borrando censo:', cErr.message)
+      else console.log(`Censo borrado: ${cDeleted?.length || 0} registros`)
+
       // 2. Borrar Proyectos
-      await supabase.from('proyectos').delete().eq('temporada_id', id)
+      const { data: pDeleted, error: pErr } = await supabase.from('proyectos').delete().eq('temporada_id', id).select()
+      if (pErr) console.warn('Error borrando proyectos:', pErr.message)
+      else console.log(`Proyectos borrados: ${pDeleted?.length || 0} registros`)
+
       // 3. Borrar Temporada
       const { data, error } = await supabase.from('temporadas').delete().eq('id', id).select()
       
       if (error) {
-        throw new Error(error.message)
+        throw new Error(`Error en la base de datos: ${error.message}`)
       }
       
       if (!data || data.length === 0) {
-        throw new Error('No se pudo borrar la temporada de la base de datos. Es posible que no tengas los permisos necesarios (RLS) o la temporada ya no exista.')
+        // Si llegamos aquí, es que la temporada existe pero no se pudo borrar.
+        // Lo más probable es RLS o que todavía queden hijos que no pudimos borrar por RLS.
+        throw new Error('No se pudo borrar la fila de la temporada. Verificá si tenés permisos de borrado (RLS) o si quedan datos vinculados.')
       }
       
-      // Actualizar estado local
       if (id === activeTemporadaId) {
         setActiveTemporadaId('')
       }
       
-      // El hook useEstado se suscribe a cambios en la tabla temporadas
-      // y actualizará automáticamente el estado temporadas
-      // No necesitamos actualizar manualmente el array temporadas
-      
-      alert('Temporada eliminada con éxito')
+      alert('✅ Temporada eliminada con éxito')
       
     } catch (err) {
       console.error(err)
-      alert(`Error al eliminar temporada: ${err instanceof Error ? err.message : 'desconocido'}`)
+      alert(`❌ ${err instanceof Error ? err.message : 'Error desconocido al eliminar'}`)
     } finally {
       setSaving(false)
     }
