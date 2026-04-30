@@ -467,17 +467,26 @@ export default function AdminPage() {
     if (!confirm('⚠️ ¿Seguro que quieres borrar esta temporada? Se borrarán todos los proyectos y el censo asociado de forma irreversible.')) return
     setSaving(true)
     try {
-      // 1. Borrar Censo
-      const { data: cDeleted, error: cErr } = await supabase.from('census').delete().eq('temporada_id', id).select()
-      if (cErr) console.warn('Error borrando censo:', cErr.message)
-      else console.log(`Censo borrado: ${cDeleted?.length || 0} registros`)
+      // 1. Obtener los proyectos de esta temporada para poder borrar su censo por proyecto_id (más seguro)
+      const { data: projects } = await supabase.from('proyectos').select('id').eq('temporada_id', id)
+      
+      if (projects && projects.length > 0) {
+        const projectIds = projects.map(p => p.id)
+        // Borramos censo vinculado a estos proyectos
+        const { data: cDel, error: cErr } = await supabase.from('census').delete().in('proyecto_id', projectIds).select()
+        if (cErr) console.warn('Error borrando censo por proyecto_id:', cErr.message)
+        else console.log(`Censo borrado (vía proyectos): ${cDel?.length || 0} registros`)
+      }
 
-      // 2. Borrar Proyectos
+      // 2. Por si acaso, borrar censo que tenga la temporada_id directamente (registros que podrían no estar en proyectos)
+      await supabase.from('census').delete().eq('temporada_id', id)
+
+      // 3. Borrar Proyectos
       const { data: pDeleted, error: pErr } = await supabase.from('proyectos').delete().eq('temporada_id', id).select()
       if (pErr) console.warn('Error borrando proyectos:', pErr.message)
       else console.log(`Proyectos borrados: ${pDeleted?.length || 0} registros`)
 
-      // 3. Borrar Temporada
+      // 4. Borrar Temporada
       const { data, error } = await supabase.from('temporadas').delete().eq('id', id).select()
       
       if (error) {
@@ -485,9 +494,7 @@ export default function AdminPage() {
       }
       
       if (!data || data.length === 0) {
-        // Si llegamos aquí, es que la temporada existe pero no se pudo borrar.
-        // Lo más probable es RLS o que todavía queden hijos que no pudimos borrar por RLS.
-        throw new Error('No se pudo borrar la fila de la temporada. Verificá si tenés permisos de borrado (RLS) o si quedan datos vinculados.')
+        throw new Error('No se pudo borrar la fila de la temporada. Verificá si tenés permisos de borrado (RLS) en Supabase.')
       }
       
       if (id === activeTemporadaId) {
