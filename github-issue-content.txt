@@ -1,0 +1,44 @@
+GitHub Issue Content for Seasons Deletion Fix
+============================================
+
+Title: [BUG] Seasons deletion leaves names on screen
+
+Labels: bug, status:needs-review
+
+Body:
+
+### Pre-flight Checks
+- [x] I have searched existing issues and this is not a duplicate  
+- [x] I understand this issue needs status:approved before a PR can be opened
+
+### Bug Description
+When deleting a season from the admin panel, the season name remains visible on the screen even though the data is deleted from the database. The UI doesn't update properly and requires a full page reload to see the changes.
+
+### Steps to Reproduce
+1. Go to the admin panel
+2. Navigate to the 'TEMPORADAS' tab  
+3. Click on the delete button (🗑️) for any season
+4. Confirm the deletion in the dialog
+5. Observe that the season name still appears in the list
+6. The only way to see the change is to refresh the entire page
+
+### Expected Behavior
+When a season is deleted, it should immediately disappear from the UI without requiring a page reload. The React state should be updated to reflect the change.
+
+### Actual Behavior
+The season name remains visible in the UI until the page is manually reloaded. The function uses window.location.reload() which is not optimal for user experience.
+
+### Operating System
+Windows
+
+### Agent / Client
+OpenCode
+
+### Shell
+bash
+
+### Relevant Logs
+No specific error logs, but the issue is in the eliminarTemporada function in src/components/pages/AdminPage.tsx
+
+### Additional Context
+The fix involves updating the React state instead of relying on page reload, leveraging the useEstado hook's automatic subscription to database changes.
