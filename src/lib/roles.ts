@@ -66,40 +66,75 @@ export function asignarRolesTramo(
   dentroIdxs: number[],
 ): Map<number, RolCode> {
   const estructura = estructuraPaso(t.id)
-  const necesita: Partial<Record<RolCode, number>> = {}
-  estructura.forEach(r => { necesita[r] = (necesita[r] ?? 0) + 1 })
-
-  const pendientes = new Set(dentroIdxs)
+  const nPuestos = estructura.length // Normalmente 5
   const asignados = new Map<number, RolCode>()
+  
+  if (dentroIdxs.length === 0) return asignados
 
-  const huecos: RolCode[] = []
-  Object.entries(necesita).forEach(([rol, n]) => {
-    for (let i = 0; i < (n ?? 0); i++) huecos.push(rol as RolCode)
-  })
-  huecos.sort((a, b) => (ROL_JERARQUIA[b] ?? 1) - (ROL_JERARQUIA[a] ?? 1))
+  // Solo optimizamos los primeros nPuestos (normalmente 5)
+  // Si hay más gente dentro (sobrecarga), el resto irá como 'COR' al final.
+  const candidatos = dentroIdxs.slice(0, nPuestos)
+  const extras = dentroIdxs.slice(nPuestos)
 
-  huecos.forEach(rol => {
-    if (pendientes.size === 0) return
-    let elegido: number | null = null
+  // Generar todas las permutaciones de candidatos para los puestos
+  // Como n es pequeño (max 5-6), podemos permitirnos un enfoque de búsqueda exhaustiva
+  // o una heurística fuerte. Para 5 costaleros, 5! = 120 combinaciones.
+  
+  let mejorPuntuacion = -1
+  let mejorAsignacion: RolCode[] = []
 
-    for (const ci of Array.from(pendientes)) {
-      if (getRol(t, ci).pri === rol) { elegido = ci; break }
+  function calcularPuntuacion(permutacion: number[]): number {
+    let score = 0
+    for (let i = 0; i < permutacion.length; i++) {
+      const ci = permutacion[i]
+      const rolNecesario = estructura[i]
+      const rolesCostalero = getRol(t, ci)
+      
+      if (rolesCostalero.pri === rolNecesario) score += 10
+      else if (rolesCostalero.sec === rolNecesario) score += 5
+      else if (rolNecesario === 'COR') score += 1 // Corriente es más flexible
     }
-    if (elegido === null) {
-      for (const ci of Array.from(pendientes)) {
-        if (getRol(t, ci).sec === rol) { elegido = ci; break }
+    return score
+  }
+
+  function permutate(arr: number[], m: number[] = []) {
+    if (arr.length === 0) {
+      const score = calcularPuntuacion(m)
+      if (score > mejorPuntuacion) {
+        mejorPuntuacion = score
+        // Guardamos los roles resultantes para CADA costalero en su orden original
+        mejorAsignacion = new Array(dentroIdxs.length)
+        const mapping = new Map<number, RolCode>()
+        for (let i = 0; i < m.length; i++) {
+          mapping.set(m[i], estructura[i])
+        }
+        // Aplicar el mapeo al orden de dentroIdxs
+        return mapping
       }
+      return null
     }
-    if (elegido === null && (ROL_JERARQUIA[rol] ?? 1) === 1) {
-      elegido = Array.from(pendientes)[0] ?? null
+
+    let localMejorMapping: Map<number, RolCode> | null = null
+    for (let i = 0; i < arr.length; i++) {
+      const curr = arr.slice()
+      const next = curr.splice(i, 1)
+      const res = permutate(curr, m.concat(next))
+      if (res) localMejorMapping = res
     }
-    if (elegido !== null) {
-      asignados.set(elegido, rol)
-      pendientes.delete(elegido)
-    }
+    return localMejorMapping
+  }
+
+  const elMejorMapeo = permutate(candidatos)
+  
+  if (elMejorMapeo) {
+    elMejorMapeo.forEach((rol, ci) => asignados.set(ci, rol))
+  }
+
+  // Asignar COR a los extras
+  extras.forEach(ci => {
+    if (!asignados.has(ci)) asignados.set(ci, 'COR')
   })
 
-  pendientes.forEach(ci => { asignados.set(ci, 'COR') })
   return asignados
 }
 
