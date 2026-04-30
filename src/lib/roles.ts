@@ -96,7 +96,7 @@ export function asignarRolesTramo(
     return score
   }
 
-  function permutate(arr: number[], m: number[] = []) {
+  function permutate(arr: number[], m: number[] = []): Map<number, RolCode> | null {
     if (arr.length === 0) {
       const score = calcularPuntuacion(m)
       if (score > mejorPuntuacion) {
