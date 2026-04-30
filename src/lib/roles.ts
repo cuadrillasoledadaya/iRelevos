@@ -102,7 +102,6 @@ export function asignarRolesTramo(
       if (score > mejorPuntuacion) {
         mejorPuntuacion = score
         // Guardamos los roles resultantes para CADA costalero en su orden original
-        mejorAsignacion = new Array(dentroIdxs.length)
         const mapping = new Map<number, RolCode>()
         for (let i = 0; i < m.length; i++) {
           mapping.set(m[i], estructura[i])
