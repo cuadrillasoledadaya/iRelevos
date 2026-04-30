@@ -17,6 +17,7 @@ interface CensusEntry {
   trabajadera?: number
   altura?: number
   proyecto_id: string
+  temporada_id?: string
   created_at: string
 }
 
