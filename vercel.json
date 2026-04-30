@@ -2,7 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "regions": ["gru", "iad"],
   "functions": {
     "app/api/import-costaleros/**": {
       "maxDuration": 30
