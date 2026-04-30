@@ -109,6 +109,7 @@ function MiPlanPersonal({ S, profile }: { S: DatosPerfil; profile: Profile | nul
           <div className="text-2xl font-black cinzel text-[var(--oro)]">{salidas}</div>
           <div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)] font-bold mt-0.5">Salidas</div>
         </div>
+        {(() => {
           const firstTramoObj = t.tramos[primerTramo]
           return (
             <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 text-center">
