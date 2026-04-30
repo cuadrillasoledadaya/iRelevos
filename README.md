@@ -33,4 +33,21 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
+### Quick Deploy
+1. Fork this repository
+2. Set up environment variables (see `.env.example`)
+3. Connect to Vercel or use CLI:
+   ```bash
+   vercel --prod
+   ```
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
+### Environment Setup
+Copy `.env.example` to `.env.local` and configure:
+- `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase project URL
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase anonymous key
+- `ICUADRILLA_API_TOKEN`: Your iCuadrilla API token
+- `ICUADRILLA_API_URL`: Your iCuadrilla API URL
+
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

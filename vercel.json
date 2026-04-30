@@ -1,0 +1,17 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "regions": ["gru", "iad"],
+  "functions": {
+    "app/api/import-costaleros/**": {
+      "maxDuration": 30
+    }
+  },
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key",
+    "ICUADRILLA_API_TOKEN": "@icuadrilla_token",
+    "ICUADRILLA_API_URL": "@icuadrilla_url"
+  }
+}
