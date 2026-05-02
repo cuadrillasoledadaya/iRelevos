@@ -18,6 +18,7 @@ import {
   calcularCiclo, completarAuto, analizar,
   datosVacios, tramosOptimos,
   getPinned, validarPinned, aplicarSugerencias,
+  isGenericTramo, migrarDatos,
 } from '@/lib/algoritmos'
 import {
   defaultRoles, ordenarDentroFisico,
@@ -112,6 +113,13 @@ export interface EstadoCtx {
   limpiarBanco: () => void
   vaciarCenso: () => Promise<void>
   resetTodo: () => void
+
+  // Planes de Relevos
+  addPlan: (nombre: string, tramos?: string[]) => void
+  updatePlan: (id: string, nombre: string) => void
+  delPlan: (id: string) => void
+  cargarPlanEnTrabajadera: (tid: number, planId: string) => void
+
   censusHeights: Record<string, number>
   temporadas: Temporada[]
   activeTemporadaId: string
@@ -269,7 +277,8 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
 
   // Datos del paso activo
   const pasoActual = pasos.find(p => p.id === pid)
-  const S: DatosPerfil = pasoActual?.content ?? datosVacios()
+  const rawContent = pasoActual?.content ? JSON.parse(JSON.stringify(pasoActual.content)) as DatosPerfil : datosVacios()
+  const S: DatosPerfil = migrarDatos(rawContent)
   const nombrePaso = pasoActual?.nombre_paso ?? 'Sin Paso'
   const nombreCuadrilla = pasoActual?.nombre_cuadrilla ?? 'Sin Cuadrilla'
   
@@ -569,8 +578,13 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
         r.dentro = nuevoDentroF.filter((x): x is number => x !== null)
         if (!ambosD) {
           r.fuera = [...nuevoFuera]
-          t.analisis = analizar(t.plan!, t.nombres.length, t.obj!, t)
         }
+        // Recalcular objetivo basado en el plan actual post-swap
+        const nuevoObj: Record<number, number> = {}
+        for (let i = 0; i < t.nombres.length; i++) nuevoObj[i] = 0
+        t.plan!.forEach(tramo => tramo.fuera.forEach(ci => { nuevoObj[ci]++ }))
+        t.obj = nuevoObj
+        t.analisis = analizar(t.plan!, t.nombres.length, nuevoObj, t)
       }
     })
     setSwapSel(null)
@@ -632,6 +646,56 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
     })
   }, [mutar])
 
+  // ── Planes de Relevos ──────────────────────────────────────────
+
+  const addPlan = useCallback((nombre: string, tramos?: string[]) => {
+    mutar(d => {
+      if (!d.planes) d.planes = []
+      d.planes.push({
+        id: `plan_${Date.now()}`,
+        nombre: nombre || 'Nuevo plan',
+        tramos: tramos || [],
+      })
+    })
+  }, [mutar])
+
+  const updatePlan = useCallback((id: string, nombre: string) => {
+    mutar(d => {
+      if (!d.planes) d.planes = []
+      const plan = d.planes.find(p => p.id === id)
+      if (plan) plan.nombre = nombre
+    })
+  }, [mutar])
+
+  const delPlan = useCallback((id: string) => {
+    mutar(d => {
+      if (!d.planes) d.planes = []
+      d.planes = d.planes.filter(p => p.id !== id)
+    })
+  }, [mutar])
+
+  const cargarPlanEnTrabajadera = useCallback((tid: number, planId: string) => {
+    mutar(d => {
+      if (!d.planes) d.planes = []
+      const plan = d.planes.find(p => p.id === planId)
+      if (!plan) return
+      const t = d.trabajaderas.find(x => x.id === tid)
+      if (!t) return
+
+      // Confirmar si hay tramos personalizados
+      const tieneTramosCustom = t.tramos.some(nombre => !isGenericTramo(nombre))
+      if (tieneTramosCustom) {
+        if (!confirm('Esta trabajadera ya tiene tramos personalizados. ¿Sobrescribir con el plan seleccionado?')) return
+      }
+
+      t.tramos = [...plan.tramos]
+      t.plan = null
+      t.obj = null
+      t.analisis = null
+      t.pinned = null
+    })
+  }, [mutar])
+
   const toggleEq = useCallback((id: number) => {
     setOpenEqs(prev => {
       const next = new Set(prev)
@@ -665,6 +729,10 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
       limpiarBanco,
       vaciarCenso,
       resetTodo,
+      addPlan,
+      updatePlan,
+      delPlan,
+      cargarPlanEnTrabajadera,
       censusHeights,
       temporadas, activeTemporadaId, setActiveTemporadaId, refetchPasos
     }}>

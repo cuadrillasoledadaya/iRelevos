@@ -118,10 +118,17 @@ describe('AdminPage - Seasons Deletion', () => {
 
     vi.stubGlobal('location', { reload: vi.fn() })
 
+    // Spy global para capturar TODAS las llamadas a insert
+    const allInsertCalls: unknown[][] = []
+
     vi.mocked(supabase.from).mockImplementation((table: string) => {
       const query = {
         select: vi.fn().mockReturnThis(),
-        insert: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockImplementation((payload: unknown) => {
+          allInsertCalls.push([table, payload])
+          // Retornar query object para permitir chaining (.select().single())
+          return query
+        }),
         eq: vi.fn().mockReturnThis(),
         order: vi.fn().mockReturnThis(),
         single: vi.fn().mockReturnThis(),
@@ -142,7 +149,6 @@ describe('AdminPage - Seasons Deletion', () => {
       }
       if (table === 'census') {
         query.eq.mockImplementation(() => makeAwaitable([{ id: 'c1', nombre: 'Juan', proyecto_id: oldProjectId }]))
-        query.insert.mockResolvedValue({ data: null, error: null })
       }
       return query as unknown as ReturnType<typeof supabase.from>
     })
@@ -163,12 +169,11 @@ describe('AdminPage - Seasons Deletion', () => {
       expect(supabase.from).toHaveBeenCalledWith('proyectos')
       expect(supabase.from).toHaveBeenCalledWith('census')
       
-      const insertMock = vi.mocked(supabase.from('census').insert)
-      const allInsertCalls = insertMock.mock.calls
+      // Buscar la llamada a insert en census con el payload correcto
       const censusInsertCall = allInsertCalls.find((call) => {
-        const payload = call[0]
-        return Array.isArray(payload) && payload.length > 0 && (payload[0] as Record<string, unknown>).nombre === 'Juan'
-      })?.[0] as Record<string, unknown>[]
+        const [callTable, payload] = call
+        return callTable === 'census' && Array.isArray(payload) && payload.length > 0 && (payload[0] as Record<string, unknown>).nombre === 'Juan'
+      })?.[1] as Record<string, unknown>[]
       
       expect(censusInsertCall).toBeDefined()
       expect(censusInsertCall[0].proyecto_id).toBe(newProjectId)

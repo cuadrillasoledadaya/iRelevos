@@ -18,6 +18,7 @@ const BANCO_DEFAULT = [
 export function datosVacios(): DatosPerfil {
   return {
     banco: [...BANCO_DEFAULT],
+    planes: [],
     trabajaderas: Array.from({ length: 7 }, (_, i) => ({
       id: i + 1,
       nombres: defaultNombres(6),
@@ -33,6 +34,9 @@ export function datosVacios(): DatosPerfil {
 }
 
 export function migrarDatos(datos: DatosPerfil): DatosPerfil {
+  if (!datos.planes) {
+    datos.planes = []
+  }
   datos.trabajaderas = datos.trabajaderas.map(t => {
     if (!t.nombres) {
       t.nombres = defaultNombres(6)
@@ -66,7 +70,34 @@ export function objSalidas(
   salidas: number,
   aplicaRegla5: boolean,
 ): Record<number, number> {
+  // Caso especial: 1 costalero recibe todos los turnos
+  if (total === 1) {
+    return { 0: numTramos * salidas }
+  }
+  
+  // Caso especial: regla 5 aplicada a 5 costaleros
+  if (aplicaRegla5 && total === 5) {
+    const totalAsignaciones = numTramos * salidas
+    const base = Math.floor(totalAsignaciones / 5)
+    const extras = totalAsignaciones % 5
+    const obj: Record<number, number> = {}
+    for (let i = 0; i < 5; i++) {
+      obj[i] = base + (i < extras ? 1 : 0)
+    }
+    return obj
+  }
+  
   const F = aplicaRegla5 ? 1 : (total - 5)
+  if (F <= 0) {
+    // Fallback para casos inválidos
+    const obj: Record<number, number> = {}
+    const base = Math.floor(numTramos / total)
+    const extras = numTramos % total
+    for (let i = 0; i < total; i++) obj[i] = i < extras ? base + 1 : base
+    return obj
+  }
+  
+  // F = costaleros fuera por tramo, plazas totales = tramos × fuera_por_tramo
   const plazas = numTramos * F
   const base = Math.floor(plazas / total)
   const extras = plazas % total
@@ -112,6 +143,26 @@ export function calcularCiclo(t: Trabajadera): { plan: TramoSlot[], objetivo: Re
 }
 
 export function tramosOptimos(total: number, salidas: number): number {
+  // Caso especial: regla 5 costaleros
+  if (total === 5) {
+    // Con regla 5, cada tramo tiene 1 fuera y 4 dentro
+    // Buscamos el mínimo número de tramos donde no se repite el costalero fuera
+    for (let n = 1; n <= 5; n++) {
+      const t: Trabajadera = {
+        id: 1, nombres: Array(5).fill(''), tramos: Array(n).fill(''),
+        salidas, roles: [], bajas: [], regla5costaleros: true,
+        plan: null, obj: null, analisis: null, pinned: null,
+        puntuaciones: {}, tramosClaves: [],
+      }
+      const { plan } = calcularCiclo(t)
+      if (!plan || !plan.every(s => s.dentro.length === 4)) continue
+      if (n === 1 || plan[0].fuera.filter(c => plan[n - 1].fuera.includes(c)).length === 0) {
+        return n
+      }
+    }
+    return 5 // fallback
+  }
+  
   const F = total - 5
   if (F <= 0) return 0
   const base = Math.ceil((total * salidas) / F)
@@ -319,4 +370,11 @@ export function completarAuto(t: Trabajadera): { plan: TramoSlot[]; obj: Record<
 export function getFueraPorTramo(t: Trabajadera): number {
   const aplicaRegla5 = t.regla5costaleros && t.nombres.length === 5
   return aplicaRegla5 ? 1 : (t.nombres.length - 5)
+}
+
+// ── Planes de Relevos ───────────────────────────────────────────────
+
+/** Detecta si un nombre de tramo es genérico ("Tramo N (TN)") */
+export function isGenericTramo(n: string): boolean {
+  return /^Tramo \d+ \(T\d+\)$/.test(n)
 }
