@@ -42,8 +42,9 @@ export default function LoginPage() {
         
         <form onSubmit={handleLogin} className="flex flex-col gap-6">
           <div>
-            <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-2 block font-bold tracking-widest">Email</label>
+            <label htmlFor="login-email" className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-2 block font-bold tracking-widest">Email</label>
             <input 
+              id="login-email"
               required 
               type="email" 
               className="inp w-full h-12" 
@@ -54,9 +55,10 @@ export default function LoginPage() {
           </div>
           
           <div>
-            <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-2 block font-bold tracking-widest">Contraseña</label>
+            <label htmlFor="login-password" className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-2 block font-bold tracking-widest">Contraseña</label>
             <div className="relative">
               <input 
+                id="login-password"
                 required 
                 type={showPassword ? "text" : "password"} 
                 className="inp w-full h-12 pr-10" 

@@ -43,8 +43,15 @@ export interface Trabajadera {
   tramosClaves: number[]
 }
 
+export interface PlanRelevo {
+  id: string
+  nombre: string
+  tramos: string[]
+}
+
 export interface DatosPerfil {
   banco: string[]
+  planes: PlanRelevo[]
   trabajaderas: Trabajadera[]
 }
 

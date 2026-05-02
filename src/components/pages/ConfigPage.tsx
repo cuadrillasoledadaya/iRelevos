@@ -2,22 +2,65 @@
 
 import React, { useState } from 'react'
 import { useEstado } from '@/hooks/useEstado'
-import type { Trabajadera } from '@/lib/types'
+import type { Trabajadera, PlanRelevo } from '@/lib/types'
 import { tramosOptimos } from '@/lib/algoritmos'
 import { shortName, pillName } from '@/lib/nombres'
 
 export default function ConfigPage() {
   const { 
     S, addBanco, delBanco, calcularTodo, resetTodo,
-    limpiarPlanificacion, limpiarTrabajaderas, limpiarBanco, vaciarCenso
+    limpiarPlanificacion, limpiarTrabajaderas, limpiarBanco, vaciarCenso,
+    addPlan, updatePlan, delPlan,
   } = useEstado()
   const [bancoInp, setBancoInp] = useState('')
+  const [newPlanName, setNewPlanName] = useState('')
+  const [selectedTramos, setSelectedTramos] = useState<string[]>([])
 
   function handleAddBanco() {
     const val = bancoInp.trim()
     if (!val) return
     addBanco(val)
     setBancoInp('')
+  }
+
+  function handleAddPlan() {
+    const name = newPlanName.trim()
+    if (!name || selectedTramos.length === 0) return
+    addPlan(name, [...selectedTramos])
+    setNewPlanName('')
+    setSelectedTramos([])
+  }
+
+  function toggleTramoEnPlan(nombre: string) {
+    setSelectedTramos(prev => 
+      prev.includes(nombre) 
+        ? prev.filter(t => t !== nombre)
+        : [...prev, nombre]
+    )
+  }
+
+  function moveSelectedTramo(index: number, direction: number) {
+    const newIndex = index + direction
+    if (newIndex < 0 || newIndex >= selectedTramos.length) return
+    setSelectedTramos(prev => {
+      const arr = [...prev]
+      const temp = arr[index]
+      arr[index] = arr[newIndex]
+      arr[newIndex] = temp
+      return arr
+    })
+  }
+
+  function removeSelectedTramo(index: number) {
+    setSelectedTramos(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function handleAddPlan() {
+    const name = newPlanName.trim()
+    if (!name || selectedTramos.length === 0) return
+    addPlan(name, [...selectedTramos])
+    setNewPlanName('')
+    setSelectedTramos([])
   }
 
   function handleReset() {
@@ -28,9 +71,9 @@ export default function ConfigPage() {
 
   return (
     <div className="pb-8">
-      {/* Banco de Nombres */}
+      {/* Banco de Relevos */}
       <div className="spanel mb4">
-        <div className="sec">✦ Banco de Nombres</div>
+        <div className="sec">✦ Banco de Relevos</div>
         <div className="banco-tags mb3 flex flex-wrap gap-2">
           {S.banco.map((n: string, i: number) => (
             <div key={i} className="banco-tag">
@@ -42,13 +85,102 @@ export default function ConfigPage() {
         <div className="flex g2">
           <input 
             className="inp f1" 
-            placeholder="Nuevo nombre de tramo…" 
+            placeholder="Añadir relevo…" 
             maxLength={50}
             value={bancoInp}
             onChange={e => setBancoInp(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAddBanco()}
           />
           <button className="btn btn-out btn-sm" onClick={handleAddBanco}>+ Añadir</button>
+        </div>
+      </div>
+
+      {/* Planes de Relevos */}
+      <div className="spanel mb4">
+        <div className="sec">✦ Planes de Relevos</div>
+        <p className="sm tcre-o mb3">Crea plantillas de secuencias de tramos para aplicar en cualquier trabajadera.</p>
+
+        {S.planes.length === 0 ? (
+          <p className="sm tcre-o mb3">No hay planes de relevos.</p>
+        ) : (
+          <div className="fc gap-2 mb3">
+            {S.planes.map((plan: PlanRelevo) => (
+              <div key={plan.id} className="flex jb aic g2 border-b border-white/5 pb-2">
+                <div className="fc f1">
+                  <input
+                    className="inp f1 sm"
+                    value={plan.nombre}
+                    onChange={(e) => updatePlan(plan.id, e.target.value)}
+                    placeholder="Nombre del plan"
+                    style={{ fontWeight: 'bold' }}
+                  />
+                  <span className="xs tcre-o">{plan.tramos.length} tramos: {plan.tramos.slice(0, 4).join(', ')}{plan.tramos.length > 4 ? '…' : ''}</span>
+                </div>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => { if (confirm('¿Eliminar el plan "' + plan.nombre + '"?')) delPlan(plan.id) }}
+                >✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="fc gap-3">
+          <input
+            className="inp f1"
+            placeholder="Nombre del plan…"
+            maxLength={50}
+            value={newPlanName}
+            onChange={e => setNewPlanName(e.target.value)}
+          />
+          
+          {/* Selector del banco */}
+          <div>
+            <div className="xs toro-o cinzel uppercase mb2" style={{ letterSpacing: '.05em' }}>Seleccionar del banco</div>
+            <div className="flex flex-wrap gap-2">
+              {S.banco.map((nombre: string) => {
+                const isSelected = selectedTramos.includes(nombre)
+                return (
+                  <button
+                    key={nombre}
+                    className={`btn btn-sm ${isSelected ? 'btn-oro' : 'btn-ghost'}`}
+                    onClick={() => toggleTramoEnPlan(nombre)}
+                    title={isSelected ? 'Quitar del plan' : 'Añadir al plan'}
+                  >
+                    {isSelected ? '✓ ' : '+ '}{nombre}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Tramos seleccionados (ordenados) */}
+          {selectedTramos.length > 0 && (
+            <div>
+              <div className="xs toro-o cinzel uppercase mb2" style={{ letterSpacing: '.05em' }}>Orden del plan ({selectedTramos.length})</div>
+              <div className="fc gap-2">
+                {selectedTramos.map((nombre, idx) => (
+                  <div key={`${nombre}-${idx}`} className="flex jb aic g2 border border-white/10 rounded px-2 py-1.5 bg-black/20">
+                    <span className="sm font-bold text-oro">{idx + 1}.</span>
+                    <span className="sm f1">{nombre}</span>
+                    <div className="flex g1">
+                      <button className="btn btn-ghost btn-icon btn-xs" onClick={() => moveSelectedTramo(idx, -1)} disabled={idx === 0}>↑</button>
+                      <button className="btn btn-ghost btn-icon btn-xs" onClick={() => moveSelectedTramo(idx, 1)} disabled={idx === selectedTramos.length - 1}>↓</button>
+                      <button className="btn btn-ghost btn-icon btn-xs text-red-400" onClick={() => removeSelectedTramo(idx)}>✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button 
+            className="btn btn-out btn-sm" 
+            onClick={handleAddPlan}
+            disabled={!newPlanName.trim() || selectedTramos.length === 0}
+          >
+            + Crear plan
+          </button>
         </div>
       </div>
 
@@ -131,12 +263,14 @@ export default function ConfigPage() {
 
 function ConfigTrabajadera({ t }: { t: Trabajadera }) {
   const { 
-    setSalidas, addTramo, delTramo, setNombreTramo, 
+    S, setSalidas, addTramo, delTramo, setNombreTramo, 
     setBancoTarget, openSheet, calcularTrab,
     toggleTramoClave,
+    cargarPlanEnTrabajadera,
   } = useEstado()
   
   const [isOpen, setIsOpen] = useState(false)
+  const [planSel, setPlanSel] = useState('')
 
   const total = t.nombres.length
   const nBajas = t.bajas?.length || 0
@@ -221,7 +355,34 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
         </div>
 
         <div className="xs toro-o cinzel uppercase mb3" style={{ letterSpacing: '.06em' }}>Tramos del ciclo</div>
-        
+
+        {/* Plan Selector */}
+        {S.planes.length > 0 && (
+          <div className="flex g2 aie mb3">
+            <select
+              className="inp f1"
+              value={planSel}
+              onChange={(e) => setPlanSel(e.target.value)}
+              aria-label="Cargar plan de tramos"
+            >
+              <option value="">-- Cargar plan --</option>
+              {S.planes.map((p: PlanRelevo) => (
+                <option key={p.id} value={p.id}>{p.nombre} ({p.tramos.length} tramos)</option>
+              ))}
+            </select>
+            <button
+              className="btn btn-out btn-sm"
+              disabled={!planSel}
+              onClick={() => {
+                if (planSel) {
+                  cargarPlanEnTrabajadera(t.id, planSel)
+                  setPlanSel('')
+                }
+              }}
+            >Cargar</button>
+          </div>
+        )}
+
         <div className="tramos-list">
           {t.tramos.map((nombre, ti) => {
             const esPri = ti === 0

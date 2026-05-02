@@ -80,11 +80,12 @@ export default function RegisterPage() {
         
         <form onSubmit={handleRegister} className="flex flex-col gap-4">
           <div>
-            <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block flex justify-between">
+            <label htmlFor="register-email" className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block flex justify-between">
               Email
               {verificandoCenso && <span className="animate-pulse text-[var(--oro)]">Verificando...</span>}
             </label>
             <input 
+              id="register-email"
               required 
               type="email" 
               className="inp w-full" 
@@ -99,23 +100,23 @@ export default function RegisterPage() {
 
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Nombre</label>
-              <input required className="inp w-full" value={nombre} onChange={e => setNombre(e.target.value)} />
+              <label htmlFor="register-nombre" className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Nombre</label>
+              <input id="register-nombre" required className="inp w-full" value={nombre} onChange={e => setNombre(e.target.value)} />
             </div>
             <div className="flex-1">
-              <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Apellidos</label>
-              <input required className="inp w-full" value={apellidos} onChange={e => setApellidos(e.target.value)} />
+              <label htmlFor="register-apellidos" className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Apellidos</label>
+              <input id="register-apellidos" required className="inp w-full" value={apellidos} onChange={e => setApellidos(e.target.value)} />
             </div>
           </div>
           
           <div>
-            <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Apodo / Nombre en Paso</label>
-            <input className="inp w-full" value={apodo} onChange={e => setApodo(e.target.value)} />
+            <label htmlFor="register-apodo" className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Apodo / Nombre en Paso</label>
+            <input id="register-apodo" className="inp w-full" value={apodo} onChange={e => setApodo(e.target.value)} />
           </div>
           
           <div>
-            <label className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Contraseña</label>
-            <input required type="password" title="Mínimo 6 caracteres" className="inp w-full" value={password} onChange={e => setPassword(e.target.value)} />
+            <label htmlFor="register-password" className="text-[0.7rem] uppercase text-[var(--cre-o)] mb-1 block">Contraseña</label>
+            <input id="register-password" required type="password" title="Mínimo 6 caracteres" className="inp w-full" value={password} onChange={e => setPassword(e.target.value)} />
           </div>
 
           {error && <div className="text-red-500 text-sm bg-red-500/10 p-3 border border-red-500/20 rounded">{error}</div>}
