@@ -55,14 +55,6 @@ export default function ConfigPage() {
     setSelectedTramos(prev => prev.filter((_, i) => i !== index))
   }
 
-  function handleAddPlan() {
-    const name = newPlanName.trim()
-    if (!name || selectedTramos.length === 0) return
-    addPlan(name, [...selectedTramos])
-    setNewPlanName('')
-    setSelectedTramos([])
-  }
-
   function handleReset() {
     if (confirm('⚠ ATENCIÓN: Esta acción borrará TODO el plan actual, todos los costaleros, roles, tramos y estadísticas de este Paso.\n\n¿Estás completamente seguro de que quieres empezar desde cero?')) {
       resetTodo()
