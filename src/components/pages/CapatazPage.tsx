@@ -147,9 +147,15 @@ function CapatazTrabajadera({ t }: { t: Trabajadera }) {
                           <div 
                             className={`paso-pill ${rol} ${tClass} relative`}
                             onClick={e => handleTapPill({ tid: t.id, ti, ci, esDentro: true, esFuera: false, posIdx, rolSlot: rol }, e)}
+                            title={`${nameAt(t, ci)} — PRI: ${getRol(t, ci).pri} / SEC: ${getRol(t, ci).sec}`}
                           >
                             {!esRolHabitual(t, ci, rol) && (
                               <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-600 border border-white" title="Fuera de rol habitual" />
+                            )}
+                            {tClass === 'sel-swap' && (
+                              <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[0.6rem] px-1 py-0.5 rounded whitespace-nowrap z-10">
+                                {getRol(t, ci).pri}/{getRol(t, ci).sec}
+                              </div>
                             )}
                             <span className="paso-pill-star inline-block text-[0.65rem] leading-none mb-0.5">{estrella}</span>
                             <span className="paso-pill-name block text-[0.75rem] whitespace-nowrap overflow-hidden text-ellipsis max-w-[56px]">{shortName(nameAt(t, ci))}</span>
@@ -184,7 +190,13 @@ function CapatazTrabajadera({ t }: { t: Trabajadera }) {
                       key={ci} 
                       className={`cp rol-${stF} ${cf} ${tClass} relative`}
                       onClick={e => handleTapPill({ tid: t.id, ti, ci, esDentro: false, esFuera: true, posIdx: null, rolSlot: null }, e)}
+                      title={`${nameAt(t, ci)} — PRI: ${rolX.pri} / SEC: ${rolX.sec}`}
                     >
+                      {tClass === 'sel-swap' && (
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[0.6rem] px-1 py-0.5 rounded whitespace-nowrap z-10">
+                          {rolX.pri}/{rolX.sec}
+                        </div>
+                      )}
                       {shortName(nameAt(t, ci))} {isRep ? '⚠' : ''}
                     </div>
                   )
