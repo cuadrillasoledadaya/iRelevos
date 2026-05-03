@@ -82,6 +82,19 @@ export function asignarRolesTramo(
   
   let mejorPuntuacion = -1
 
+  /**
+   * Calcula la puntuación de una permutación.
+   * Prioridad:
+   *  1. Minimizar personas FUERA de posición (ni pri ni sec)
+   *  2. Maximizar personas en posición PRINCIPAL
+   *  3. Maximizar personas en posición SECUNDARIA
+   * 
+   * Estrategia multi-objetivo con pesos escalonados:
+   *  - Fuera de posición: -1000 (penalización masiva)
+   *  - Principal: +100
+   *  - Secundaria: +50
+   *  - COR flexible (si no encaja ni pri/sec): +10
+   */
   function calcularPuntuacion(permutacion: number[]): number {
     let score = 0
     for (let i = 0; i < permutacion.length; i++) {
@@ -89,9 +102,15 @@ export function asignarRolesTramo(
       const rolNecesario = estructura[i]
       const rolesCostalero = getRol(t, ci)
       
-      if (rolesCostalero.pri === rolNecesario) score += 10
-      else if (rolesCostalero.sec === rolNecesario) score += 5
-      else if (rolNecesario === 'COR') score += 1 // Corriente es más flexible
+      if (rolesCostalero.pri === rolNecesario) {
+        score += 100
+      } else if (rolesCostalero.sec === rolNecesario) {
+        score += 50
+      } else if (rolNecesario === 'COR') {
+        score += 10 // COR es más flexible, no es "fuera de posición" grave
+      } else {
+        score -= 1000 // FUERA DE POSICIÓN - penalización masiva
+      }
     }
     return score
   }
