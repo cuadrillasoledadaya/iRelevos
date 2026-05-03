@@ -85,15 +85,14 @@ export function asignarRolesTramo(
   /**
    * Calcula la puntuación de una permutación.
    * Prioridad:
-   *  1. Minimizar personas FUERA de posición (ni pri ni sec)
+   *  1. CERO personas fuera de posición (ni pri ni sec)
    *  2. Maximizar personas en posición PRINCIPAL
    *  3. Maximizar personas en posición SECUNDARIA
    * 
    * Estrategia multi-objetivo con pesos escalonados:
-   *  - Fuera de posición: -1000 (penalización masiva)
    *  - Principal: +100
    *  - Secundaria: +50
-   *  - COR flexible (si no encaja ni pri/sec): +10
+   *  - Fuera de posición (ni pri ni sec): -1000
    */
   function calcularPuntuacion(permutacion: number[]): number {
     let score = 0
@@ -106,8 +105,6 @@ export function asignarRolesTramo(
         score += 100
       } else if (rolesCostalero.sec === rolNecesario) {
         score += 50
-      } else if (rolNecesario === 'COR') {
-        score += 10 // COR es más flexible, no es "fuera de posición" grave
       } else {
         score -= 1000 // FUERA DE POSICIÓN - penalización masiva
       }

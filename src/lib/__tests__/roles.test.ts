@@ -265,5 +265,39 @@ describe('roles', () => {
       const ordenado = ordenarDentroFisico({ id: 1 } as Trabajadera, plan)
       expect(ordenado[0].dentro).toEqual([])
     })
+
+    it('debería preferir ambos en secundaria antes que uno fuera de posición', () => {
+      // Escenario del usuario: Emilio (COS/FIJ) en COR es fuera de posición.
+      // Gorrion (FIJ/COR) está en FIJ (su principal).
+      // Si swap: Emilio en FIJ (sec) y Gorrion en COR (sec) = mejor.
+      const trabajadera = {
+        id: 2, // tid=2 → estructura = [COS, FIJ, COR, FIJ, COS]
+        nombres: ['Patro', 'Israel', 'Emilio', 'Gorrion', 'Susino'],
+        roles: [
+          { pri: 'COS', sec: 'FIJ' }, // Patro
+          { pri: 'FIJ', sec: 'COS' }, // Israel
+          { pri: 'COS', sec: 'FIJ' }, // Emilio
+          { pri: 'FIJ', sec: 'COR' }, // Gorrion
+          { pri: 'COS', sec: 'FIJ' }, // Susino
+        ],
+      } as Trabajadera
+
+      const plan: TramoSlot[] = [
+        { dentro: [0, 1, 2, 3, 4] }, // Todos dentro
+      ]
+
+      const ordenado = ordenarDentroFisico(trabajadera, plan)
+      const fisico = ordenado[0].dentroFisico!
+
+      // Verificar que NADIE esté fuera de posición
+      const fueraDePosicion = fisico.filter((ci, posIdx) => {
+        if (ci === null) return false
+        const rol = getRol(trabajadera, ci)
+        const rolReq = estructura[posIdx]
+        return rol.pri !== rolReq && rol.sec !== rolReq
+      })
+
+      expect(fueraDePosicion).toHaveLength(0)
+    })
   })
 })
