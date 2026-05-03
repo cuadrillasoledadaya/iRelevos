@@ -1,39 +1,39 @@
 // ══════════════════════════════════════════════════════════════════
-// ESTADO GLOBAL — Contexto Multi-Paso (Supabase Proyectos)
+// ESTADO GLOBAL — Hook combinado de stores Zustand (Phase 7.3)
+// Ya no usa React Context. Los stores son singletons accesibles
+// directamente. Este hook solo combina estado + acciones para
+// compatibilidad con consumidores existentes.
 // ══════════════════════════════════════════════════════════════════
 'use client'
 
-import React, {
-  createContext, useCallback, useContext,
-  useEffect, useState,
-} from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type {
   ActivePage, ActiveSheet,
   CellTarget, CensusTarget, DatosPerfil, PasoDB,
-  PinState, RolCode, SwapState, Trabajadera, Temporada
+  PinState, RolCode, SwapState, Trabajadera, Temporada,
 } from '@/lib/types'
 
 export type { ActivePage, ActiveSheet, PasoDB, DatosPerfil, Trabajadera, RolCode, PinState, SwapState, CellTarget, CensusTarget, Temporada }
+
 import {
-  calcularCiclo, completarAuto, analizar,
-  datosVacios, tramosOptimos,
-  getPinned, validarPinned, aplicarSugerencias,
-  isGenericTramo, migrarDatos,
+  completarAuto, tramosOptimos, validarPinned,
 } from '@/lib/algoritmos'
-import {
-  defaultRoles, ordenarDentroFisico,
-} from '@/lib/roles'
+import { ordenarDentroFisico } from '@/lib/roles'
 import { useAuth } from './useAuth'
 import { supabase } from '@/lib/supabase'
+import {
+  uiStore, projectStore, temporadaStore,
+  trabajaderaStore, planStore, bancoStore,
+} from '@/stores'
 
-// ── Contexto ───────────────────────────────────────────────────────
+// ── Contexto (compatibilidad de tipos) ─────────────────────────────
 
 export interface EstadoCtx {
   // Datos
-  pasos: PasoDB[]      // Lista de proyectos desde Supabase
-  pid: string       // ID del proyecto activo
+  pasos: PasoDB[]
+  pid: string
   setPid: (id: string) => void
-  S: DatosPerfil    // El estado del paso actual
+  S: DatosPerfil
   nombrePaso: string
   nombreCuadrilla: string
 
@@ -50,19 +50,19 @@ export interface EstadoCtx {
 
   // Swap (Capataz)
   swapSel: Partial<SwapState> | null
-  setSwapSel: React.Dispatch<React.SetStateAction<Partial<SwapState> | null>>
+  setSwapSel: (sel: Partial<SwapState> | null) => void
 
   // Celda (Plan)
   cellTarget: CellTarget | null
-  setCellTarget: React.Dispatch<React.SetStateAction<CellTarget | null>>
+  setCellTarget: (t: CellTarget | null) => void
 
   // Banco / sugerencia
   bancoTarget: { tid: number; ti: number } | null
-  setBancoTarget: React.Dispatch<React.SetStateAction<{ tid: number; ti: number } | null>>
+  setBancoTarget: (t: { tid: number; ti: number } | null) => void
 
   // Censo selector
   censusTarget: CensusTarget | null
-  setCensusTarget: React.Dispatch<React.SetStateAction<CensusTarget | null>>
+  setCensusTarget: (t: CensusTarget | null) => void
 
   // Accordion abierto en equipo
   openEqs: Set<number>
@@ -127,63 +127,34 @@ export interface EstadoCtx {
   refetchPasos: () => Promise<void>
 }
 
-const EstadoContext = createContext<EstadoCtx | null>(null)
-
-const LS_PID = 'cpwa_active_paso_id'
-const LS_TEMA = 'cpwa_tema'
 const LS_TID = 'cpwa_active_temp_id'
-const LS_PAGE = 'cpwa_active_page'
 
-// ── Provider ───────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// INICIALIZACIÓN DE LA APP — Se debe llamar UNA VEZ en el layout
+// ══════════════════════════════════════════════════════════════════
 
-export function EstadoProvider({ children }: { children: React.ReactNode }) {
-  const [pasos, setPasos] = useState<PasoDB[]>([])
-  const [pid, setPid] = useState<string>('')
-  const [activePage, setActivePage] = useState<ActivePage>('home')
-  
-  // 1. Cargar página guardada al inicio
-  useEffect(() => {
-    const saved = localStorage.getItem(LS_PAGE) as ActivePage
-    if (saved && ['home', 'config', 'equipo', 'plan', 'capataz', 'carga', 'admin'].includes(saved)) {
-      setActivePage(saved)
-    }
-  }, [])
-
-  // 2. Guardar página cuando cambie
-  useEffect(() => {
-    localStorage.setItem(LS_PAGE, activePage)
-  }, [activePage])
-  const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null)
-  const [tema, setTema] = useState<'dark' | 'light'>('light')
-  const [swapSel, setSwapSel] = useState<Partial<SwapState> | null>(null)
-  const [cellTarget, setCellTarget] = useState<CellTarget | null>(null)
-  const [bancoTarget, setBancoTarget] = useState<{ tid: number; ti: number } | null>(null)
-  const [censusTarget, setCensusTarget] = useState<CensusTarget | null>(null)
-  const [openEqs, setOpenEqs] = useState<Set<number>>(new Set([1]))
-  const [censusHeights, setCensusHeights] = useState<Record<string, number>>({})
-  const [temporadas, setTemporadas] = useState<Temporada[]>([])
-  const [activeTemporadaId, setActiveTemporadaId] = useState<string>('')
+export function useAppInit() {
   const { user, loading: authLoading } = useAuth()
 
-  // 1. Cargar lista de proyectos de Supabase
+  // 1. Cargar temporadas de Supabase
   useEffect(() => {
     if (authLoading) return
 
     async function init() {
-      // 1. Cargar Temporadas
       const { data: temps, error: tErr } = await supabase
         .from('temporadas')
         .select('*')
         .order('created_at', { ascending: false })
-      
-      if (!tErr && temps && temps.length > 0) {
-        setTemporadas(temps)
-        const savedTid = localStorage.getItem(LS_TID)
-        const currentTemp = (savedTid && temps.find(t => t.id === savedTid)) || temps.find(t => t.activa) || temps[0]
-        setActiveTemporadaId(currentTemp.id)
-      }
 
-      // 2. Cargar Proyectos (será gestionado por el useEffect de activeTemporadaId)
+      if (!tErr && temps && temps.length > 0) {
+        temporadaStore.getState().setTemporadas(temps)
+        const savedTid = localStorage.getItem(LS_TID)
+        const currentTemp =
+          (savedTid && temps.find((t: Temporada) => t.id === savedTid)) ||
+          temps.find((t: Temporada) => t.activa) ||
+          temps[0]
+        temporadaStore.getState().setActiveTemporadaId(currentTemp.id)
+      }
     }
 
     init()
@@ -200,60 +171,83 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, authLoading])
 
-  // Cargar proyectos cuando cambie la temporada
-  const refetchPasos = useCallback(async () => {
-    if (!activeTemporadaId) return
-    const { data, error } = await supabase
-      .from('proyectos')
-      .select('id, nombre_paso, nombre_cuadrilla, num_trabajaderas, content, created_at, temporada_id')
-      .eq('temporada_id', activeTemporadaId)
-      .order('created_at', { ascending: false })
-
-    if (!error && data) {
-      setPasos(data)
-      if (data.length > 0) {
-        const savedPid = localStorage.getItem(LS_PID)
-        if (savedPid && data.some(p => p.id === savedPid)) {
-          setPid(savedPid)
-        } else {
-          setPid(data[0].id)
-        }
-      } else {
-        setPid('')
-      }
+  // 2. Sincronizar activeTemporadaId entre stores y disparar refetch
+  const activeTemporadaId = temporadaStore((s) => s.activeTemporadaId)
+  useEffect(() => {
+    if (activeTemporadaId) {
+      projectStore.getState().setActiveTemporadaId(activeTemporadaId)
+      projectStore.getState().refetchPasos()
+      localStorage.setItem(LS_TID, activeTemporadaId)
     }
   }, [activeTemporadaId])
 
-  useEffect(() => {
-    refetchPasos()
-    if (activeTemporadaId) localStorage.setItem(LS_TID, activeTemporadaId)
-  }, [activeTemporadaId, refetchPasos])
-
-  // Aplicar tema
+  // Aplicar tema al DOM
+  const tema = uiStore((s) => s.tema)
   useEffect(() => {
     if (typeof document === 'undefined') return
     document.documentElement.classList.toggle('light', tema === 'light')
-    localStorage.setItem(LS_TEMA, tema)
   }, [tema])
+}
 
-  // Guardar PID actual
-  useEffect(() => {
-    if (pid) localStorage.setItem(LS_PID, pid)
-  }, [pid])
+// ══════════════════════════════════════════════════════════════════
+// USE ESTADO — Hook combinado (sin Context)
+// ══════════════════════════════════════════════════════════════════
 
-  // Cargar alturas del censo para este proyecto y temporada
+export function useEstado(): EstadoCtx {
+  // ── Estado de stores (Zustand selectors) ────────────────────────
+
+  const activePage = uiStore((s) => s.activePage)
+  const setActivePage = useCallback((p: ActivePage) => uiStore.getState().setActivePage(p), [])
+
+  const activeSheet = uiStore((s) => s.activeSheet)
+  const openSheet = useCallback((s: ActiveSheet) => uiStore.getState().openSheet(s), [])
+  const closeSheet = useCallback(() => uiStore.getState().closeSheet(), [])
+
+  const tema = uiStore((s) => s.tema)
+  const toggleTema = useCallback(() => uiStore.getState().toggleTema(), [])
+
+  const swapSel = uiStore((s) => s.swapSel)
+  const setSwapSel = useCallback((sel: Partial<SwapState> | null) => uiStore.getState().setSwapSel(sel), [])
+
+  const cellTarget = uiStore((s) => s.cellTarget)
+  const setCellTarget = useCallback((t: CellTarget | null) => uiStore.getState().setCellTarget(t), [])
+
+  const bancoTarget = uiStore((s) => s.bancoTarget)
+  const setBancoTarget = useCallback((t: { tid: number; ti: number } | null) => uiStore.getState().setBancoTarget(t), [])
+
+  const censusTarget = uiStore((s) => s.censusTarget)
+  const setCensusTarget = useCallback((t: CensusTarget | null) => uiStore.getState().setCensusTarget(t), [])
+
+  const openEqs = uiStore((s) => s.openEqs)
+  const toggleEq = useCallback((id: number) => uiStore.getState().toggleEq(id), [])
+
+  const pasos = projectStore((s) => s.pasos)
+  const pid = projectStore((s) => s.pid)
+  const setPid = useCallback((id: string) => projectStore.getState().setPid(id), [])
+  const S = projectStore((s) => s.S)
+  const nombrePaso = projectStore((s) => s.nombrePaso)
+  const nombreCuadrilla = projectStore((s) => s.nombreCuadrilla)
+  const refetchPasos = useCallback(async () => projectStore.getState().refetchPasos(), [])
+
+  const temporadas = temporadaStore((s) => s.temporadas)
+  const activeTemporadaId = temporadaStore((s) => s.activeTemporadaId)
+  const setActiveTemporadaId = useCallback((id: string) => temporadaStore.getState().setActiveTemporadaId(id), [])
+
+  // ── Census heights (local state, no store) ──────────────────────
+
+  const [censusHeights, setCensusHeights] = useState<Record<string, number>>({})
+
   useEffect(() => {
     if (!activeTemporadaId) return
     const fetchHeights = async () => {
-      // Nota: Aquí filtramos por temporada_id para asegurar que cogemos la altura del censo de este año
       const { data } = await supabase
         .from('census')
         .select('nombre, apellidos, apodo, altura')
         .eq('temporada_id', activeTemporadaId)
-      
+
       if (data) {
         const map: Record<string, number> = {}
-        data.forEach(c => {
+        data.forEach((c: { nombre: string; apellidos: string; apodo?: string; altura?: number }) => {
           if (c.altura) {
             const fullName = `${c.nombre} ${c.apellidos}`.trim()
             map[fullName] = c.altura
@@ -266,483 +260,228 @@ export function EstadoProvider({ children }: { children: React.ReactNode }) {
     fetchHeights()
   }, [pid, activeTemporadaId])
 
-  // Helper para guardar cambios en la nube
-  const saveCloud = useCallback(async (content: DatosPerfil, targetPid: string) => {
-    if (!user || !targetPid) return
-    await supabase
-      .from('proyectos')
-      .update({ content })
-      .eq('id', targetPid)
-  }, [user])
-
-  // Datos del paso activo
-  const pasoActual = pasos.find(p => p.id === pid)
-  const rawContent = pasoActual?.content ? JSON.parse(JSON.stringify(pasoActual.content)) as DatosPerfil : datosVacios()
-  const S: DatosPerfil = migrarDatos(rawContent)
-  const nombrePaso = pasoActual?.nombre_paso ?? 'Sin Paso'
-  const nombreCuadrilla = pasoActual?.nombre_cuadrilla ?? 'Sin Cuadrilla'
-  
-  // ── Mutación con persistencia ──────────────────────────────────
-  
-  const mutar = useCallback((fn: (draft: DatosPerfil) => void): void => {
-    if (!pid) return
-    setPasos(prev => {
-      const nextPasos = [...prev]
-      const idx = nextPasos.findIndex(p => p.id === pid)
-      if (idx === -1) return prev
-
-      const draft = JSON.parse(JSON.stringify(nextPasos[idx].content)) as DatosPerfil
-      fn(draft)
-      nextPasos[idx] = { ...nextPasos[idx], content: draft }
-      
-      // Persistencia asíncrona
-      saveCloud(draft, pid)
-      return nextPasos
-    })
-  }, [pid, saveCloud])
-
-  const getTrab = useCallback((d: DatosPerfil, tid: number): Trabajadera => {
-    return d.trabajaderas.find(t => t.id === tid)!
-  }, [])
-
-  // ── Implementación de Mutaciones ───────────────────────────────
-
-  const completarPlan = useCallback((tid: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      const res = completarAuto(t)
-      if ('error' in res) return
-      ordenarDentroFisico(t, res.plan)
-      t.plan = res.plan; t.obj = res.obj; t.analisis = res.analisis
-    })
-  }, [mutar, getTrab])
+  // ── Trabajadera actions ─────────────────────────────────────────
 
   const setNombre = useCallback((tid: number, i: number, nombre: string) => {
-    mutar(d => { getTrab(d, tid).nombres[i] = nombre })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().setNombre(tid, i, nombre)
+  }, [])
 
   const addCost = useCallback((tid: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      t.nombres.push(`Costalero ${t.nombres.length + 1}`)
-      if (!t.roles) t.roles = defaultRoles(t.nombres.length - 1, tid)
-      t.roles.push({ pri: 'COR', sec: 'FIJ' })
-      t.plan = null; t.obj = null; t.analisis = null; t.pinned = null
-    })
-    setOpenEqs(prev => new Set(prev).add(tid))
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().addCost(tid)
+    uiStore.getState().openEq(tid)
+  }, [])
 
   const delCost = useCallback((tid: number, i: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      const bajas = t.bajas ?? []
-      t.nombres.splice(i, 1)
-      t.roles?.splice(i, 1)
-      t.bajas = bajas.filter(b => b !== i).map(b => b > i ? b - 1 : b)
-      t.plan = null; t.obj = null; t.analisis = null; t.pinned = null
-    })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().delCost(tid, i)
+  }, [])
 
   const toggleBaja = useCallback((tid: number, i: number): boolean => {
-    let ok = true
-    mutar(d => {
-      const t = getTrab(d, tid)
-      if (!t.bajas) t.bajas = []
-      const idx = t.bajas.indexOf(i)
-      if (idx >= 0) {
-        t.bajas.splice(idx, 1)
-      } else {
-        const activos = t.nombres.length - t.bajas.length
-        if (activos <= 6) { ok = false; return }
-        t.bajas.push(i)
-      }
-      t.plan = null; t.obj = null; t.analisis = null; t.pinned = null
-    })
-    return ok
-  }, [mutar, getTrab])
+    return trabajaderaStore.getState().toggleBaja(tid, i)
+  }, [])
 
   const setRolPri = useCallback((tid: number, i: number, rol: string) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      if (!t.roles[i]) t.roles[i] = { pri: 'COR', sec: 'FIJ' }
-      t.roles[i].pri = rol as RolCode
-      if (t.roles[i].sec === rol) t.roles[i].sec = 'COR'
-      
-      // Invalida caché de posiciones y análisis
-      if (t.plan) t.plan.forEach(slot => { delete slot.dentroFisico })
-      t.analisis = null
-    })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().setRolPri(tid, i, rol)
+  }, [])
 
   const setRolSec = useCallback((tid: number, i: number, rol: string) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      if (!t.roles[i]) t.roles[i] = { pri: 'COR', sec: 'FIJ' }
-      t.roles[i].sec = rol as RolCode
-
-      // Invalida caché de posiciones y análisis
-      if (t.plan) t.plan.forEach(slot => { delete slot.dentroFisico })
-      t.analisis = null
-    })
-  }, [mutar, getTrab])
-
-  const setPuntuacion = useCallback((tid: number, nombre: string, pts: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      if (!t.puntuaciones) t.puntuaciones = {}
-      t.puntuaciones[nombre] = pts
-    })
-  }, [mutar, getTrab])
-
-  const addCostUltimo = useCallback((tid: number, nombre: string, roles: string[]) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      const nuevoIdx = t.nombres.length
-      t.nombres.push(nombre)
-      t.roles.push({ pri: roles[0] as RolCode, sec: (roles[1] || 'COR') as RolCode })
-      
-      if (t.plan) {
-        t.plan.forEach(slot => { slot.fuera.push(nuevoIdx) })
-      }
-      if (t.pinned) {
-        t.pinned.forEach(row => row.push('L'))
-      }
-      t.obj = null; t.analisis = null
-    })
-    setTimeout(() => completarPlan(tid), 50)
-  }, [mutar, getTrab, completarPlan])
+    trabajaderaStore.getState().setRolSec(tid, i, rol)
+  }, [])
 
   const toggleRegla5 = useCallback((tid: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      t.regla5costaleros = !t.regla5costaleros
-      t.plan = null; t.obj = null; t.analisis = null; t.pinned = null
-    })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().toggleRegla5(tid)
+  }, [])
 
   const addTrab = useCallback(() => {
-    mutar(d => {
-      const nextId = d.trabajaderas.length + 1
-      d.trabajaderas.push({
-        id: nextId, nombres: ['Costalero 1', 'Costalero 2', 'Costalero 3', 'Costalero 4', 'Costalero 5', 'Costalero 6'],
-        salidas: 2, roles: defaultRoles(6, nextId), tramos: [`Tramo 1 (T${nextId})`, `Tramo 2 (T${nextId})`, `Tramo 3 (T${nextId})`],
-        plan: null, obj: null, analisis: null, pinned: null, bajas: [], regla5costaleros: false,
-        puntuaciones: {}, tramosClaves: [],
-      })
-    })
-  }, [mutar])
+    trabajaderaStore.getState().addTrab()
+  }, [])
+
+  const setPuntuacion = useCallback((tid: number, nombre: string, pts: number) => {
+    trabajaderaStore.getState().setPuntuacion(tid, nombre, pts)
+  }, [])
+
+  const addCostUltimo = useCallback((tid: number, nombre: string, roles: string[]) => {
+    trabajaderaStore.getState().addCostUltimo(tid, nombre, roles)
+    setTimeout(() => completarPlan(tid), 50)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const setNombreTramo = useCallback((tid: number, ti: number, nombre: string) => {
-    mutar(d => { getTrab(d, tid).tramos[ti] = nombre })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().setNombreTramo(tid, ti, nombre)
+  }, [])
 
   const addTramo = useCallback((tid: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      t.tramos.push(`Tramo ${t.tramos.length + 1} (T${tid})`)
-      t.plan = null; t.obj = null; t.analisis = null; t.pinned = null
-    })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().addTramo(tid)
+  }, [])
 
   const delTramo = useCallback((tid: number, ti: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      t.tramos.splice(ti, 1)
-      t.plan = null; t.obj = null; t.analisis = null; t.pinned = null
-    })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().delTramo(tid, ti)
+  }, [])
 
   const setSalidas = useCallback((tid: number, salidas: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      t.salidas = salidas
-      t.plan = null; t.obj = null; t.analisis = null; t.pinned = null
-    })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().setSalidas(tid, salidas)
+  }, [])
 
   const usarBanco = useCallback((tid: number, ti: number, nombre: string) => {
-    mutar(d => { getTrab(d, tid).tramos[ti] = nombre })
-  }, [mutar, getTrab])
-
-  const tramosOptimosFor = useCallback((tid: number, salidas?: number): number => {
-    const t = S.trabajaderas.find(x => x.id === tid)!
-    const nActivos = t.nombres.length - (t.bajas?.length ?? 0)
-    return tramosOptimos(nActivos, salidas ?? t.salidas ?? 2)
-  }, [S])
+    trabajaderaStore.getState().usarBanco(tid, ti, nombre)
+  }, [])
 
   const sugerirTramos = useCallback((tid: number, targetSalidas?: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      if (targetSalidas !== undefined) t.salidas = targetSalidas
-      const nActivos = t.nombres.length - (t.bajas?.length ?? 0)
-      const nOpt = tramosOptimos(nActivos, t.salidas ?? 2)
-      const actual = t.tramos.length
-      if (actual < nOpt) {
-        for (let i = actual; i < nOpt; i++) t.tramos.push(`Tramo ${i + 1} (T${tid})`)
-      } else if (actual > nOpt) {
-        t.tramos = t.tramos.slice(0, nOpt)
-      }
-      t.plan = null; t.obj = null; t.analisis = null; t.pinned = null
-    })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().sugerirTramos(tid, targetSalidas)
+  }, [])
 
   const toggleTramoClave = useCallback((tid: number, ti: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      if (!t.tramosClaves) t.tramosClaves = []
-      const idx = t.tramosClaves.indexOf(ti)
-      if (idx >= 0) t.tramosClaves.splice(idx, 1)
-      else t.tramosClaves.push(ti)
-      t.tramosClaves.sort((a, b) => a - b)
-    })
-  }, [mutar, getTrab])
+    trabajaderaStore.getState().toggleTramoClave(tid, ti)
+  }, [])
 
   const sugerirYCalcular = useCallback((tid: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      try {
-        aplicarSugerencias(t)
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err)
-        alert(msg)
-      }
-    })
+    trabajaderaStore.getState().sugerirYCalcular(tid)
     setTimeout(() => completarPlan(tid), 50)
-  }, [mutar, getTrab, completarPlan])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Plan helpers ────────────────────────────────────────────────
+
+  const completarPlan = useCallback((tid: number) => {
+    const state = projectStore.getState()
+    const t = state.S.trabajaderas.find((x: Trabajadera) => x.id === tid)
+    if (!t) return
+    const res = completarAuto(t)
+    if ('error' in res) return
+    ordenarDentroFisico(t, res.plan)
+    // Actualizar directamente en el store
+    projectStore.setState((prev) => {
+      const nextS = { ...prev.S }
+      const idx = nextS.trabajaderas.findIndex((x: Trabajadera) => x.id === tid)
+      if (idx >= 0) {
+        nextS.trabajaderas[idx] = { ...nextS.trabajaderas[idx] }
+        nextS.trabajaderas[idx].plan = res.plan
+        nextS.trabajaderas[idx].obj = res.obj
+        nextS.trabajaderas[idx].analisis = res.analisis
+      }
+      return { S: nextS }
+    })
+  }, [])
+
+  const tramosOptimosFor = useCallback((tid: number, salidas?: number): number => {
+    const state = projectStore.getState()
+    const t = state.S.trabajaderas.find((x: Trabajadera) => x.id === tid)
+    if (!t) return 1
+    const nActivos = t.nombres.length - (t.bajas?.length ?? 0)
+    return tramosOptimos(nActivos, salidas ?? t.salidas ?? 2)
+  }, [])
+
+  // ── Banco actions ───────────────────────────────────────────────
 
   const addBanco = useCallback((nombre: string) => {
-    mutar(d => { d.banco.push(nombre) })
-  }, [mutar])
+    bancoStore.getState().addBanco(nombre)
+  }, [])
 
   const delBanco = useCallback((i: number) => {
-    mutar(d => { d.banco.splice(i, 1) })
-  }, [mutar])
-
-  const calcularTrab = useCallback((tid: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      const { plan, objetivo } = calcularCiclo(t)
-      ordenarDentroFisico(t, plan)
-      t.plan = plan
-      t.obj = objetivo
-      t.analisis = analizar(plan, t.nombres.length, objetivo, t)
-      t.pinned = null
-    })
-  }, [mutar, getTrab])
-
-  const calcularTodo = useCallback(() => {
-    mutar(d => {
-      d.trabajaderas.forEach(t => {
-        const { plan, objetivo } = calcularCiclo(t)
-        ordenarDentroFisico(t, plan)
-        t.plan = plan; t.obj = objetivo
-        t.analisis = analizar(plan, t.nombres.length, objetivo, t)
-        t.pinned = null
-      })
-    })
-  }, [mutar])
-
-  const quitarBloqueos = useCallback((tid: number) => {
-    mutar(d => { getTrab(d, tid).pinned = null })
-  }, [mutar, getTrab])
-
-  const limpiarPlan = useCallback((tid: number) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      t.plan = null; t.obj = null; t.analisis = null
-    })
-  }, [mutar, getTrab])
-
-  const setPinned = useCallback((tid: number, ti: number, ci: number, v: PinState) => {
-    mutar(d => {
-      const t = getTrab(d, tid)
-      const p = getPinned(t)
-      p[ti][ci] = v
-      t.pinned = p
-    })
-  }, [mutar, getTrab])
-
-  const getErroresPinned = useCallback((tid: number): string[] => {
-    const t = S.trabajaderas.find(x => x.id === tid)
-    if (!t) return []
-    return validarPinned(t)
-  }, [S])
-
-  const confirmarSwap = useCallback((ws: SwapState) => {
-    mutar(d => {
-      const { a, ambosD, nuevoDentroF, nuevoFuera } = ws
-      const t = getTrab(d, a.tid)
-      const r = t.plan![a.ti]
-      if (r) {
-        r.dentroFisico = [...nuevoDentroF]
-        r.dentro = nuevoDentroF.filter((x): x is number => x !== null)
-        if (!ambosD) {
-          r.fuera = [...nuevoFuera]
-        }
-        // Recalcular objetivo basado en el plan actual post-swap
-        const nuevoObj: Record<number, number> = {}
-        for (let i = 0; i < t.nombres.length; i++) nuevoObj[i] = 0
-        t.plan!.forEach(tramo => tramo.fuera.forEach(ci => { nuevoObj[ci]++ }))
-        t.obj = nuevoObj
-        t.analisis = analizar(t.plan!, t.nombres.length, nuevoObj, t)
-      }
-    })
-    setSwapSel(null)
-  }, [mutar, getTrab])
-
-  const limpiarPlanificacion = useCallback(() => {
-    mutar(d => {
-      d.trabajaderas.forEach(t => {
-        t.plan = null
-        t.analisis = null
-        t.obj = null
-      })
-    })
-  }, [mutar])
-
-  const limpiarTrabajaderas = useCallback(() => {
-    mutar(d => {
-      d.trabajaderas.forEach(t => {
-        t.nombres = t.nombres.map((_, i) => `Costalero ${i + 1}`)
-        t.bajas = []
-        t.plan = null
-        t.analisis = null
-        t.obj = null
-        t.puntuaciones = {}
-      })
-    })
-  }, [mutar])
+    bancoStore.getState().delBanco(i)
+  }, [])
 
   const limpiarBanco = useCallback(() => {
-    mutar(d => {
-      d.banco = []
-    })
-  }, [mutar])
+    bancoStore.getState().limpiarBanco()
+  }, [])
+
+  // ── Plan actions ────────────────────────────────────────────────
+
+  const calcularTrab = useCallback((tid: number) => {
+    planStore.getState().calcularTrab(tid)
+  }, [])
+
+  const calcularTodo = useCallback(() => {
+    planStore.getState().calcularTodo()
+  }, [])
+
+  const quitarBloqueos = useCallback((tid: number) => {
+    planStore.getState().quitarBloqueos(tid)
+  }, [])
+
+  const limpiarPlan = useCallback((tid: number) => {
+    planStore.getState().limpiarPlan(tid)
+  }, [])
+
+  const setPinned = useCallback((tid: number, ti: number, ci: number, v: PinState) => {
+    planStore.getState().setPinned(tid, ti, ci, v)
+  }, [])
+
+  const getErroresPinned = useCallback((tid: number): string[] => {
+    const state = projectStore.getState()
+    const t = state.S.trabajaderas.find((x: Trabajadera) => x.id === tid)
+    if (!t) return []
+    return validarPinned(t)
+  }, [])
+
+  const confirmarSwap = useCallback((ws: SwapState) => {
+    planStore.getState().confirmarSwap(ws)
+    uiStore.getState().setSwapSel(null)
+  }, [])
+
+  const limpiarPlanificacion = useCallback(() => {
+    planStore.getState().limpiarPlanificacion()
+  }, [])
+
+  const limpiarTrabajaderas = useCallback(() => {
+    planStore.getState().limpiarTrabajaderas()
+  }, [])
+
+  const resetTodo = useCallback(() => {
+    planStore.getState().resetTodo()
+  }, [])
+
+  // ── Planes de Relevos ───────────────────────────────────────────
+
+  const addPlan = useCallback((nombre: string, tramos?: string[]) => {
+    planStore.getState().addPlan(nombre, tramos)
+  }, [])
+
+  const updatePlan = useCallback((id: string, nombre: string) => {
+    planStore.getState().updatePlan(id, nombre)
+  }, [])
+
+  const delPlan = useCallback((id: string) => {
+    planStore.getState().delPlan(id)
+  }, [])
+
+  const cargarPlanEnTrabajadera = useCallback((tid: number, planId: string) => {
+    planStore.getState().cargarPlanEnTrabajadera(tid, planId)
+  }, [])
 
   const vaciarCenso = useCallback(async () => {
-    if (!pid) return
+    const currentPid = projectStore.getState().pid
+    if (!currentPid) return
     const { error } = await supabase
       .from('census')
       .delete()
-      .eq('proyecto_id', pid)
-    
+      .eq('proyecto_id', currentPid)
+
     if (error) {
       console.error('Error al vaciar censo:', error.message)
       alert('Error al vaciar el censo: ' + error.message)
     } else {
       alert('Censo vaciado correctamente.')
     }
-  }, [pid])
-
-  const resetTodo = useCallback(() => {
-    mutar(d => {
-      d.trabajaderas = [{
-        id: 1, nombres: ['Costalero 1', 'Costalero 2', 'Costalero 3', 'Costalero 4', 'Costalero 5', 'Costalero 6'],
-        salidas: 2, roles: defaultRoles(6, 1), tramos: [`Tramo 1 (T1)`, `Tramo 2 (T1)`, `Tramo 3 (T1)`],
-        plan: null, obj: null, analisis: null, pinned: null, bajas: [], regla5costaleros: false,
-        puntuaciones: {}, tramosClaves: [],
-      }]
-      d.banco = []
-    })
-  }, [mutar])
-
-  // ── Planes de Relevos ──────────────────────────────────────────
-
-  const addPlan = useCallback((nombre: string, tramos?: string[]) => {
-    mutar(d => {
-      if (!d.planes) d.planes = []
-      d.planes.push({
-        id: `plan_${Date.now()}`,
-        nombre: nombre || 'Nuevo plan',
-        tramos: tramos || [],
-      })
-    })
-  }, [mutar])
-
-  const updatePlan = useCallback((id: string, nombre: string) => {
-    mutar(d => {
-      if (!d.planes) d.planes = []
-      const plan = d.planes.find(p => p.id === id)
-      if (plan) plan.nombre = nombre
-    })
-  }, [mutar])
-
-  const delPlan = useCallback((id: string) => {
-    mutar(d => {
-      if (!d.planes) d.planes = []
-      d.planes = d.planes.filter(p => p.id !== id)
-    })
-  }, [mutar])
-
-  const cargarPlanEnTrabajadera = useCallback((tid: number, planId: string) => {
-    mutar(d => {
-      if (!d.planes) d.planes = []
-      const plan = d.planes.find(p => p.id === planId)
-      if (!plan) return
-      const t = d.trabajaderas.find(x => x.id === tid)
-      if (!t) return
-
-      // Confirmar si hay tramos personalizados
-      const tieneTramosCustom = t.tramos.some(nombre => !isGenericTramo(nombre))
-      if (tieneTramosCustom) {
-        if (!confirm('Esta trabajadera ya tiene tramos personalizados. ¿Sobrescribir con el plan seleccionado?')) return
-      }
-
-      t.tramos = [...plan.tramos]
-      t.plan = null
-      t.obj = null
-      t.analisis = null
-      t.pinned = null
-    })
-  }, [mutar])
-
-  const toggleEq = useCallback((id: number) => {
-    setOpenEqs(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
   }, [])
 
-  const openSheet = useCallback((s: ActiveSheet) => setActiveSheet(s), [])
-  const closeSheet = useCallback(() => setActiveSheet(null), [])
-  const toggleTema = useCallback(() => setTema(t => t === 'dark' ? 'light' : 'dark'), [])
-
-  return (
-    <EstadoContext.Provider value={{
-      pasos, pid, setPid, S, nombrePaso, nombreCuadrilla,
-      activePage, setActivePage,
-      activeSheet, openSheet, closeSheet,
-      tema, toggleTema,
-      swapSel, setSwapSel,
-      cellTarget, setCellTarget,
-      bancoTarget, setBancoTarget,
-      censusTarget, setCensusTarget,
-      openEqs, toggleEq,
-      setNombre, addCost, delCost, toggleBaja, setRolPri, setRolSec, toggleRegla5, addTrab, setPuntuacion, addCostUltimo,
-      setNombreTramo, addTramo, delTramo, setSalidas, usarBanco, tramosOptimosFor, sugerirTramos, toggleTramoClave, sugerirYCalcular,
-      addBanco, delBanco,
-      calcularTodo, calcularTrab, completarPlan, limpiarPlan, quitarBloqueos, setPinned, getErroresPinned,
-      confirmarSwap,
-      limpiarPlanificacion,
-      limpiarTrabajaderas,
-      limpiarBanco,
-      vaciarCenso,
-      resetTodo,
-      addPlan,
-      updatePlan,
-      delPlan,
-      cargarPlanEnTrabajadera,
-      censusHeights,
-      temporadas, activeTemporadaId, setActiveTemporadaId, refetchPasos
-    }}>
-      {children}
-    </EstadoContext.Provider>
-  )
-}
-
-export function useEstado(): EstadoCtx {
-  const ctx = useContext(EstadoContext)
-  if (!ctx) throw new Error('useEstado must be used within EstadoProvider')
-  return ctx
+  return {
+    pasos, pid, setPid, S, nombrePaso, nombreCuadrilla,
+    activePage, setActivePage,
+    activeSheet, openSheet, closeSheet,
+    tema, toggleTema,
+    swapSel, setSwapSel,
+    cellTarget, setCellTarget,
+    bancoTarget, setBancoTarget,
+    censusTarget, setCensusTarget,
+    openEqs, toggleEq,
+    setNombre, addCost, delCost, toggleBaja, setRolPri, setRolSec, toggleRegla5, addTrab, setPuntuacion, addCostUltimo,
+    setNombreTramo, addTramo, delTramo, setSalidas, usarBanco, tramosOptimosFor, sugerirTramos, toggleTramoClave, sugerirYCalcular,
+    addBanco, delBanco,
+    calcularTodo, calcularTrab, completarPlan, limpiarPlan, quitarBloqueos, setPinned, getErroresPinned,
+    confirmarSwap,
+    limpiarPlanificacion, limpiarTrabajaderas, limpiarBanco, vaciarCenso, resetTodo,
+    addPlan, updatePlan, delPlan, cargarPlanEnTrabajadera,
+    censusHeights,
+    temporadas, activeTemporadaId, setActiveTemporadaId, refetchPasos,
+  }
 }

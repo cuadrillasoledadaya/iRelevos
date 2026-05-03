@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Cinzel, Lato } from 'next/font/google'
 import './globals.css'
-import { EstadoProvider } from '@/hooks/useEstado'
 import { AuthProvider } from '@/hooks/useAuth'
+import { AppInitializer } from '@/components/AppInitializer'
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -47,9 +47,9 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className={`${cinzel.variable} ${lato.variable}`}>
         <AuthProvider>
-          <EstadoProvider>
+          <AppInitializer>
             {children}
-          </EstadoProvider>
+          </AppInitializer>
         </AuthProvider>
       </body>
     </html>
