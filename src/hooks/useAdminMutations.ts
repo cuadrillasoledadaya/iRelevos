@@ -472,7 +472,12 @@ export function useAdminMutations(
   const fetchFromICuadrilla = useCallback(async (defaultPid: string) => {
     setImportLoading(true)
     try {
-      const res = await fetch('/api/import-costaleros')
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/import-costaleros', {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+      })
       const data = await res.json()
 
       if (!res.ok) {
@@ -554,7 +559,12 @@ export function useAdminMutations(
 
     setSaving(true)
     try {
-      const res = await fetch('/api/import-costaleros')
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/import-costaleros', {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+      })
       const remoteData: ImportEntry[] = await res.json()
       const remoteIds = new Set(remoteData.map(r => r.external_id))
 

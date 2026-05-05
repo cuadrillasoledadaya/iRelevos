@@ -1,6 +1,43 @@
 import { NextResponse } from 'next/server'
+import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 
-export async function GET() {
+/**
+ * GET /api/import-costaleros
+ *
+ * Obtiene costaleros desde la API externa de iCuadrilla.
+ * Requiere autenticación y rol de admin (superadmin/capataz/auxiliar).
+ */
+export async function GET(request: Request) {
+  // ── Auth ─────────────────────────────────────────────────────────
+  const authHeader = request.headers.get('Authorization')
+  const token = authHeader?.replace('Bearer ', '')
+
+  if (!token) {
+    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+  }
+
+  const admin = getSupabaseAdmin()
+
+  const { data: userData, error: userError } = await admin.auth.getUser(token)
+  if (userError || !userData.user) {
+    return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
+  }
+
+  const { data: requesterProfile } = await admin
+    .from('profiles')
+    .select('role')
+    .eq('id', userData.user.id)
+    .single()
+
+  const rol = requesterProfile?.role
+  if (rol !== 'superadmin' && rol !== 'capataz' && rol !== 'auxiliar') {
+    return NextResponse.json(
+      { error: 'Solo admins pueden importar costaleros' },
+      { status: 403 }
+    )
+  }
+
+  // ── Fetch iCuadrilla ─────────────────────────────────────────────
   const apiUrl = process.env.ICUADRILLA_API_URL
   const apiToken = process.env.ICUADRILLA_API_TOKEN
 
