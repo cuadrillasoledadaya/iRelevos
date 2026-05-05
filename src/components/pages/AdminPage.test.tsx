@@ -3,11 +3,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import AdminPage from './AdminPage'
 import { useEstado, EstadoCtx } from '../../hooks/useEstado'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
 
+vi.mock('../../hooks/useAuth')
 vi.mock('../../hooks/useEstado')
-vi.mock('../../hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: '123' }, loading: false })
-}))
 
 describe('AdminPage - Seasons Deletion', () => {
   const mockSetActiveTemporadaId = vi.fn()
@@ -15,7 +14,13 @@ describe('AdminPage - Seasons Deletion', () => {
   
   beforeEach(() => {
     vi.clearAllMocks()
-    
+
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: '123' },
+      profile: { role: 'superadmin' },
+      loading: false,
+    } as ReturnType<typeof useAuth>)
+
     const mockEstado = {
       pid: 'p1',
       activeTemporadaId: 't1',
@@ -87,6 +92,18 @@ describe('AdminPage - Seasons Deletion', () => {
     
     vi.stubGlobal('confirm', vi.fn(() => true))
     vi.stubGlobal('alert', vi.fn())
+  })
+
+  it('should deny access to non-admin users', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: '456' },
+      profile: { role: 'costalero' },
+      loading: false,
+    } as ReturnType<typeof useAuth>)
+
+    render(<AdminPage />)
+    expect(screen.getByText('Acceso Denegado')).toBeInTheDocument()
+    expect(screen.getByText(/No tenés permisos/)).toBeInTheDocument()
   })
 
   it('should show a delete button for each season', async () => {

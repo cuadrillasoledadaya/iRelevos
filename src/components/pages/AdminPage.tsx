@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useEstado } from '@/hooks/useEstado'
 import { useAdminData } from '@/hooks/useAdminData'
 import { useAdminMutations } from '@/hooks/useAdminMutations'
+import { useAuth } from '@/hooks/useAuth'
 
 import UsuariosTab from '@/components/admin/UsuariosTab'
 import CensoTab from '@/components/admin/CensoTab'
@@ -108,6 +109,28 @@ export default function AdminPage() {
   const handleCrearTemporada = useCallback(() => {
     m.crearTemporada(m.newTemp, () => window.location.reload())
   }, [m])
+
+  // ── Verificación de permisos ─────────────────────────────────────
+  const { profile } = useAuth()
+  const esAdmin =
+    profile?.role === 'superadmin' ||
+    profile?.role === 'capataz' ||
+    profile?.role === 'auxiliar'
+
+  if (!esAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[var(--bg)] p-4">
+        <div className="text-center">
+          <h2 className="text-2xl font-black cinzel text-red-500 uppercase tracking-widest mb-2">
+            Acceso Denegado
+          </h2>
+          <p className="text-[var(--crema)] text-sm">
+            No tenés permisos para acceder al panel de administración.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   // ═════════════════════════════════════════════════════════════════
   // RENDER
