@@ -104,7 +104,11 @@ export function createTrabajaderaStore(
     setRolPri: (tid, i, rol) => {
       mutar(d => {
         const t = getTrabFn(d, tid)
-        if (!t.roles[i]) t.roles[i] = { pri: 'COR', sec: 'FIJ' }
+        // Asegurar que roles tenga la misma longitud que nombres (evita arrays sparse)
+        if (!t.roles) t.roles = []
+        while (t.roles.length < t.nombres.length) {
+          t.roles.push({ pri: 'COR', sec: 'FIJ' })
+        }
         t.roles[i].pri = rol as RolCode
         if (t.roles[i].sec === rol) t.roles[i].sec = 'COR'
         if (t.plan) t.plan.forEach(slot => {
@@ -117,7 +121,11 @@ export function createTrabajaderaStore(
     setRolSec: (tid, i, rol) => {
       mutar(d => {
         const t = getTrabFn(d, tid)
-        if (!t.roles[i]) t.roles[i] = { pri: 'COR', sec: 'FIJ' }
+        // Asegurar que roles tenga la misma longitud que nombres (evita arrays sparse)
+        if (!t.roles) t.roles = []
+        while (t.roles.length < t.nombres.length) {
+          t.roles.push({ pri: 'COR', sec: 'FIJ' })
+        }
         t.roles[i].sec = rol as RolCode
         if (t.plan) t.plan.forEach(slot => {
           delete slot.dentroFisico

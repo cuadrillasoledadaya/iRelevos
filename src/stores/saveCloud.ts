@@ -15,6 +15,13 @@ const pending = new Map<string, DatosPerfil>()
  *
  * No-op si no hay usuario autenticado, no hay pid, o el usuario
  * no es el dueño del proyecto.
+ *
+ * MIGRACIÓN SQL (si no está hecha):
+ *   ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+ *   DROP POLICY IF EXISTS "solo_owner_update" ON proyectos;
+ *   DROP POLICY IF EXISTS "solo_owner_delete" ON proyectos;
+ *   CREATE POLICY "solo_owner_update" ON proyectos FOR UPDATE USING (auth.uid() = user_id);
+ *   CREATE POLICY "solo_owner_delete" ON proyectos FOR DELETE USING (auth.uid() = user_id);
  */
 export function saveCloud(
   content: DatosPerfil,

@@ -52,8 +52,29 @@ export function useAdminMutations(
 
   const eliminarUsuario = useCallback(async (uid: string) => {
     if (!confirm('¿Seguro que quieres eliminar este perfil activo? Perderá el acceso.')) return
-    const { error } = await supabase.from('profiles').delete().eq('id', uid)
-    if (!error) setUsuarios(prev => prev.filter(u => u.id !== uid))
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      alert('No estás autenticado')
+      return
+    }
+
+    const res = await fetch('/api/admin/delete-user', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ uid }),
+    })
+
+    if (!res.ok) {
+      const data = (await res.json()) as { error?: string }
+      alert('Error al eliminar: ' + (data.error ?? 'desconocido'))
+      return
+    }
+
+    setUsuarios(prev => prev.filter(u => u.id !== uid))
   }, [setUsuarios])
 
   const cambiarRol = useCallback(async (uid: string, nuevoRol: UserRole) => {

@@ -45,8 +45,22 @@ export function migrarDatos(datos: DatosPerfil): DatosPerfil {
     if (!t.pinned) t.pinned = null
     if (!t.bajas) t.bajas = []
     if (!t.regla5costaleros) t.regla5costaleros = false
-    if (!t.roles || t.roles.length !== t.nombres.length) {
+    if (!t.roles) {
       t.roles = defaultRoles(t.nombres.length, t.id)
+    } else if (t.roles.length !== t.nombres.length) {
+      // Rellenar o truncar sin perder los roles existentes
+      while (t.roles.length < t.nombres.length) {
+        t.roles.push({ pri: 'COR', sec: 'FIJ' })
+      }
+      if (t.roles.length > t.nombres.length) {
+        t.roles = t.roles.slice(0, t.nombres.length)
+      }
+    }
+    // Sanitizar: rellenar huecos undefined (arrays sparse)
+    for (let i = 0; i < t.roles.length; i++) {
+      if (!t.roles[i]) {
+        t.roles[i] = { pri: 'COR', sec: 'FIJ' }
+      }
     }
     if (!t.puntuaciones) t.puntuaciones = {}
     if (!t.tramosClaves) t.tramosClaves = []
