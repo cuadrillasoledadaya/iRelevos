@@ -121,4 +121,6 @@ export interface PasoDB {
   content: DatosPerfil
   created_at: string
   temporada_id?: string
+  /** Owner del proyecto (auth.users.id). Requiere columna en Supabase. */
+  user_id?: string
 }

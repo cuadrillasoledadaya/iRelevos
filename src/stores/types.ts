@@ -135,7 +135,7 @@ export interface RootState extends UIState, ProjectState, TemporadaState {
 export interface RootActions
   extends UIActions, ProjectActions, TemporadaActions, TrabajaderaActions, PlanActions, BancoActions {
   mutar: (fn: (draft: DatosPerfil) => void) => void
-  saveCloud: (content: DatosPerfil, targetPid: string) => Promise<void>
+  saveCloud: (content: DatosPerfil, targetPid: string) => void
   vaciarCenso: () => Promise<void>
 }
 

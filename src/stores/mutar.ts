@@ -37,7 +37,7 @@ export function createMutar<
 >(
   set: (partial: Partial<State> | ((state: State) => Partial<State>)) => void,
   get: () => State,
-  saveCloud: (content: DatosPerfil, targetPid: string) => Promise<void>,
+  saveCloud: (content: DatosPerfil, targetPid: string) => void,
 ) {
   return (fn: (draft: DatosPerfil) => void): void => {
     const { pid } = get()

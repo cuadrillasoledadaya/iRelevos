@@ -61,94 +61,128 @@ export function rolDePosicion(t: Trabajadera, posIdx: number): RolCode {
   return estructuraPaso(t.id)[posIdx] ?? 'COR'
 }
 
+// Memoization cache para asignarRolesTramo
+const _asignarRolesCache = new Map<string, Map<number, RolCode>>()
+const MAX_PERMUTACIONES = 8 // >8! = 40320, usamos greedy
+
+/**
+ * Asigna roles óptimos a los costaleros dentro de un tramo.
+ *
+ * Complejidad:
+ *  - Para ≤8 candidatos: O(n!) fuerza bruta (n ≤ 8 → max 40,320 permutaciones)
+ *  - Para >8 candidatos: O(n²) greedy heurístico
+ *
+ * Memoiza por (tid, dentroIdxs) para evitar recálculos.
+ */
 export function asignarRolesTramo(
   t: Trabajadera,
   dentroIdxs: number[],
 ): Map<number, RolCode> {
   const estructura = estructuraPaso(t.id)
-  const nPuestos = estructura.length // Normalmente 5
+  const nPuestos = estructura.length
   const asignados = new Map<number, RolCode>()
-  
+
   if (dentroIdxs.length === 0) return asignados
 
-  // Solo optimizamos los primeros nPuestos (normalmente 5)
-  // Si hay más gente dentro (sobrecarga), el resto irá como 'COR' al final.
+  // Memoization: evitar recalcular para el mismo (tid, dentroIdxs)
+  const cacheKey = `${t.id}|${dentroIdxs.join(',')}`
+  const cached = _asignarRolesCache.get(cacheKey)
+  if (cached) return new Map(cached)
+
   const candidatos = dentroIdxs.slice(0, nPuestos)
   const extras = dentroIdxs.slice(nPuestos)
 
-  // Generar todas las permutaciones de candidatos para los puestos
-  // Como n es pequeño (max 5-6), podemos permitirnos un enfoque de búsqueda exhaustiva
-  // o una heurística fuerte. Para 5 costaleros, 5! = 120 combinaciones.
-  
-  let mejorPuntuacion = -1
+  let elMejorMapeo: Map<number, RolCode> | null = null
 
-  /**
-   * Calcula la puntuación de una permutación.
-   * Prioridad:
-   *  1. CERO personas fuera de posición (ni pri ni sec)
-   *  2. Maximizar personas en posición PRINCIPAL
-   *  3. Maximizar personas en posición SECUNDARIA
-   * 
-   * Estrategia multi-objetivo con pesos escalonados:
-   *  - Principal: +100
-   *  - Secundaria: +50
-   *  - Fuera de posición (ni pri ni sec): -1000
-   */
-  function calcularPuntuacion(permutacion: number[]): number {
-    let score = 0
-    for (let i = 0; i < permutacion.length; i++) {
-      const ci = permutacion[i]
-      const rolNecesario = estructura[i]
-      const rolesCostalero = getRol(t, ci)
-      
-      if (rolesCostalero.pri === rolNecesario) {
-        score += 100
-      } else if (rolesCostalero.sec === rolNecesario) {
-        score += 50
-      } else {
-        score -= 1000 // FUERA DE POSICIÓN - penalización masiva
-      }
-    }
-    return score
-  }
+  if (candidatos.length <= MAX_PERMUTACIONES) {
+    // ── FUERZA BRUTA ─────────────────────────────────────────────
+    let mejorPuntuacion = -Infinity
 
-  function permutate(arr: number[], m: number[] = []): Map<number, RolCode> | null {
-    if (arr.length === 0) {
-      const score = calcularPuntuacion(m)
-      if (score > mejorPuntuacion) {
-        mejorPuntuacion = score
-        // Guardamos los roles resultantes para CADA costalero en su orden original
-        const mapping = new Map<number, RolCode>()
-        for (let i = 0; i < m.length; i++) {
-          mapping.set(m[i], estructura[i])
+    const calcularPuntuacion = (permutacion: number[]): number => {
+      let score = 0
+      for (let i = 0; i < permutacion.length; i++) {
+        const ci = permutacion[i]
+        const rolNecesario = estructura[i]
+        const rolesCostalero = getRol(t, ci)
+
+        if (rolesCostalero.pri === rolNecesario) {
+          score += 100
+        } else if (rolesCostalero.sec === rolNecesario) {
+          score += 50
+        } else {
+          score -= 1000
         }
-        // Aplicar el mapeo al orden de dentroIdxs
-        return mapping
       }
-      return null
+      return score
     }
 
-    let localMejorMapping: Map<number, RolCode> | null = null
-    for (let i = 0; i < arr.length; i++) {
-      const curr = arr.slice()
-      const next = curr.splice(i, 1)
-      const res = permutate(curr, m.concat(next))
-      if (res) localMejorMapping = res
+    const permutate = (arr: number[], m: number[] = []): Map<number, RolCode> | null => {
+      if (arr.length === 0) {
+        const score = calcularPuntuacion(m)
+        if (score > mejorPuntuacion) {
+          mejorPuntuacion = score
+          const mapping = new Map<number, RolCode>()
+          for (let i = 0; i < m.length; i++) {
+            mapping.set(m[i], estructura[i])
+          }
+          return mapping
+        }
+        return null
+      }
+
+      let localMejorMapping: Map<number, RolCode> | null = null
+      for (let i = 0; i < arr.length; i++) {
+        const curr = arr.slice()
+        const next = curr.splice(i, 1)
+        const res = permutate(curr, m.concat(next))
+        if (res) localMejorMapping = res
+      }
+      return localMejorMapping
     }
-    return localMejorMapping
+
+    elMejorMapeo = permutate(candidatos)
+  } else {
+    // ── GREEDY HEURÍSTICO ────────────────────────────────────────
+    // Para cada posición, elegir el costalero no usado con mejor score.
+    const usados = new Set<number>()
+    elMejorMapeo = new Map<number, RolCode>()
+
+    for (let pos = 0; pos < estructura.length; pos++) {
+      const rolNecesario = estructura[pos]
+      let mejorCi = -1
+      let mejorScore = -Infinity
+
+      for (const ci of candidatos) {
+        if (usados.has(ci)) continue
+        const r = getRol(t, ci)
+        let score = 0
+        if (r.pri === rolNecesario) score = 100
+        else if (r.sec === rolNecesario) score = 50
+        else score = -1000
+
+        if (score > mejorScore) {
+          mejorScore = score
+          mejorCi = ci
+        }
+      }
+
+      if (mejorCi !== -1) {
+        elMejorMapeo.set(mejorCi, rolNecesario)
+        usados.add(mejorCi)
+      }
+    }
   }
 
-  const elMejorMapeo = permutate(candidatos)
-  
   if (elMejorMapeo) {
     elMejorMapeo.forEach((rol, ci) => asignados.set(ci, rol))
   }
 
-  // Asignar COR a los extras
   extras.forEach(ci => {
     if (!asignados.has(ci)) asignados.set(ci, 'COR')
   })
 
+  // Guardar en cache (copia defensiva)
+  _asignarRolesCache.set(cacheKey, new Map(asignados))
   return asignados
 }
 

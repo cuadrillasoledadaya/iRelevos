@@ -290,6 +290,7 @@ describe('roles', () => {
       const fisico = ordenado[0].dentroFisico!
 
       // Verificar que NADIE esté fuera de posición
+      const estructura = estructuraPaso(trabajadera.id)
       const fueraDePosicion = fisico.filter((ci, posIdx) => {
         if (ci === null) return false
         const rol = getRol(trabajadera, ci)
