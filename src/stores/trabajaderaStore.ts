@@ -104,18 +104,16 @@ export function createTrabajaderaStore(
     setRolPri: (tid, i, rol) => {
       mutar(d => {
         const t = getTrabFn(d, tid)
-        // DEBUG
-        // eslint-disable-next-line no-console
-        console.log(`[DEBUG setRolPri] tid=${tid} i=${i} rol=${rol} nombresLen=${t.nombres.length} rolesLen=${t.roles?.length} roles[${i}]=`, t.roles?.[i])
-        // Asegurar que roles tenga la misma longitud que nombres (evita arrays sparse)
+        // Asegurar array roles: longitud correcta + sin nulls/undefineds
         if (!t.roles) t.roles = []
         while (t.roles.length < t.nombres.length) {
           t.roles.push({ pri: 'COR', sec: 'FIJ' })
         }
+        for (let j = 0; j < t.roles.length; j++) {
+          if (!t.roles[j]) t.roles[j] = { pri: 'COR', sec: 'FIJ' }
+        }
         t.roles[i].pri = rol as RolCode
         if (t.roles[i].sec === rol) t.roles[i].sec = 'COR'
-        // eslint-disable-next-line no-console
-        console.log(`[DEBUG setRolPri] AFTER roles[${i}]=`, t.roles[i])
         if (t.plan) t.plan.forEach(slot => {
           delete slot.dentroFisico
         })
@@ -126,10 +124,13 @@ export function createTrabajaderaStore(
     setRolSec: (tid, i, rol) => {
       mutar(d => {
         const t = getTrabFn(d, tid)
-        // Asegurar que roles tenga la misma longitud que nombres (evita arrays sparse)
+        // Asegurar array roles: longitud correcta + sin nulls/undefineds
         if (!t.roles) t.roles = []
         while (t.roles.length < t.nombres.length) {
           t.roles.push({ pri: 'COR', sec: 'FIJ' })
+        }
+        for (let j = 0; j < t.roles.length; j++) {
+          if (!t.roles[j]) t.roles[j] = { pri: 'COR', sec: 'FIJ' }
         }
         t.roles[i].sec = rol as RolCode
         if (t.plan) t.plan.forEach(slot => {
