@@ -7,7 +7,8 @@
 import { create } from 'zustand'
 import type { DatosPerfil, PasoDB } from '@/lib/types'
 import { supabase } from '@/lib/supabase'
-import { datosVacios, migrarDatos } from '@/lib/algoritmos'
+import { datosVacios } from '@/lib/algoritmos'
+import { deriveFromPasos } from './helpers'
 
 // ── Estado ────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ export interface ProjectStoreState {
   nombrePaso: string
   nombreCuadrilla: string
   S: DatosPerfil
+  censusHeights: Record<string, number>
 }
 
 export interface ProjectStoreActions {
@@ -25,6 +27,8 @@ export interface ProjectStoreActions {
   setPasos: (pasos: PasoDB[]) => void
   setActiveTemporadaId: (id: string) => void
   refetchPasos: () => Promise<void>
+  fetchCensusHeights: () => Promise<void>
+  vaciarCenso: () => Promise<void>
 }
 
 export type ProjectStore = ProjectStoreState & ProjectStoreActions
@@ -32,27 +36,6 @@ export type ProjectStore = ProjectStoreState & ProjectStoreActions
 // ── Helpers ───────────────────────────────────────────────────────
 
 const LS_PID = 'cpwa_active_paso_id'
-
-/**
- * Deriva las propiedades computadas del proyecto activo.
- */
-function deriveFromPasos(pasos: PasoDB[], pid: string): {
-  nombrePaso: string
-  nombreCuadrilla: string
-  S: DatosPerfil
-} {
-  const pasoActual = pasos.find(p => p.id === pid)
-  const rawContent = pasoActual?.content
-  const S: DatosPerfil = rawContent
-    ? migrarDatos(JSON.parse(JSON.stringify(rawContent)) as DatosPerfil)
-    : datosVacios()
-
-  return {
-    nombrePaso: pasoActual?.nombre_paso ?? 'Sin Paso',
-    nombreCuadrilla: pasoActual?.nombre_cuadrilla ?? 'Sin Cuadrilla',
-    S,
-  }
-}
 
 // ── Store ─────────────────────────────────────────────────────────
 
@@ -65,6 +48,7 @@ export const createProjectStore = () => create<ProjectStore>()((set, get) => ({
     nombrePaso: 'Sin Paso',
     nombreCuadrilla: 'Sin Cuadrilla',
     S: datosVacios(),
+    censusHeights: {},
 
     // ── Acciones ──
 
@@ -115,6 +99,45 @@ export const createProjectStore = () => create<ProjectStore>()((set, get) => ({
 
       if (!error && data) {
         get().setPasos(data as PasoDB[])
+      }
+    },
+
+    fetchCensusHeights: async () => {
+      const { activeTemporadaId } = get()
+      if (!activeTemporadaId) return
+
+      const { data } = await supabase
+        .from('census')
+        .select('nombre, apellidos, apodo, altura')
+        .eq('temporada_id', activeTemporadaId)
+
+      if (data) {
+        const map: Record<string, number> = {}
+        data.forEach((c: { nombre: string; apellidos: string; apodo?: string; altura?: number }) => {
+          if (c.altura) {
+            const fullName = `${c.nombre} ${c.apellidos}`.trim()
+            map[fullName] = c.altura
+            if (c.apodo) map[c.apodo.trim()] = c.altura
+          }
+        })
+        set({ censusHeights: map })
+      }
+    },
+
+    vaciarCenso: async () => {
+      const { pid } = get()
+      if (!pid) return
+
+      const { error } = await supabase
+        .from('census')
+        .delete()
+        .eq('proyecto_id', pid)
+
+      if (error) {
+        console.error('Error al vaciar censo:', error.message)
+        alert('Error al vaciar el censo: ' + error.message)
+      } else {
+        alert('Censo vaciado correctamente.')
       }
     },
   }))

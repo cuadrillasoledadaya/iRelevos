@@ -64,6 +64,7 @@ describe('projectStore', () => {
       nombrePaso: 'Sin Paso',
       nombreCuadrilla: 'Sin Cuadrilla',
       S: datosVacios(),
+      censusHeights: {},
     })
   })
 
@@ -191,6 +192,103 @@ describe('projectStore', () => {
     it('no debería hacer nada si no hay activeTemporadaId', async () => {
       const store = projectStore
       await store.getState().refetchPasos()
+      expect(supabase.from).not.toHaveBeenCalled()
+    })
+  })
+
+  // ── censusHeights ───────────────────────────────────────────────
+
+  describe('censusHeights', () => {
+    it('debería inicializar censusHeights como objeto vacío', () => {
+      expect(projectStore.getState().censusHeights).toEqual({})
+    })
+  })
+
+  // ── fetchCensusHeights ──────────────────────────────────────────
+
+  describe('fetchCensusHeights', () => {
+    it('debería llamar a supabase con activeTemporadaId', async () => {
+      const mockCensusData = [
+        { nombre: 'Juan', apellidos: 'Pérez', apodo: 'Juani', altura: 180 },
+        { nombre: 'María', apellidos: 'López', apodo: null, altura: 165 },
+      ]
+
+      const mockChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          data: mockCensusData,
+          error: null,
+        }),
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(supabase.from).mockReturnValue(mockChain as any)
+
+      projectStore.setState({ activeTemporadaId: 'temp-1' })
+      await projectStore.getState().fetchCensusHeights()
+
+      expect(supabase.from).toHaveBeenCalledWith('census')
+      const heights = projectStore.getState().censusHeights
+      expect(heights['Juan Pérez']).toBe(180)
+      expect(heights['Juani']).toBe(180)
+      expect(heights['María López']).toBe(165)
+    })
+
+    it('debería ignorar entries sin altura', async () => {
+      const mockCensusData = [
+        { nombre: 'Juan', apellidos: 'Pérez', apodo: null, altura: null },
+      ]
+
+      const mockChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          data: mockCensusData,
+          error: null,
+        }),
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(supabase.from).mockReturnValue(mockChain as any)
+
+      projectStore.setState({ activeTemporadaId: 'temp-1' })
+      await projectStore.getState().fetchCensusHeights()
+
+      const heights = projectStore.getState().censusHeights
+      expect(Object.keys(heights)).toHaveLength(0)
+    })
+
+    it('no debería llamar a supabase si no hay activeTemporadaId', async () => {
+      projectStore.setState({ activeTemporadaId: '' })
+      await projectStore.getState().fetchCensusHeights()
+      expect(supabase.from).not.toHaveBeenCalled()
+    })
+  })
+
+  // ── vaciarCenso ─────────────────────────────────────────────────
+
+  describe('vaciarCenso', () => {
+    it('debería llamar a supabase delete con el pid actual', async () => {
+      const mockChain = {
+        delete: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          error: null,
+        }),
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(supabase.from).mockReturnValue(mockChain as any)
+
+      projectStore.setState({ pid: 'proj-1' })
+      await projectStore.getState().vaciarCenso()
+
+      expect(supabase.from).toHaveBeenCalledWith('census')
+      expect(mockChain.delete).toHaveBeenCalled()
+      expect(mockChain.eq).toHaveBeenCalledWith('proyecto_id', 'proj-1')
+    })
+
+    it('no debería hacer nada si no hay pid', async () => {
+      projectStore.setState({ pid: '' })
+      await projectStore.getState().vaciarCenso()
       expect(supabase.from).not.toHaveBeenCalled()
     })
   })

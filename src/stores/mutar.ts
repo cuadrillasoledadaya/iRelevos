@@ -4,28 +4,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import type { DatosPerfil, PasoDB } from '@/lib/types'
-import { datosVacios, migrarDatos } from '@/lib/algoritmos'
-
-/**
- * Deriva las propiedades computadas del proyecto activo.
- */
-function deriveFromPasos(pasos: PasoDB[], pid: string): {
-  nombrePaso: string
-  nombreCuadrilla: string
-  S: DatosPerfil
-} {
-  const pasoActual = pasos.find(p => p.id === pid)
-  const rawContent = pasoActual?.content
-  const S: DatosPerfil = rawContent
-    ? migrarDatos(JSON.parse(JSON.stringify(rawContent)) as DatosPerfil)
-    : datosVacios()
-
-  return {
-    nombrePaso: pasoActual?.nombre_paso ?? 'Sin Paso',
-    nombreCuadrilla: pasoActual?.nombre_cuadrilla ?? 'Sin Cuadrilla',
-    S,
-  }
-}
+import { deriveFromPasos } from './helpers'
 
 /**
  * Crea la función mutar que opera sobre el store Zustand.
