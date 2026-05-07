@@ -32,14 +32,16 @@ export interface TrabajaderaStore {
 
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void
 type GetTrabFn = (d: DatosPerfil, tid: number) => Trabajadera
+type CompletarPlanFn = (tid: number) => void
 
 /**
- * Crea el store de trabajadera. Recibe mutar() y getTrab() como
- * dependencias inyectadas (provistas por el root store).
+ * Crea el store de trabajadera. Recibe mutar(), getTrab() y
+ * completarPlan() como dependencias inyectadas.
  */
 export function createTrabajaderaStore(
   mutar: MutarFn,
   getTrabFn: GetTrabFn,
+  completarPlan: CompletarPlanFn,
 ) {
   return create<TrabajaderaStore>()(() => ({
     // ── Costaleros ───────────────────────────────────────────────
@@ -207,6 +209,7 @@ export function createTrabajaderaStore(
         t.obj = null
         t.analisis = null
       })
+      completarPlan(tid)
     },
 
     // ── Tramos ───────────────────────────────────────────────────
@@ -301,6 +304,7 @@ export function createTrabajaderaStore(
           if (typeof alert !== 'undefined') alert(msg)
         }
       })
+      completarPlan(tid)
     },
   }))
 }

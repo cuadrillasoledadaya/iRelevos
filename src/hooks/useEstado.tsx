@@ -35,16 +35,7 @@ export function useEstado(): EstadoCtx {
   useEffect(() => { if (activeTemporadaId) projectStore.getState().fetchCensusHeights() }, [pid, activeTemporadaId])
 
   const addCost = useCallback((tid: number) => { trabajaderaStore.getState().addCost(tid); uiStore.getState().openEq(tid) }, [])
-  const completarPlan = useCallback((tid: number) => { planStore.getState().completarPlan(tid) }, [])
   const confirmarSwap = useCallback((ws: SwapState) => { planStore.getState().confirmarSwap(ws); uiStore.getState().setSwapSel(null) }, [])
-  const addCostUltimo = useCallback((tid: number, nombre: string, roles: string[]) => {
-    trabajaderaStore.getState().addCostUltimo(tid, nombre, roles); setTimeout(() => completarPlan(tid), 50)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const sugerirYCalcular = useCallback((tid: number) => {
-    trabajaderaStore.getState().sugerirYCalcular(tid); setTimeout(() => completarPlan(tid), 50)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
   const tramosOptimosFor = useCallback((tid: number, salidas?: number): number => {
     const t = getTrab(projectStore.getState().S, tid); return tramosOptimosForTrab(t, salidas)
   }, [])
@@ -67,16 +58,18 @@ export function useEstado(): EstadoCtx {
     toggleBaja: trabajaderaStore.getState().toggleBaja,
     setRolPri: trabajaderaStore.getState().setRolPri, setRolSec: trabajaderaStore.getState().setRolSec,
     toggleRegla5: trabajaderaStore.getState().toggleRegla5, addTrab: trabajaderaStore.getState().addTrab,
-    setPuntuacion: trabajaderaStore.getState().setPuntuacion, addCostUltimo,
+    setPuntuacion: trabajaderaStore.getState().setPuntuacion,
+    addCostUltimo: trabajaderaStore.getState().addCostUltimo,
     setNombreTramo: trabajaderaStore.getState().setNombreTramo, addTramo: trabajaderaStore.getState().addTramo,
     delTramo: trabajaderaStore.getState().delTramo, setSalidas: trabajaderaStore.getState().setSalidas,
     usarBanco: trabajaderaStore.getState().usarBanco, tramosOptimosFor,
     sugerirTramos: trabajaderaStore.getState().sugerirTramos,
-    toggleTramoClave: trabajaderaStore.getState().toggleTramoClave, sugerirYCalcular,
+    toggleTramoClave: trabajaderaStore.getState().toggleTramoClave,
+    sugerirYCalcular: trabajaderaStore.getState().sugerirYCalcular,
     addBanco: bancoStore.getState().addBanco, delBanco: bancoStore.getState().delBanco,
     limpiarBanco: bancoStore.getState().limpiarBanco,
     calcularTodo: planStore.getState().calcularTodo, calcularTrab: planStore.getState().calcularTrab,
-    completarPlan, limpiarPlan: planStore.getState().limpiarPlan,
+    completarPlan: planStore.getState().completarPlan, limpiarPlan: planStore.getState().limpiarPlan,
     quitarBloqueos: planStore.getState().quitarBloqueos,
     setPinned: planStore.getState().setPinned, getErroresPinned: planStore.getState().getErroresPinned, confirmarSwap,
     limpiarPlanificacion: planStore.getState().limpiarPlanificacion,

@@ -23,8 +23,8 @@ const mutar = createMutar(
   saveCloud,
 )
 
-export const trabajaderaStore = createTrabajaderaStore(mutar, getTrab)
 export const planStore = createPlanStore(mutar, getTrab, () => projectStore.getState().S)
+export const trabajaderaStore = createTrabajaderaStore(mutar, getTrab, (tid) => planStore.getState().completarPlan(tid))
 export const bancoStore = createBancoStore(mutar)
 
 // ── Re-exportar stores standalone ─────────────────────────────────

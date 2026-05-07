@@ -60,7 +60,7 @@ function createTestEnv() {
     () => {}, // no-op saveCloud
   )
 
-  const trabajaderaStore = createTrabajaderaStore(mutar, getTrab)
+  const trabajaderaStore = createTrabajaderaStore(mutar, getTrab, () => {})
 
   return { projectStore, trabajaderaStore }
 }

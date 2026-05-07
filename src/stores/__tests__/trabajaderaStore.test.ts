@@ -2,7 +2,7 @@
 // TESTS — trabajaderaStore.ts (Strict TDD — Phase 4.2 written FIRST)
 // ══════════════════════════════════════════════════════════════════
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { create } from 'zustand'
 import { createTrabajaderaStore } from '../trabajaderaStore'
 import { getTrab } from '../helpers'
@@ -76,7 +76,7 @@ function createTestEnv(initialContent?: DatosPerfil) {
     })
   }
 
-  const store = createTrabajaderaStore(mutar, getTrab)
+  const store = createTrabajaderaStore(mutar, getTrab, vi.fn())
 
   return { store, pasosStore, getContent: () => pasosStore.getState().pasos[0].content }
 }
