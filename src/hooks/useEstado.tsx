@@ -7,7 +7,6 @@
 
 import { useCallback, useEffect } from 'react'
 import type { SwapState } from '@/lib/types'
-import { validarPinned } from '@/lib/algoritmos'
 import { getTrab, tramosOptimosForTrab } from '@/stores/helpers'
 import { uiStore, projectStore, temporadaStore, trabajaderaStore, planStore, bancoStore } from '@/stores'
 import type { EstadoCtx } from './useEstadoTypes'
@@ -49,9 +48,6 @@ export function useEstado(): EstadoCtx {
   const tramosOptimosFor = useCallback((tid: number, salidas?: number): number => {
     const t = getTrab(projectStore.getState().S, tid); return tramosOptimosForTrab(t, salidas)
   }, [])
-  const getErroresPinned = useCallback((tid: number): string[] => {
-    const t = getTrab(projectStore.getState().S, tid); return validarPinned(t)
-  }, [])
   const refetchPasos = useCallback(async () => projectStore.getState().refetchPasos(), [])
   const vaciarCenso = useCallback(async () => projectStore.getState().vaciarCenso(), [])
 
@@ -82,7 +78,7 @@ export function useEstado(): EstadoCtx {
     calcularTodo: planStore.getState().calcularTodo, calcularTrab: planStore.getState().calcularTrab,
     completarPlan, limpiarPlan: planStore.getState().limpiarPlan,
     quitarBloqueos: planStore.getState().quitarBloqueos,
-    setPinned: planStore.getState().setPinned, getErroresPinned, confirmarSwap,
+    setPinned: planStore.getState().setPinned, getErroresPinned: planStore.getState().getErroresPinned, confirmarSwap,
     limpiarPlanificacion: planStore.getState().limpiarPlanificacion,
     limpiarTrabajaderas: planStore.getState().limpiarTrabajaderas, resetTodo: planStore.getState().resetTodo,
     addPlan: planStore.getState().addPlan, updatePlan: planStore.getState().updatePlan,

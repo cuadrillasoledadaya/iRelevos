@@ -24,7 +24,7 @@ const mutar = createMutar(
 )
 
 export const trabajaderaStore = createTrabajaderaStore(mutar, getTrab)
-export const planStore = createPlanStore(mutar, getTrab)
+export const planStore = createPlanStore(mutar, getTrab, () => projectStore.getState().S)
 export const bancoStore = createBancoStore(mutar)
 
 // ── Re-exportar stores standalone ─────────────────────────────────

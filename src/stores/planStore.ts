@@ -5,7 +5,7 @@
 
 import { create } from 'zustand'
 import {
-  calcularCiclo, completarAuto, analizar, getPinned,
+  calcularCiclo, completarAuto, analizar, getPinned, validarPinned,
 } from '@/lib/algoritmos'
 import { ordenarDentroFisico } from '@/lib/roles'
 import type { DatosPerfil, PinState, SwapState, Trabajadera } from '@/lib/types'
@@ -30,8 +30,9 @@ export interface PlanStore {
 
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void
 type GetTrabFn = (d: DatosPerfil, tid: number) => Trabajadera
+type GetSFn = () => DatosPerfil
 
-export function createPlanStore(mutar: MutarFn, getTrabFn: GetTrabFn) {
+export function createPlanStore(mutar: MutarFn, getTrabFn: GetTrabFn, getS: GetSFn) {
   return create<PlanStore>()(() => ({
     calcularTodo: () => {
       mutar(d => {
@@ -94,11 +95,9 @@ export function createPlanStore(mutar: MutarFn, getTrabFn: GetTrabFn) {
       })
     },
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getErroresPinned: (_tid): string[] => {
-      // Esta función lee estado sin mutar — necesita acceso al S actual
-      // Se implementa como acción que recibe el state externo
-      return [] // Se sustituye en el proveedor con acceso a S
+    getErroresPinned: (tid): string[] => {
+      const t = getTrabFn(getS(), tid)
+      return validarPinned(t)
     },
 
     confirmarSwap: (ws) => {

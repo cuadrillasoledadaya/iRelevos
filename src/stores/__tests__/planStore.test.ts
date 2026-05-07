@@ -66,8 +66,9 @@ function createTestEnv(initialContent?: DatosPerfil) {
     })
   }
 
-  const store = createPlanStore(mutar, getTrab)
-  return { store, pasosStore, getContent: () => pasosStore.getState().pasos[0].content }
+  const getS = () => pasosStore.getState().pasos[0].content
+  const store = createPlanStore(mutar, getTrab, getS)
+  return { store, pasosStore, getContent: getS }
 }
 
 describe('planStore', () => {
@@ -151,12 +152,28 @@ describe('planStore', () => {
 
   // ── setPinned / getErroresPinned ──────────────────────────────
 
-  describe('setPinned', () => {
+  describe('setPinned / getErroresPinned', () => {
     it('debería fijar un costalero en una posición', () => {
       env.store.getState().calcularTrab(1) // necesita plan para pinned
       env.store.getState().setPinned(1, 0, 0, 'L')
       const t = env.getContent().trabajaderas[0]
       expect(t.pinned).not.toBeNull()
+    })
+
+    it('getErroresPinned debería validar pinned sin errores', () => {
+      env.store.getState().calcularTrab(1)
+      const errs = env.store.getState().getErroresPinned(1)
+      expect(errs).toEqual([])
+    })
+
+    it('getErroresPinned debería detectar demasiados fijados dentro', () => {
+      env.store.getState().calcularTrab(1)
+      // Fijar 6 costaleros dentro en un tramo (máx 5)
+      for (let ci = 0; ci < 6; ci++) {
+        env.store.getState().setPinned(1, 0, ci, 'D')
+      }
+      const errs = env.store.getState().getErroresPinned(1)
+      expect(errs.some(e => e.includes('fijados dentro'))).toBe(true)
     })
   })
 
