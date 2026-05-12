@@ -478,11 +478,13 @@ export function useAdminMutations(
           'Authorization': `Bearer ${session?.access_token ?? ''}`,
         },
       })
-      const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'Error desconocido al obtener datos')
+        const errorText = await res.text()
+        throw new Error(errorText || `Error ${res.status} al obtener datos`)
       }
+
+      const data = await res.json()
 
       const importEntries: ImportEntry[] = data
 
@@ -565,6 +567,12 @@ export function useAdminMutations(
           'Authorization': `Bearer ${session?.access_token ?? ''}`,
         },
       })
+
+      if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(errorText || `Error ${res.status} al sincronizar`)
+      }
+
       const remoteData: ImportEntry[] = await res.json()
       const remoteIds = new Set(remoteData.map(r => r.external_id))
 
