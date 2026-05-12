@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/import-costaleros
  *
@@ -8,47 +10,63 @@ import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
  * Requiere autenticación y rol de admin (superadmin/capataz/auxiliar).
  */
 export async function GET(request: Request) {
-  // ── Auth ─────────────────────────────────────────────────────────
-  const authHeader = request.headers.get('Authorization')
-  const token = authHeader?.replace('Bearer ', '')
-
-  if (!token) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
-  }
-
-  const admin = getSupabaseAdmin()
-
-  const { data: userData, error: userError } = await admin.auth.getUser(token)
-  if (userError || !userData.user) {
-    return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
-  }
-
-  const { data: requesterProfile } = await admin
-    .from('profiles')
-    .select('role')
-    .eq('id', userData.user.id)
-    .single()
-
-  const rol = requesterProfile?.role
-  if (rol !== 'superadmin' && rol !== 'capataz' && rol !== 'auxiliar') {
-    return NextResponse.json(
-      { error: 'Solo admins pueden importar costaleros' },
-      { status: 403 }
-    )
-  }
-
-  // ── Fetch iCuadrilla ─────────────────────────────────────────────
-  const apiUrl = process.env.ICUADRILLA_API_URL
-  const apiToken = process.env.ICUADRILLA_API_TOKEN
-
-  if (!apiUrl || !apiToken) {
-    return NextResponse.json(
-      { error: 'Faltan variables de entorno ICUADRILLA_API_URL o ICUADRILLA_API_TOKEN' },
-      { status: 500 }
-    )
-  }
-
   try {
+    // ── Auth ─────────────────────────────────────────────────────────
+    const authHeader = request.headers.get('Authorization')
+    const token = authHeader?.replace('Bearer ', '')
+
+    if (!token) {
+      console.error('[Import API] 401: No se recibió token en Authorization header')
+      return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    console.log('[Import API] Iniciando getSupabaseAdmin...')
+    const admin = getSupabaseAdmin()
+    console.log('[Import API] getSupabaseAdmin OK')
+
+    console.log('[Import API] Verificando token con admin.auth.getUser...')
+    const { data: userData, error: userError } = await admin.auth.getUser(token)
+    if (userError || !userData.user) {
+      console.error('[Import API] 401: Token inválido', userError?.message)
+      return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
+    }
+    console.log('[Import API] Token válido, userId:', userData.user.id)
+
+    console.log('[Import API] Consultando profiles...')
+    const { data: requesterProfile, error: profileError } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', userData.user.id)
+      .single()
+
+    if (profileError) {
+      console.error('[Import API] 500: Error al consultar profiles', profileError.message)
+      return NextResponse.json({ error: `Error DB profiles: ${profileError.message}` }, { status: 500 })
+    }
+
+    const rol = requesterProfile?.role
+    console.log('[Import API] Rol obtenido:', rol)
+    if (rol !== 'superadmin' && rol !== 'capataz' && rol !== 'auxiliar') {
+      console.error('[Import API] 403: Rol no autorizado:', rol)
+      return NextResponse.json(
+        { error: 'Solo admins pueden importar costaleros' },
+        { status: 403 }
+      )
+    }
+
+    // ── Fetch iCuadrilla ─────────────────────────────────────────────
+    const apiUrl = process.env.ICUADRILLA_API_URL
+    const apiToken = process.env.ICUADRILLA_API_TOKEN
+
+    if (!apiUrl || !apiToken) {
+      console.error('[Import API] 500: Faltan variables de entorno')
+      return NextResponse.json(
+        { error: 'Faltan variables de entorno ICUADRILLA_API_URL o ICUADRILLA_API_TOKEN' },
+        { status: 500 }
+      )
+    }
+
+    console.log('[Import API] Fetching iCuadrilla:', apiUrl)
     const res = await fetch(`${apiUrl}?select=*`, {
       headers: {
         'apikey': apiToken,
@@ -57,11 +75,13 @@ export async function GET(request: Request) {
       },
       cache: 'no-store',
     })
+    console.log('[Import API] iCuadrilla respondió status:', res.status)
 
     if (!res.ok) {
       const errorText = await res.text()
+      console.error('[Import API] iCuadrilla error body:', errorText.substring(0, 500))
       return NextResponse.json(
-        { error: `iCuadrilla API respondió con ${res.status}: ${errorText}` },
+        { error: `iCuadrilla API respondió con ${res.status}: ${errorText.substring(0, 200)}` },
         { status: res.status }
       )
     }
@@ -113,6 +133,9 @@ export async function GET(request: Request) {
 
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error desconocido'
+    const stack = err instanceof Error ? err.stack : ''
+    console.error('[Import API] 500: Error no controlado:', msg)
+    console.error('[Import API] Stack:', stack)
     return NextResponse.json(
       { error: `Error de conexión o procesamiento: ${msg}` },
       { status: 500 }
