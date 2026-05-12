@@ -1,6 +1,6 @@
 {
   "name": "relevos-app",
-  "version": "1.2.03",
+  "version": "1.2.05",
   "private": true,
   "scripts": {
     "dev": "next dev",
