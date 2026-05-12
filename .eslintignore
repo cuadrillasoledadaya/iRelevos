@@ -1,0 +1,4 @@
+**/*.test.ts
+**/*.test.tsx
+src/test/**
+src/hooks/__tests__/**
