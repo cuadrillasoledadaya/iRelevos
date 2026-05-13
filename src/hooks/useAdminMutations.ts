@@ -508,43 +508,46 @@ export function useAdminMutations(
   }, [importPid])
 
   const ejecutarImportacion = useCallback(async () => {
-    if (!importPid || !importPreview) return
+    if (!importPid) {
+      alert('Selecciona un paso para sincronizar.')
+      return
+    }
+    if (!importPreview) {
+      alert('Primero obtené el preview de iCuadrilla.')
+      return
+    }
     setSaving(true)
 
     try {
-      const aImportar = importPreview.filter(c => c.selected)
-      if (aImportar.length === 0) {
-        alert('No has seleccionado a nadie para importar.')
-        setSaving(false)
-        return
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/import-costaleros', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({ proyecto_id: importPid }),
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || `Error ${res.status}`)
       }
 
-      let nuevos = 0
-      let actualizados = 0
-
-      for (const costalero of aImportar) {
-        if (costalero._status === 'new') nuevos++
-        else actualizados++
-
-        await supabase.rpc('upsert_census_from_external', {
-          p_external_id: costalero.external_id,
-          p_nombre: costalero.nombre,
-          p_apellidos: costalero.apellidos,
-          p_apodo: costalero.apodo,
-          p_email: costalero.email,
-          p_trabajadera: costalero.trabajadera,
-          p_proyecto_id: importPid,
-          p_source: 'icuadrilla',
-        })
-      }
+      const result = await res.json()
 
       await syncTodoCenso(importPid)
       setImportPreview(null)
-      alert(`✅ Proceso finalizado:\n- ${nuevos} costaleros nuevos\n- ${actualizados} datos actualizados\n- Cuadrilla sincronizada.`)
+      alert(
+        `✅ Sincronización completa (full sync):\n` +
+        `- ${result.deleted ?? '?'} registros eliminados del censo local\n` +
+        `- ${result.inserted ?? '?'} costaleros importados desde iCuadrilla\n` +
+        `- Cuadrilla sincronizada.`
+      )
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err)
-      alert('❌ Error durante el proceso de importación.')
+      alert('❌ Error durante la sincronización: ' + (err instanceof Error ? err.message : 'desconocido'))
     } finally {
       setSaving(false)
       fetchCensus()
