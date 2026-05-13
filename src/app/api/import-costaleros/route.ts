@@ -19,6 +19,7 @@ interface ICuadrillaRaw {
   trabajadera?: number;
   fila?: number;
   altura?: number;
+  estado?: string;
 }
 
 interface NormalizedCostalero {
@@ -107,12 +108,15 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
   const data = await res.json()
   const raw: ICuadrillaRaw[] = Array.isArray(data) ? data : [data]
 
-  console.log(`[Import API] Recibidos ${raw.length} registros de iCuadrilla`)
-  if (raw.length > 0) {
-    console.log(`[Import API] Muestra del primero:`, JSON.stringify(raw[0]))
+  const activos = raw.filter((u) => u.estado !== 'baja')
+  const filtrados = raw.length - activos.length
+
+  console.log(`[Import API] Recibidos ${raw.length} registros de iCuadrilla — activos: ${activos.length}, filtrados (baja): ${filtrados}`)
+  if (activos.length > 0) {
+    console.log(`[Import API] Muestra del primero activo:`, JSON.stringify(activos[0]))
   }
 
-  return raw.map((u: ICuadrillaRaw) => {
+  return activos.map((u: ICuadrillaRaw) => {
     const cleanNombre = (u.nombre || u.first_name || u.name || 'Sin Nombre').trim()
     const cleanApellidos = (u.apellidos || u.last_name || u.surname || '').trim()
     const rawEmail = (u.email || u.correo || u.mail || '').toLowerCase().trim()
