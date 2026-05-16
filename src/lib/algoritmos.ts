@@ -91,7 +91,8 @@ export function objSalidas(
   
   // Caso especial: regla 5 aplicada a 5 costaleros
   if (aplicaRegla5 && total === 5) {
-    const totalAsignaciones = numTramos * salidas
+    // Cada costalero sale exactamente salidas veces → total * salidas asignaciones
+    const totalAsignaciones = total * salidas
     const base = Math.floor(totalAsignaciones / 5)
     const extras = totalAsignaciones % 5
     const obj: Record<number, number> = {}
@@ -156,25 +157,12 @@ export function calcularCiclo(t: Trabajadera): { plan: TramoSlot[], objetivo: Re
   return { plan, objetivo: obj }
 }
 
-export function tramosOptimos(total: number, salidas: number): number {
-  // Caso especial: regla 5 costaleros
-  if (total === 5) {
-    // Con regla 5, cada tramo tiene 1 fuera y 4 dentro
-    // Buscamos el mínimo número de tramos donde no se repite el costalero fuera
-    for (let n = 1; n <= 5; n++) {
-      const t: Trabajadera = {
-        id: 1, nombres: Array(5).fill(''), tramos: Array(n).fill(''),
-        salidas, roles: [], bajas: [], regla5costaleros: true,
-        plan: null, obj: null, analisis: null, pinned: null,
-        puntuaciones: {}, tramosClaves: [],
-      }
-      const { plan } = calcularCiclo(t)
-      if (!plan || !plan.every(s => s.dentro.length === 4)) continue
-      if (n === 1 || plan[0].fuera.filter(c => plan[n - 1].fuera.includes(c)).length === 0) {
-        return n
-      }
-    }
-    return 5 // fallback
+export function tramosOptimos(total: number, salidas: number, regla5costaleros?: boolean): number {
+  // Caso especial: regla 5 costaleros activa con exactamente 5 costaleros
+  if (regla5costaleros && total === 5) {
+    // Con regla5: 1 fuera por tramo, cada costalero sale salidas veces
+    // Total slots fuera necesarios = total * salidas = tramos necesarios
+    return total * salidas
   }
   
   const F = total - 5
