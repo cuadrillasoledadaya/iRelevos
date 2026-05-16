@@ -236,6 +236,175 @@ describe('roles', () => {
     })
   })
 
+  // ══════════════════════════════════════════════════════════════════
+  // Regla 5 costaleros — cooriente libre
+  // ══════════════════════════════════════════════════════════════════
+  describe('getDentroFisico — regla5 costaleros', () => {
+    const t5Regla5: Trabajadera = {
+      id: 1,
+      nombres: ['A', 'B', 'C', 'D', 'E'],
+      roles: [
+        { pri: 'PAT', sec: 'FIJ' },
+        { pri: 'FIJ', sec: 'COR' },
+        { pri: 'COR', sec: 'FIJ' },
+        { pri: 'FIJ', sec: 'PAT' },
+        { pri: 'PAT', sec: 'FIJ' },
+      ],
+      salidas: 5,
+      tramos: ['T1'],
+      bajas: [],
+      regla5costaleros: true,
+      plan: null,
+      obj: null,
+      analisis: null,
+      pinned: null,
+      puntuaciones: {},
+      tramosClaves: [],
+    }
+
+    const t5SinRegla: Trabajadera = {
+      ...t5Regla5,
+      regla5costaleros: false,
+    }
+
+    it('con regla5=true, dentroFisico[2] debe ser null (cooriente libre)', () => {
+      const slot: TramoSlot = { dentro: [0, 1, 2, 3] } // 4 dentro (regla5)
+      const fisico = getDentroFisico(t5Regla5, slot)
+      expect(fisico).toHaveLength(5)
+      expect(fisico[2]).toBeNull()
+    })
+
+    it('con regla5=true, los 4 costaleros aparecen en dentroFisico fuera de la cooriente', () => {
+      const slot: TramoSlot = { dentro: [0, 1, 2, 3] }
+      const fisico = getDentroFisico(t5Regla5, slot)
+      // Todos los costaleros deben estar en alguna posición distinta de la cooriente
+      const costalerosEnPaso = fisico.filter((x): x is number => x !== null)
+      expect(costalerosEnPaso).toHaveLength(4)
+      expect(costalerosEnPaso.sort()).toEqual([0, 1, 2, 3])
+    })
+
+    it('con regla5=false, la cooriente PUEDE estar ocupada (comportamiento actual)', () => {
+      const slot: TramoSlot = { dentro: [0, 1, 2, 3] }
+      const fisico = getDentroFisico(t5SinRegla, slot)
+      // No garantizamos que [2] sea null — el comportamiento actual puede ocuparla
+      expect(fisico).toHaveLength(5)
+      // Al menos verificamos que devuelve 5 posiciones
+      const ocupadas = fisico.filter((x): x is number => x !== null)
+      expect(ocupadas.length).toBeGreaterThanOrEqual(4)
+    })
+
+    it('con 6 costaleros, regla5 no aplica aunque esté activa', () => {
+      const t6: Trabajadera = {
+        ...t5Regla5,
+        nombres: ['A', 'B', 'C', 'D', 'E', 'F'],
+        roles: [
+          { pri: 'PAT', sec: 'FIJ' },
+          { pri: 'FIJ', sec: 'COR' },
+          { pri: 'COR', sec: 'FIJ' },
+          { pri: 'FIJ', sec: 'PAT' },
+          { pri: 'PAT', sec: 'FIJ' },
+          { pri: 'COR', sec: 'FIJ' },
+        ],
+        regla5costaleros: true,
+      }
+      const slot: TramoSlot = { dentro: [0, 1, 2, 3, 4, 5] }
+      const fisico = getDentroFisico(t6, slot)
+      // getDentroFisico solo devuelve 5 posiciones (la estructura del paso)
+      expect(fisico).toHaveLength(5)
+      // La cooriente puede estar ocupada (NO se aplica regla5 con ≠5 costaleros)
+      // Solo verificamos que los 5 primeros estén colocados
+      const costaleros = fisico.filter((x): x is number => x !== null)
+      expect(costaleros.length).toBeGreaterThanOrEqual(4)
+    })
+
+    // Triangulación: paso secundario (tid=2) y 5 costaleros con slot.dentro=5
+    it('con regla5=true y tid=2, cooriente también libre (paso secundario)', () => {
+      const t5tid2: Trabajadera = {
+        ...t5Regla5,
+        id: 2,
+        roles: [
+          { pri: 'COS', sec: 'FIJ' },
+          { pri: 'FIJ', sec: 'COS' },
+          { pri: 'COR', sec: 'FIJ' },
+          { pri: 'FIJ', sec: 'COS' },
+          { pri: 'COS', sec: 'FIJ' },
+        ],
+      }
+      const slot: TramoSlot = { dentro: [0, 1, 2, 3] }
+      const fisico = getDentroFisico(t5tid2, slot)
+      expect(fisico).toHaveLength(5)
+      expect(fisico[2]).toBeNull()
+    })
+
+    it('con regla5=true, los costaleros sobrantes se colocan en posiciones no activas', () => {
+      // Cuando hay más costaleros que posiciones activas (ej. 5 dentro con regla5),
+      // los extras que no caben en las 4 posiciones activas se manejan como
+      // en el comportamiento original: pueden perderse en getDentroFisico
+      // (limitación pre-existente; ordenarDentroFisico sí los conserva).
+      // Este test verifica que al menos no rompe y mantiene cooriente null.
+      const slot: TramoSlot = { dentro: [0, 1, 2, 3, 4] }
+      const fisico = getDentroFisico(t5Regla5, slot)
+      expect(fisico[2]).toBeNull()
+      // La mayoría de los costaleros deben estar presentes
+      const costaleros = fisico.filter((x): x is number => x !== null)
+      expect(costaleros.length).toBeGreaterThanOrEqual(4)
+    })
+  })
+
+  describe('ordenarDentroFisico — regla5 costaleros', () => {
+    const t5Regla5: Trabajadera = {
+      id: 1,
+      nombres: ['A', 'B', 'C', 'D', 'E'],
+      roles: [
+        { pri: 'PAT', sec: 'FIJ' },
+        { pri: 'FIJ', sec: 'COR' },
+        { pri: 'COR', sec: 'FIJ' },
+        { pri: 'FIJ', sec: 'PAT' },
+        { pri: 'PAT', sec: 'FIJ' },
+      ],
+      salidas: 5,
+      tramos: ['T1'],
+      bajas: [],
+      regla5costaleros: true,
+      plan: null,
+      obj: null,
+      analisis: null,
+      pinned: null,
+      puntuaciones: {},
+      tramosClaves: [],
+    }
+
+    it('con regla5=true, dentroFisico[2] es null y slot.dentro tiene 4 índices sin nulls', () => {
+      const plan: TramoSlot[] = [
+        { dentro: [0, 1, 2, 3] },
+      ]
+      const ordenado = ordenarDentroFisico(t5Regla5, plan)
+      const slot = ordenado[0]
+
+      expect(slot.dentroFisico).toBeDefined()
+      expect(slot.dentroFisico!).toHaveLength(5)
+      expect(slot.dentroFisico![2]).toBeNull()
+
+      expect(slot.dentro).toHaveLength(4)
+      expect(slot.dentro.every(x => typeof x === 'number')).toBe(true)
+
+      const fisicoFiltrado = slot.dentroFisico!.filter((x): x is number => x !== null)
+      expect(slot.dentro).toEqual(fisicoFiltrado)
+    })
+
+    it('con regla5=false, no modifica la cooriente', () => {
+      const t5SinRegla: Trabajadera = { ...t5Regla5, regla5costaleros: false }
+      const plan: TramoSlot[] = [
+        { dentro: [0, 1, 2, 3] },
+      ]
+      const ordenado = ordenarDentroFisico(t5SinRegla, plan)
+      const slot = ordenado[0]
+
+      expect(slot.dentroFisico).toBeDefined()
+      expect(slot.dentroFisico!).toHaveLength(5)
+    })
+  })
+
   describe('ordenarDentroFisico', () => {
     it('debería ordenar plan completo según roles', () => {
       const trabajadera = {

@@ -190,6 +190,13 @@ export function getDentroFisico(t: Trabajadera, slot: TramoSlot): (number | null
   if (slot.dentroFisico) return slot.dentroFisico
   const asig = asignarRolesTramo(t, slot.dentro)
   const estructura = estructuraPaso(t.id)
+
+  // Regla 5 costaleros: cooriente (posición central) siempre libre
+  const aplicarRegla5 = t.regla5costaleros && t.nombres.length === 5
+  const idxsActivos = aplicarRegla5
+    ? [0, 1, 3, 4] // excluye posición 2 (cooriente)
+    : [0, 1, 2, 3, 4]
+
   const porRol: Partial<Record<RolCode, number[]>> = {}
   asig.forEach((rol, ci) => {
     if (!porRol[rol]) porRol[rol] = []
@@ -197,7 +204,8 @@ export function getDentroFisico(t: Trabajadera, slot: TramoSlot): (number | null
   })
   const fisico: (number | null)[] = []
   const usados = new Set<number>()
-  estructura.forEach(rol => {
+  idxsActivos.forEach(posIdx => {
+    const rol = estructura[posIdx]
     const disp = (porRol[rol] ?? []).filter(ci => !usados.has(ci))
     if (disp.length > 0) { fisico.push(disp[0]); usados.add(disp[0]) }
     else fisico.push(null)
@@ -211,6 +219,11 @@ export function getDentroFisico(t: Trabajadera, slot: TramoSlot): (number | null
     }
   }
 
+  // Insertar null en la cooriente si regla5 está activa
+  if (aplicarRegla5) {
+    fisico.splice(2, 0, null)
+  }
+
   slot.dentroFisico = fisico
   return fisico
 }
@@ -220,6 +233,13 @@ export function ordenarDentroFisico(t: Trabajadera, plan: TramoSlot[]): TramoSlo
     if (!slot.dentro || slot.dentro.length === 0) return
     const asig = asignarRolesTramo(t, slot.dentro)
     const estructura = estructuraPaso(t.id)
+
+    // Regla 5 costaleros: cooriente (posición central) siempre libre
+    const aplicarRegla5 = t.regla5costaleros && t.nombres.length === 5
+    const idxsActivos = aplicarRegla5
+      ? [0, 1, 3, 4] // excluye posición 2 (cooriente)
+      : [0, 1, 2, 3, 4]
+
     const porRol: Partial<Record<RolCode, number[]>> = {}
     asig.forEach((rol, ci) => {
       if (!porRol[rol]) porRol[rol] = []
@@ -227,7 +247,8 @@ export function ordenarDentroFisico(t: Trabajadera, plan: TramoSlot[]): TramoSlo
     })
     const nuevoDentro: (number | null)[] = []
     const usados = new Set<number>()
-    estructura.forEach(rol => {
+    idxsActivos.forEach(posIdx => {
+      const rol = estructura[posIdx]
       const disponibles = (porRol[rol] ?? []).filter(ci => !usados.has(ci))
       if (disponibles.length > 0) {
         nuevoDentro.push(disponibles[0])
@@ -246,6 +267,11 @@ export function ordenarDentroFisico(t: Trabajadera, plan: TramoSlot[]): TramoSlo
     }
     // Si aún sobran personas (porque dentro > 5), las metemos al final
     noUsados.forEach(ci => nuevoDentro.push(ci))
+
+    // Insertar null en la cooriente si regla5 está activa
+    if (aplicarRegla5) {
+      nuevoDentro.splice(2, 0, null)
+    }
 
     slot.dentro = nuevoDentro.filter((x): x is number => x !== null)
     slot.dentroFisico = nuevoDentro
