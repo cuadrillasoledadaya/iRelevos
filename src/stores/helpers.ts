@@ -25,7 +25,7 @@ export function getTrab(d: DatosPerfil, tid: number): Trabajadera {
  */
 export function tramosOptimosForTrab(t: Trabajadera, salidas?: number): number {
   const nActivos = t.nombres.length - (t.bajas?.length ?? 0)
-  return tramosOptimos(nActivos, salidas ?? t.salidas ?? 2)
+  return tramosOptimos(nActivos, salidas ?? t.salidas ?? 2, t.regla5costaleros)
 }
 
 /**

@@ -30,6 +30,7 @@ describe('algoritmos', () => {
 
     it('debería aplicar regla 5 costaleros cuando total = 5', () => {
       // Given: 5 costaleros (regla 5 activa), 2 tramos, 1 salida
+      // La suma esperada es total * salidas = cada costalero sale salidas veces
       const total = 5
       const numTramos = 2
       const salidas = 1
@@ -38,19 +39,15 @@ describe('algoritmos', () => {
       // When: calculamos distribución con regla 5
       const resultado = objSalidas(total, numTramos, salidas, aplicaRegla5)
 
-      // Debug: imprimir resultado para entender
-      console.log('Resultado regla 5:', resultado)
-      console.log('Suma total:', Object.values(resultado).reduce((sum, val) => sum + val, 0))
-
       // Then: todos deben tener asignaciones válidas
       expect(resultado).toBeDefined()
       Object.values(resultado).forEach(asignaciones => {
         expect(asignaciones).toBeGreaterThanOrEqual(0)
       })
       
-      // La suma total debe igual el número total de salidas
+      // Cada costalero debe salir salidas veces → total * salidas asignaciones
       const sumaTotal = Object.values(resultado).reduce((sum, val) => sum + val, 0)
-      expect(sumaTotal).toBe(numTramos * salidas)
+      expect(sumaTotal).toBe(total * salidas)
     })
 
     it('debería manejo caso límite: 1 costalero', () => {
@@ -66,6 +63,54 @@ describe('algoritmos', () => {
       // Then: el único costalero debe tener todas las salidas
       expect(resultado).toBeDefined()
       expect(resultado[0]).toBe(numTramos * salidas)
+    })
+
+    // ── Bugfix: objSalidas regla5 totalAsignaciones ──────────────
+
+    it('debería usar total * salidas (no numTramos * salidas) con regla5 activa', () => {
+      // Bug 2: totalAsignaciones = numTramos * salidas es incorrecto con regla5
+      // Debe ser total * salidas = cada costalero sale exactamente salidas veces
+      // Given: 5 costaleros, regla5 activa, 2 salidas, 10 tramos
+      const resultado = objSalidas(5, 10, 2, true)
+
+      // Cada costalero debe tener 2 salidas (no distribuciones basadas en 10*2=20)
+      Object.values(resultado).forEach(asignaciones => {
+        expect(asignaciones).toBe(2)
+      })
+
+      // Suma total debe ser total * salidas = 5 * 2 = 10
+      const sumaTotal = Object.values(resultado).reduce((sum, val) => sum + val, 0)
+      expect(sumaTotal).toBe(10)
+    })
+
+    it('debería distribuir equitativamente con regla5 y 3 salidas', () => {
+      // Given: 5 costaleros, regla5, 3 salidas, 15 tramos
+      const resultado = objSalidas(5, 15, 3, true)
+
+      // Cada costalero debe tener 3 salidas
+      Object.values(resultado).forEach(asignaciones => {
+        expect(asignaciones).toBe(3)
+      })
+
+      // Suma = 5 * 3 = 15
+      const sumaTotal = Object.values(resultado).reduce((sum, val) => sum + val, 0)
+      expect(sumaTotal).toBe(15)
+    })
+
+    it('debería manejar regla5 con tramos no múltiplos exactos', () => {
+      // Given: 5 costaleros, regla5, 2 salidas, 8 tramos (no óptimo)
+      // Con 8 tramos: total slots fuera = 8, pero total * salidas = 10
+      // La corrección debe usar total * salidas = 10, no numTramos * salidas = 16
+      const resultado = objSalidas(5, 8, 2, true)
+
+      // Suma total debe ser total * salidas = 10
+      const sumaTotal = Object.values(resultado).reduce((sum, val) => sum + val, 0)
+      expect(sumaTotal).toBe(10)
+
+      // Distribución equitativa: base = 2, todos tienen 2
+      Object.values(resultado).forEach(asignaciones => {
+        expect(asignaciones).toBe(2)
+      })
     })
   })
 
@@ -209,19 +254,15 @@ describe('algoritmos', () => {
     })
 
     it('debería manejo caso con regla 5 costaleros', () => {
-      // Given: 5 costaleros, 1 salida (regla 5 aplicable)
+      // Given: 5 costaleros, 1 salida (regla 5 activa)
       const total = 5
       const salidas = 1
 
-      // When: calculamos tramos óptimos
-      const resultado = tramosOptimos(total, salidas)
+      // When: calculamos tramos óptimos con regla5 explícita
+      const resultado = tramosOptimos(total, salidas, true)
 
-      // Debug: imprimir resultado para entender
-      console.log('Tramos óptimos resultado:', resultado)
-      console.log('Total costaleros:', total, 'Salidas:', salidas)
-
-      // Then: debe retornar número válido
-      expect(resultado).toBeGreaterThan(0)
+      // Then: 5 costaleros × 1 salida = 5 tramos
+      expect(resultado).toBe(5)
     })
 
     it('debería retornar 0 para casos inválidos', () => {
@@ -234,6 +275,49 @@ describe('algoritmos', () => {
 
       // Then: debe retornar 0
       expect(resultado).toBe(0)
+    })
+
+    // ── Bugfix: regla5costaleros parameter ──────────────────────
+
+    it('debería retornar total * salidas cuando regla5 está activa y total = 5 (2 salidas)', () => {
+      // Bug 1: Con regla5 activa, 5 costaleros × 2 salidas = 10 tramos
+      const resultado = tramosOptimos(5, 2, true)
+
+      // Then: 5 costaleros × 2 salidas cada uno = 10 tramos (cada tramo saca 1)
+      expect(resultado).toBe(10)
+    })
+
+    it('debería retornar total * salidas cuando regla5 está activa y total = 5 (3 salidas)', () => {
+      // 5 costaleros × 3 salidas = 15 tramos
+      const resultado = tramosOptimos(5, 3, true)
+
+      expect(resultado).toBe(15)
+    })
+
+    it('debería NO aplicar regla5 sin flag aunque total sea 5', () => {
+      // Cuando regla5costaleros es false (o no se pasa), total=5 implica F=0 → 0
+      const resultado = tramosOptimos(5, 2, false)
+
+      // F = total - 5 = 0 → caso inválido → 0
+      expect(resultado).toBe(0)
+    })
+
+    it('debería ser backward-compatible sin el tercer parámetro (total=5 sin regla5)', () => {
+      // Llamada sin el tercer parámetro: regla5costaleros = undefined → no aplica
+      const resultado = tramosOptimos(5, 2)
+
+      // F = total - 5 = 0 → 0 (comportamiento actual con total=5 sin regla5)
+      expect(resultado).toBe(0)
+    })
+
+    it('debería ignorar regla5 cuando total ≠ 5 aunque el flag sea true', () => {
+      // Con 7 costaleros, regla5 no aplica aunque el flag esté en true
+      const resultadoConRegla5 = tramosOptimos(7, 3, true)
+      const resultadoSinRegla5 = tramosOptimos(7, 3, false)
+
+      // Ambos deben dar el mismo resultado (regla5 solo afecta cuando total=5)
+      expect(resultadoConRegla5).toBe(resultadoSinRegla5)
+      expect(resultadoConRegla5).toBeGreaterThan(0)
     })
   })
 

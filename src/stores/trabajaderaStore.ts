@@ -264,7 +264,7 @@ export function createTrabajaderaStore(
         const t = getTrabFn(d, tid)
         if (targetSalidas !== undefined) t.salidas = targetSalidas
         const nActivos = t.nombres.length - (t.bajas?.length ?? 0)
-        const nOpt = tramosOptimos(nActivos, t.salidas ?? 2)
+        const nOpt = tramosOptimos(nActivos, t.salidas ?? 2, t.regla5costaleros)
         const actual = t.tramos.length
         if (actual < nOpt) {
           for (let i = actual; i < nOpt; i++) {

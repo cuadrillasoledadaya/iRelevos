@@ -400,7 +400,7 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 	const F = t.regla5costaleros && total === 5 ? 1 : total - 5;
 
 	const salidas = t.salidas ?? 2;
-	const nOpt = tramosOptimos(totalActivos, salidas);
+	const nOpt = tramosOptimos(totalActivos, salidas, t.regla5costaleros);
 	const nAct = t.tramos.length;
 	const hayPlan = !!t.plan;
 	const an = t.analisis;
