@@ -34,3 +34,27 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Local Pi runtime state
+.atl/
+.pi/
+.windsurf/
+.opencode/
+context.md
+
+# Project design artifacts (untracked by default)
+/openspec/
+
+# Legacy prototypes
+/costaleros_pwa_v*.html
+*.docx
+
+# Dev artifacts
+.pi-lens/
+graphify-out/
+scout-*.md
+progress.md
+false
+nul
+
+# Duplicate project copy
+/relevos-app/
