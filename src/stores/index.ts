@@ -3,34 +3,48 @@
 // Crea las instancias singleton y resuelve dependencias (mutar → projectStore).
 // ══════════════════════════════════════════════════════════════════
 
-import { uiStore } from './uiStore'
-import { projectStore } from './projectStore'
-import { temporadaStore } from './temporadaStore'
-import { createTrabajaderaStore } from './trabajaderaStore'
-import { createPlanStore } from './planStore'
-import { createBancoStore } from './bancoStore'
-import { createMutar } from './mutar'
-import { saveCloud } from './saveCloud'
-import { getTrab } from './helpers'
+import { uiStore } from "./uiStore";
+import { projectStore } from "./projectStore";
+import { createTemporadaStore } from "./temporadaStore";
+import { createTrabajaderaStore } from "./trabajaderaStore";
+import { createPlanStore } from "./planStore";
+import { createBancoStore } from "./bancoStore";
+import { createMutar } from "./mutar";
+import { saveCloud } from "./saveCloud";
+import { getTrab } from "./helpers";
 
 // ── Resolver dependencias ─────────────────────────────────────────
 // mutar() necesita projectStore ya creado para leer/escribir S.
 
 const mutar = createMutar(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  projectStore.setState as any,
-  projectStore.getState,
-  saveCloud,
-)
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	projectStore.setState as any,
+	projectStore.getState,
+	saveCloud,
+);
 
-export const planStore = createPlanStore(mutar, getTrab, () => projectStore.getState().S)
-export const trabajaderaStore = createTrabajaderaStore(mutar, getTrab, (tid) => planStore.getState().completarPlan(tid))
-export const bancoStore = createBancoStore(mutar)
+export const planStore = createPlanStore(
+	mutar,
+	getTrab,
+	() => projectStore.getState().S,
+);
+export const trabajaderaStore = createTrabajaderaStore(mutar, getTrab, (tid) =>
+	planStore.getState().completarPlan(tid),
+);
+export const bancoStore = createBancoStore(mutar);
+
+// ── Resolver temporadaStore con refetchPasos inyectado ────────────
+// Rompe dependencia circular: projectStore lee activeTemporadaId de
+// temporadaStore, y temporadaStore dispara refetchPasos de projectStore.
+
+export const temporadaStore = createTemporadaStore(() =>
+	projectStore.getState().refetchPasos(),
+);
 
 // ── Re-exportar stores standalone ─────────────────────────────────
 // Los consumidores pueden importar directamente si lo prefieren.
 
-export { uiStore, projectStore, temporadaStore }
+export { uiStore, projectStore };
 
 // ── Helper: re-export mutar para tests avanzados ──────────────────
-export { mutar }
+export { mutar };

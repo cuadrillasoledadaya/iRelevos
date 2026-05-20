@@ -2,28 +2,38 @@
 // TEMPORADA STORE — Slice de temporadas (Phase 3.2)
 // ══════════════════════════════════════════════════════════════════
 
-import { create } from 'zustand'
-import type { Temporada } from '@/lib/types'
+import { create } from "zustand";
+import type { Temporada } from "@/lib/types";
+
+const LS_TID = "cpwa_active_temp_id";
 
 export interface TemporadaStoreState {
-  temporadas: Temporada[]
-  activeTemporadaId: string
+	temporadas: Temporada[];
+	activeTemporadaId: string;
 }
 
 export interface TemporadaStoreActions {
-  setActiveTemporadaId: (id: string) => void
-  setTemporadas: (temporadas: Temporada[]) => void
+	setActiveTemporadaId: (id: string) => void;
+	setTemporadas: (temporadas: Temporada[]) => void;
 }
 
-export type TemporadaStore = TemporadaStoreState & TemporadaStoreActions
+export type TemporadaStore = TemporadaStoreState & TemporadaStoreActions;
 
-export const createTemporadaStore = () => create<TemporadaStore>()((set) => ({
-    temporadas: [],
-    activeTemporadaId: '',
+export function createTemporadaStore(refetchPasos?: () => Promise<void>) {
+	return create<TemporadaStore>()((set) => ({
+		temporadas: [],
+		activeTemporadaId: "",
 
-    setActiveTemporadaId: (id) => set({ activeTemporadaId: id }),
+		setActiveTemporadaId: (id) => {
+			set({ activeTemporadaId: id });
+			if (id) {
+				localStorage.setItem(LS_TID, id);
+				refetchPasos?.();
+			}
+		},
 
-    setTemporadas: (temporadas) => set({ temporadas }),
-  }))
+		setTemporadas: (temporadas) => set({ temporadas }),
+	}));
+}
 
-export const temporadaStore = createTemporadaStore()
+export const temporadaStore = createTemporadaStore();
