@@ -30,7 +30,7 @@ export default function SugerenciaSheet() {
 	const nOpt2 = tramosOptimos(nActivos, 2, t.regla5costaleros);
 	const nOpt3 = tramosOptimos(nActivos, 3, t.regla5costaleros);
 	const actual = t.tramos.length;
-	const F = (t.regla5costaleros && nActivos === 5) ? 1 : (nActivos - 5);
+	const F = t.regla5costaleros && nActivos === 5 ? 1 : nActivos - 5;
 
 	function salidas_info(nTramos: number) {
 		const plazas = nTramos * F;

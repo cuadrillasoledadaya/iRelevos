@@ -4,7 +4,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { uiStore } from "./uiStore";
-import { projectStore } from "./projectStore";
+import { projectStore, setTemporadaGetter } from "./projectStore";
 import { createTemporadaStore } from "./temporadaStore";
 import { createTrabajaderaStore } from "./trabajaderaStore";
 import { createPlanStore } from "./planStore";
@@ -40,6 +40,10 @@ export const bancoStore = createBancoStore(mutar);
 export const temporadaStore = createTemporadaStore(() =>
 	projectStore.getState().refetchPasos(),
 );
+
+// Inyectar el getter de temporada activa en projectStore
+// para romper la dependencia circular entre stores.
+setTemporadaGetter(() => temporadaStore.getState().activeTemporadaId);
 
 // ── Re-exportar stores standalone ─────────────────────────────────
 // Los consumidores pueden importar directamente si lo prefieren.

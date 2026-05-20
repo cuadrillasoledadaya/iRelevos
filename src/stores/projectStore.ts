@@ -9,7 +9,12 @@ import type { DatosPerfil, PasoDB } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { datosVacios } from "@/lib/algoritmos";
 import { deriveFromPasos } from "./helpers";
-import { temporadaStore } from "./temporadaStore";
+
+let getActiveTemporadaId = () => "";
+
+export function setTemporadaGetter(fn: () => string) {
+	getActiveTemporadaId = fn;
+}
 
 // ── Estado ────────────────────────────────────────────────────────
 
@@ -83,7 +88,7 @@ export const createProjectStore = () =>
 		},
 
 		refetchPasos: async () => {
-			const activeTemporadaId = temporadaStore.getState().activeTemporadaId;
+			const activeTemporadaId = getActiveTemporadaId();
 			if (!activeTemporadaId) return;
 
 			const { data, error } = await supabase
@@ -100,7 +105,7 @@ export const createProjectStore = () =>
 		},
 
 		fetchCensusHeights: async () => {
-			const activeTemporadaId = temporadaStore.getState().activeTemporadaId;
+			const activeTemporadaId = getActiveTemporadaId();
 			if (!activeTemporadaId) return;
 
 			const { data } = await supabase
