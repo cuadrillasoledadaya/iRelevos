@@ -6,6 +6,7 @@ import { useAdminData } from "@/hooks/useAdminData";
 import { useAdminMutations } from "@/hooks/useAdminMutations";
 import { useAuth } from "@/hooks/useAuth";
 import { projectStore } from "@/stores";
+import { supabase } from "@/lib/supabase";
 
 import UsuariosTab from "@/components/admin/UsuariosTab";
 import CensoTab from "@/components/admin/CensoTab";
@@ -38,23 +39,38 @@ export default function AdminPage() {
 
 	const handleSyncComplete = useCallback(
 		async (proyectoId: string) => {
-			// Recargar pasos desde Supabase y actualizar ambos estados
-			await fetchPasos();
-			await projectStore.getState().refetchPasos();
+			// Recargar el proyecto específico directamente desde Supabase
+			const { data: updatedPaso } = await supabase
+				.from("proyectos")
+				.select(
+					"id, nombre_paso, nombre_cuadrilla, num_trabajaderas, content, created_at, temporada_id",
+				)
+				.eq("id", proyectoId)
+				.single();
 
-			// Forzar actualización del proyecto activo para recalcular S
-			const currentPid = projectStore.getState().pid;
-			if (proyectoId === currentPid) {
-				// Forzar recalculo de S pasando el pid actual
-				const pasosActuales = projectStore.getState().pasos;
-				if (pasosActuales.length > 0) {
-					projectStore.getState().setPasos(pasosActuales);
-				}
+			if (!updatedPaso) {
+				// Fallback: recargar todos los pasos
+				await fetchPasos();
+				await projectStore.getState().refetchPasos();
+				const storedPid = localStorage.getItem("cpwa_active_paso_id");
+				if (storedPid) projectStore.getState().setPid(storedPid);
+				return;
 			}
-			// También forzar actualización si el sync es de otro proyecto pero
-			// tenemos pasos activos
-			if (currentPid) {
-				projectStore.getState().setPid(currentPid);
+
+			// Actualizar el paso en el store de projectStore
+			const pasosActuales = projectStore.getState().pasos;
+			const pasoIdx = pasosActuales.findIndex((p) => p.id === proyectoId);
+
+			if (pasoIdx >= 0) {
+				// Reemplazar el paso actualizado
+				const nuevosPasos = [...pasosActuales];
+				nuevosPasos[pasoIdx] = updatedPaso as any;
+				projectStore.getState().setPasos(nuevosPasos);
+			} else {
+				// El paso no estaba en la lista, recargar todo
+				await projectStore.getState().refetchPasos();
+				const storedPid = localStorage.getItem("cpwa_active_paso_id");
+				if (storedPid) projectStore.getState().setPid(storedPid);
 			}
 		},
 		[fetchPasos],
