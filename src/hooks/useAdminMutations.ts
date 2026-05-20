@@ -25,7 +25,7 @@ export function useAdminMutations(
 	setPasos: React.Dispatch<React.SetStateAction<PasoDB[]>>,
 	fetchCensus: (filterPid?: string) => Promise<void>,
 	fetchPasos: () => Promise<void>,
-	onSyncComplete?: (proyectoId: string) => void,
+	onSyncComplete?: (proyectoId: string, updatedContent?: unknown) => void,
 ) {
 	const [saving, setSaving] = useState(false);
 	const [importLoading, setImportLoading] = useState(false);
@@ -561,10 +561,27 @@ export function useAdminMutations(
 				});
 			});
 
-			await supabase.from("proyectos").update({ content }).eq("id", proyectoId);
+			const { error: updateErr } = await supabase
+				.from("proyectos")
+				.update({ content })
+				.eq("id", proyectoId);
+
+			if (updateErr) {
+				alert("Error al guardar: " + updateErr.message);
+				setSaving(false);
+				return;
+			}
+
+			// Leer el proyecto actualizado para asegurar datos frescos
+			const { data: updatedProj } = await supabase
+				.from("proyectos")
+				.select("content")
+				.eq("id", proyectoId)
+				.single();
+
 			alert("✅ Cuadrilla sincronizada desde el censo.");
 			setSaving(false);
-			onSyncComplete?.(proyectoId);
+			onSyncComplete?.(proyectoId, updatedProj?.content);
 		},
 		[onSyncComplete],
 	);

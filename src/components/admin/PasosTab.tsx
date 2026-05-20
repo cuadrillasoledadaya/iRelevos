@@ -66,16 +66,18 @@ export default function PasosTab({
             </div>
             <div className="flex flex-col gap-1 mt-1">
               <button
+                type="button"
                 disabled={saving}
-                onClick={() => onSyncTodoCenso(p.id)}
+                onClick={(e) => { e.stopPropagation(); onSyncTodoCenso(p.id); }}
                 className="btn btn-out w-full text-[0.65rem]"
                 style={{ borderColor: 'var(--oro)', color: 'var(--oro)' }}
               >
                 {saving ? '⏳ Sincronizando...' : '🔄 Sincronizar Cuadrilla desde Censo'}
               </button>
               <button
+                type="button"
                 disabled={saving}
-                onClick={() => onSyncCensoDesdeProyecto(p.id)}
+                onClick={(e) => { e.stopPropagation(); onSyncCensoDesdeProyecto(p.id); }}
                 className="btn btn-ghost w-full text-[0.65rem] border border-blue-400/30 text-blue-400 hover:bg-blue-400/10"
               >
                 {saving ? '⏳ Generando...' : '➡️ Generar Censo desde Cuadrilla'}

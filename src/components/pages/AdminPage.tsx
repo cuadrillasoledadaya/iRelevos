@@ -6,7 +6,6 @@ import { useAdminData } from "@/hooks/useAdminData";
 import { useAdminMutations } from "@/hooks/useAdminMutations";
 import { useAuth } from "@/hooks/useAuth";
 import { projectStore } from "@/stores";
-import { supabase } from "@/lib/supabase";
 
 import UsuariosTab from "@/components/admin/UsuariosTab";
 import CensoTab from "@/components/admin/CensoTab";
@@ -39,40 +38,28 @@ export default function AdminPage() {
 
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const handleSyncComplete = useCallback(
-		async (proyectoId: string) => {
-			// Recargar el proyecto específico directamente desde Supabase
-			const { data: updatedPaso } = await supabase
-				.from("proyectos")
-				.select(
-					"id, nombre_paso, nombre_cuadrilla, num_trabajaderas, content, created_at, temporada_id",
-				)
-				.eq("id", proyectoId)
-				.single();
+		async (proyectoId: string, updatedContent?: unknown) => {
+			if (updatedContent) {
+				// Actualizar directamente con el content que viene de la mutación
+				const pasosActuales = projectStore.getState().pasos;
+				const pasoIdx = pasosActuales.findIndex((p) => p.id === proyectoId);
 
-			if (!updatedPaso) {
-				// Fallback: recargar todos los pasos
-				await fetchPasos();
-				await projectStore.getState().refetchPasos();
-				const storedPid = localStorage.getItem("cpwa_active_paso_id");
-				if (storedPid) projectStore.getState().setPid(storedPid);
-				return;
+				if (pasoIdx >= 0) {
+					const nuevosPasos = [...pasosActuales];
+					nuevosPasos[pasoIdx] = {
+						...nuevosPasos[pasoIdx],
+						content: updatedContent as any,
+					};
+					projectStore.getState().setPasos(nuevosPasos);
+					return;
+				}
 			}
 
-			// Actualizar el paso en el store de projectStore
-			const pasosActuales = projectStore.getState().pasos;
-			const pasoIdx = pasosActuales.findIndex((p) => p.id === proyectoId);
-
-			if (pasoIdx >= 0) {
-				// Reemplazar el paso actualizado
-				const nuevosPasos = [...pasosActuales];
-				nuevosPasos[pasoIdx] = updatedPaso;
-				projectStore.getState().setPasos(nuevosPasos);
-			} else {
-				// El paso no estaba en la lista, recargar todo
-				await projectStore.getState().refetchPasos();
-				const storedPid = localStorage.getItem("cpwa_active_paso_id");
-				if (storedPid) projectStore.getState().setPid(storedPid);
-			}
+			// Fallback: recargar todos los pasos desde Supabase
+			await fetchPasos();
+			await projectStore.getState().refetchPasos();
+			const storedPid = localStorage.getItem("cpwa_active_paso_id");
+			if (storedPid) projectStore.getState().setPid(storedPid);
 		},
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 		[fetchPasos],
