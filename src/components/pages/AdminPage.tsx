@@ -37,6 +37,7 @@ export default function AdminPage() {
 
 	// ── Mutaciones ───────────────────────────────────────────────────
 
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const handleSyncComplete = useCallback(
 		async (proyectoId: string) => {
 			// Recargar el proyecto específico directamente desde Supabase
@@ -64,7 +65,7 @@ export default function AdminPage() {
 			if (pasoIdx >= 0) {
 				// Reemplazar el paso actualizado
 				const nuevosPasos = [...pasosActuales];
-				nuevosPasos[pasoIdx] = updatedPaso as any;
+				nuevosPasos[pasoIdx] = updatedPaso;
 				projectStore.getState().setPasos(nuevosPasos);
 			} else {
 				// El paso no estaba en la lista, recargar todo
@@ -73,6 +74,7 @@ export default function AdminPage() {
 				if (storedPid) projectStore.getState().setPid(storedPid);
 			}
 		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 		[fetchPasos],
 	);
 
