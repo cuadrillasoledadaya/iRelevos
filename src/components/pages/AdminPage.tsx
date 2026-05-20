@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { temporadaStore } from "@/stores";
+import { useEstado } from "@/hooks/useEstado";
 import { useAdminData } from "@/hooks/useAdminData";
 import { useAdminMutations } from "@/hooks/useAdminMutations";
 import { useAuth } from "@/hooks/useAuth";
+import { projectStore } from "@/stores";
+import type { DatosPerfil } from "@/lib/types";
 
 import UsuariosTab from "@/components/admin/UsuariosTab";
 import CensoTab from "@/components/admin/CensoTab";
@@ -14,9 +16,7 @@ import TemporadasTab from "@/components/admin/TemporadasTab";
 type AdminTab = "usuarios" | "censo" | "pasos" | "temporadas";
 
 export default function AdminPage() {
-	const activeTemporadaId = temporadaStore((s) => s.activeTemporadaId);
-	const temporadas = temporadaStore((s) => s.temporadas);
-	const setActiveTemporadaId = temporadaStore.getState().setActiveTemporadaId;
+	const { activeTemporadaId, temporadas, setActiveTemporadaId } = useEstado();
 	const [activeTab, setActiveTab] = useState<AdminTab>("usuarios");
 	const [filterPid, setFilterPid] = useState("all");
 
@@ -37,6 +37,35 @@ export default function AdminPage() {
 
 	// ── Mutaciones ───────────────────────────────────────────────────
 
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	const handleSyncComplete = useCallback(
+		async (proyectoId: string, updatedContent?: unknown) => {
+			if (updatedContent) {
+				// Actualizar directamente con el content que viene de la mutación
+				const pasosActuales = projectStore.getState().pasos;
+				const pasoIdx = pasosActuales.findIndex((p) => p.id === proyectoId);
+
+				if (pasoIdx >= 0) {
+					const nuevosPasos = [...pasosActuales];
+					nuevosPasos[pasoIdx] = {
+						...nuevosPasos[pasoIdx],
+						content: updatedContent as DatosPerfil,
+					};
+					projectStore.getState().setPasos(nuevosPasos);
+					return;
+				}
+			}
+
+			// Fallback: recargar todos los pasos desde Supabase
+			await fetchPasos();
+			await projectStore.getState().refetchPasos();
+			const storedPid = localStorage.getItem("cpwa_active_paso_id");
+			if (storedPid) projectStore.getState().setPid(storedPid);
+		},
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[fetchPasos],
+	);
+
 	const m = useAdminMutations(
 		activeTemporadaId,
 		pasos,
@@ -45,6 +74,7 @@ export default function AdminPage() {
 		setPasos,
 		(f = "all") => fetchCensus(f),
 		fetchPasos,
+		handleSyncComplete,
 	);
 
 	// ── Cargar datos según tab activa ────────────────────────────────
@@ -74,7 +104,7 @@ export default function AdminPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [activeTemporadaId]);
 
-	// ── Handlers passthrough ─────────────────────────────────────────
+	// ── Callbacks ───────────────────────────────────────────────────
 
 	const handleFetchFromICuadrilla = useCallback(() => {
 		m.fetchFromICuadrilla(pasos[0]?.id ?? "");
