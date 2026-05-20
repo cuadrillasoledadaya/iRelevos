@@ -6,6 +6,7 @@ import { useAdminData } from "@/hooks/useAdminData";
 import { useAdminMutations } from "@/hooks/useAdminMutations";
 import { useAuth } from "@/hooks/useAuth";
 import { projectStore } from "@/stores";
+import type { DatosPerfil } from "@/lib/types";
 
 import UsuariosTab from "@/components/admin/UsuariosTab";
 import CensoTab from "@/components/admin/CensoTab";
@@ -48,7 +49,7 @@ export default function AdminPage() {
 					const nuevosPasos = [...pasosActuales];
 					nuevosPasos[pasoIdx] = {
 						...nuevosPasos[pasoIdx],
-						content: updatedContent as any,
+						content: updatedContent as DatosPerfil,
 					};
 					projectStore.getState().setPasos(nuevosPasos);
 					return;
