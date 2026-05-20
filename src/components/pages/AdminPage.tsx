@@ -36,18 +36,22 @@ export default function AdminPage() {
 
 	// ── Mutaciones ───────────────────────────────────────────────────
 
-	const handleSyncComplete = useCallback(async (proyectoId: string) => {
-		// Recargar pasos y forzar actualización del estado global
-		await projectStore.getState().refetchPasos();
-		// Si el sync fue del paso activo, forzar reload del store local
-		if (proyectoId === projectStore.getState().pid) {
-			const pasosActuales = projectStore.getState().pasos;
-			const pasoActual = pasosActuales.find((p) => p.id === proyectoId);
-			if (pasoActual) {
-				projectStore.getState().setPasos(pasosActuales);
+	const handleSyncComplete = useCallback(
+		async (proyectoId: string) => {
+			// Recargar pasos desde Supabase y actualizar ambos estados
+			await fetchPasos();
+			// También recargar el store global para que EquipoPage se actualice
+			await projectStore.getState().refetchPasos();
+			// Si el sync fue del paso activo, forzar reload del store global
+			if (proyectoId === projectStore.getState().pid) {
+				const pasosActuales = projectStore.getState().pasos;
+				if (pasosActuales.length > 0) {
+					projectStore.getState().setPasos(pasosActuales);
+				}
 			}
-		}
-	}, []);
+		},
+		[fetchPasos],
+	);
 
 	const m = useAdminMutations(
 		activeTemporadaId,
