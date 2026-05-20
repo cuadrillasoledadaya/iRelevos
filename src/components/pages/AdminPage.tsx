@@ -40,14 +40,21 @@ export default function AdminPage() {
 		async (proyectoId: string) => {
 			// Recargar pasos desde Supabase y actualizar ambos estados
 			await fetchPasos();
-			// También recargar el store global para que EquipoPage se actualice
 			await projectStore.getState().refetchPasos();
-			// Si el sync fue del paso activo, forzar reload del store global
-			if (proyectoId === projectStore.getState().pid) {
+
+			// Forzar actualización del proyecto activo para recalcular S
+			const currentPid = projectStore.getState().pid;
+			if (proyectoId === currentPid) {
+				// Forzar recalculo de S pasando el pid actual
 				const pasosActuales = projectStore.getState().pasos;
 				if (pasosActuales.length > 0) {
 					projectStore.getState().setPasos(pasosActuales);
 				}
+			}
+			// También forzar actualización si el sync es de otro proyecto pero
+			// tenemos pasos activos
+			if (currentPid) {
+				projectStore.getState().setPid(currentPid);
 			}
 		},
 		[fetchPasos],
