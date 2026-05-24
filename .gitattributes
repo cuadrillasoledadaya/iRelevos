@@ -1,0 +1,39 @@
+# Force LF line endings for code files (cross-platform)
+* text=auto eol=lf
+
+# JS/TS/JSON - always LF
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.mjs text eol=lf
+
+# CSS/HTML/Markdown - always LF
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+
+# Config files - LF
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+
+# Binary files - no conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.ttf binary
+*.otf binary
+
+# Keep specific files as-is
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.env* text eol=lf
