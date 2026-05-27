@@ -6,13 +6,12 @@ import type { ActiveSheet } from "@/lib/types";
 import { rolesDisponibles, getRol } from "@/lib/roles";
 import type { Trabajadera } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
-import type { RolCode } from "@/lib/types";
 
 const getRolColor = (rol: string) => {
-	const r = rol as RolCode;
-	if (r === "PAT" || r === "COS") return "rgba(184, 151, 62, 0.25)"; // Oro suave
-	if (r === "FIJ") return "rgba(34, 197, 94, 0.25)"; // Verde suave
-	if (r === "COR") return "rgba(107, 114, 128, 0.25)"; // Gris suave
+	const base = rol.includes("_") ? rol.split("_")[0] : rol;
+	if (base === "PAT" || base === "COS") return "rgba(184, 151, 62, 0.25)"; // Oro suave
+	if (base === "FIJ") return "rgba(34, 197, 94, 0.25)"; // Verde suave
+	if (base === "COR") return "rgba(107, 114, 128, 0.25)"; // Gris suave
 	return "transparent";
 };
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { uiStore, projectStore, planStore } from "@/stores";
 import { nameAt } from "@/lib/nombres";
-import { estructuraPaso, getRol, rolLabel } from "@/lib/roles";
+import { estructuraPaso, getRol, rolLabel, rolBase } from "@/lib/roles";
 import type { RolCode, SwapState, Trabajadera } from "@/lib/types";
 
 export default function SwapSheet() {
@@ -165,7 +165,7 @@ export default function SwapSheet() {
 							rolNuevo={rolNuevoA}
 							val={valA}
 							esDentro={a.esDentro}
-							rolClass={rolActualA ?? rolNuevoA ?? "COR"}
+							rolClass={rolBase(rolActualA ?? rolNuevoA ?? "COR")}
 						/>
 						<div className="swap-arrow">⇄</div>
 						<SwapCard
@@ -174,7 +174,7 @@ export default function SwapSheet() {
 							rolNuevo={rolNuevoB}
 							val={valB}
 							esDentro={b.esDentro}
-							rolClass={rolActualB ?? rolNuevoB ?? "COR"}
+							rolClass={rolBase(rolActualB ?? rolNuevoB ?? "COR")}
 						/>
 					</div>
 					<div className={`swap-validacion ${compatible ? "ok" : "warn"}`}>

@@ -3,7 +3,14 @@
 // Shape exacto del modelo de datos del HTML original
 // ══════════════════════════════════════════════════════════════════
 
-export type RolCode = 'PAT' | 'COS' | 'FIJ' | 'COR'
+export type RolCode =
+  | 'PAT_D'
+  | 'PAT_I'
+  | 'COS_D'
+  | 'COS_I'
+  | 'FIJ_D'
+  | 'FIJ_I'
+  | 'COR'
 export type PinState = 'L' | 'D' | 'F' | 'LF'
 
 export interface Rol {

@@ -57,7 +57,7 @@ export function createTrabajaderaStore(
         const t = getTrabFn(d, tid)
         t.nombres.push(`Costalero ${t.nombres.length + 1}`)
         if (!t.roles) t.roles = defaultRoles(t.nombres.length - 1, tid)
-        t.roles.push({ pri: 'COR', sec: 'FIJ' })
+        t.roles.push({ pri: 'COR', sec: 'FIJ_I' })
         t.plan = null
         t.obj = null
         t.analisis = null
@@ -109,10 +109,10 @@ export function createTrabajaderaStore(
         // Asegurar array roles: longitud correcta + sin nulls/undefineds
         if (!t.roles) t.roles = []
         while (t.roles.length < t.nombres.length) {
-          t.roles.push({ pri: 'COR', sec: 'FIJ' })
+          t.roles.push({ pri: 'COR', sec: 'FIJ_I' })
         }
         for (let j = 0; j < t.roles.length; j++) {
-          if (!t.roles[j]) t.roles[j] = { pri: 'COR', sec: 'FIJ' }
+          if (!t.roles[j]) t.roles[j] = { pri: 'COR', sec: 'FIJ_I' }
         }
         t.roles[i].pri = rol as RolCode
         if (t.roles[i].sec === rol) t.roles[i].sec = 'COR'
@@ -129,10 +129,10 @@ export function createTrabajaderaStore(
         // Asegurar array roles: longitud correcta + sin nulls/undefineds
         if (!t.roles) t.roles = []
         while (t.roles.length < t.nombres.length) {
-          t.roles.push({ pri: 'COR', sec: 'FIJ' })
+          t.roles.push({ pri: 'COR', sec: 'FIJ_I' })
         }
         for (let j = 0; j < t.roles.length; j++) {
-          if (!t.roles[j]) t.roles[j] = { pri: 'COR', sec: 'FIJ' }
+          if (!t.roles[j]) t.roles[j] = { pri: 'COR', sec: 'FIJ_I' }
         }
         t.roles[i].sec = rol as RolCode
         if (t.plan) t.plan.forEach(slot => {

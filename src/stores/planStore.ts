@@ -151,9 +151,9 @@ export function createPlanStore(mutar: MutarFn, getTrabFn: GetTrabFn, getS: GetS
             nombres: ['Costalero 1', 'Costalero 2', 'Costalero 3', 'Costalero 4', 'Costalero 5', 'Costalero 6'],
             salidas: 2,
             roles: [
-              { pri: 'COS', sec: 'COR' }, { pri: 'COS', sec: 'COR' },
-              { pri: 'COS', sec: 'FIJ' }, { pri: 'COS', sec: 'FIJ' },
-              { pri: 'COR', sec: 'COS' }, { pri: 'COR', sec: 'COS' },
+              { pri: 'COS_I', sec: 'COR' }, { pri: 'COS_D', sec: 'COR' },
+              { pri: 'COS_I', sec: 'FIJ_I' }, { pri: 'COS_D', sec: 'FIJ_D' },
+              { pri: 'COR', sec: 'COS_I' }, { pri: 'COR', sec: 'COS_D' },
             ],
             tramos: ['Tramo 1 (T1)', 'Tramo 2 (T1)', 'Tramo 3 (T1)'],
             plan: null, obj: null, analisis: null, pinned: null,

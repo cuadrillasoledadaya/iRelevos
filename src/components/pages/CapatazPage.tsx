@@ -4,6 +4,7 @@ import React from "react";
 import { uiStore, projectStore, planStore } from "@/stores";
 import {
 	getRol,
+	rolBase,
 	estructuraPaso,
 	getDentroFisico,
 	esRolHabitual,
@@ -252,13 +253,13 @@ function CapatazTrabajadera({ t }: { t: Trabajadera }) {
 								<div className="fuera-label">Fuera</div>
 								{r.fuera.map((ci: number) => {
 									const rolX = getRol(t, ci);
+									const base = rolBase(rolX.pri);
 									const stF =
-										rolX.pri === "PAT" || rolX.pri === "COS"
-											? "PAT"
-											: rolX.pri === "FIJ"
-												? "FIJ"
-												: "COR";
-
+										base === 'PAT' || base === 'COS'
+											? 'PAT'
+											: base === 'FIJ'
+												? 'FIJ'
+												: 'COR';
 									const isRep =
 										ti === t.tramos.length - 1 && t.plan![0].fuera.includes(ci);
 									const isCons = ti > 0 && t.plan![ti - 1].fuera.includes(ci);

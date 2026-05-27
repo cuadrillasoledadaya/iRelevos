@@ -17,12 +17,12 @@ import type {
 
 export function useAdminMutations(
 	activeTemporadaId: string,
-	pasos: PasoDB[],
+	_pasos: PasoDB[],
 	setCensus: React.Dispatch<React.SetStateAction<CensusEntry[]>>,
 	setUsuarios: React.Dispatch<
 		React.SetStateAction<import("@/hooks/useAuth").Profile[]>
 	>,
-	setPasos: React.Dispatch<React.SetStateAction<PasoDB[]>>,
+	_setPasos: React.Dispatch<React.SetStateAction<PasoDB[]>>,
 	fetchCensus: (filterPid?: string) => Promise<void>,
 	fetchPasos: () => Promise<void>,
 	onSyncComplete?: (proyectoId: string, updatedContent?: unknown) => void,
@@ -259,34 +259,102 @@ export function useAdminMutations(
 	);
 
 	// ═════════════════════════════════════════════════════════════════
-	// CENSO
+	// CENSO - syncCostaleroToProject debe estar antes que addToCensus
 	// ═════════════════════════════════════════════════════════════════
+
+	const syncCostaleroToProject = useCallback(
+		async (proyectoId: string, trabajaderaId: number, displayName: string) => {
+			const {
+				data: { session },
+			} = await supabase.auth.getSession()
+			const { data: proj, error: fetchErr } = await supabase
+				.from("proyectos")
+				.select("content, user_id")
+				.eq("id", proyectoId)
+				.single()
+
+			if (fetchErr || !proj) {
+				// eslint-disable-next-line no-console
+				console.error("syncCostalero: no se pudo leer el proyecto", fetchErr)
+				return
+			}
+
+			if (proj.user_id && proj.user_id !== session?.user?.id) {
+				alert("No tenes permiso para modificar este proyecto.")
+				return
+			}
+
+			const content = proj.content as {
+				trabajaderas: {
+					id: number
+					nombres: string[]
+					roles?: { pri: string; sec: string }[]
+				}[]
+			}
+			const trab = content.trabajaderas.find((t) => t.id === trabajaderaId)
+			if (!trab) {
+				// eslint-disable-next-line no-console
+				console.error(
+					`syncCostalero: no existe trabajadera ${trabajaderaId} en el proyecto`,
+				)
+				return
+			}
+
+			const slotIdx = trab.nombres.findIndex((n) => /^Costalero \d+$/.test(n))
+			if (slotIdx === -1) {
+				trab.nombres.push(displayName)
+				if (trab.roles) trab.roles.push({ pri: "COR", sec: "FIJ_I" })
+			} else {
+				trab.nombres[slotIdx] = displayName
+			}
+
+			const updatePayload: Record<string, unknown> = { content }
+			if (!proj.user_id) updatePayload.user_id = session?.user?.id
+
+			const { error: updateErr } = await supabase
+				.from("proyectos")
+				.update(updatePayload)
+				.eq("id", proyectoId)
+
+			if (updateErr) {
+				// eslint-disable-next-line no-console
+				console.error(
+					"syncCostalero: error al actualizar el proyecto",
+					updateErr,
+				)
+				alert(
+					`⚠️ No se pudo actualizar la cuadrilla: ${updateErr.message}.\nUsá el botón "🔄 Sincronizar Cuadrilla" manualmente.`,
+				)
+			}
+		},
+		[],
+	)
 
 	const addToCensus = useCallback(
 		async (e: React.FormEvent) => {
-			e.preventDefault();
-			if (!newEntry.nombre) return;
-			setSaving(true);
+			e.preventDefault()
+			if (!newEntry.nombre) return
+			setSaving(true)
 
 			const trabajaderaNum = newEntry.trabajadera
 				? parseInt(newEntry.trabajadera)
-				: null;
-			const alturaNum = newEntry.altura ? parseFloat(newEntry.altura) : null;
+				: null
+			const alturaNum = newEntry.altura ? parseFloat(newEntry.altura) : null
 
 			const payload = {
 				...newEntry,
 				trabajadera: trabajaderaNum || null,
 				altura: alturaNum || null,
 				temporada_id: activeTemporadaId,
-			};
+			}
 
 			const { data, error } = await supabase
 				.from("census")
 				.insert([payload])
-				.select();
+				.select()
 
 			if (!error && data) {
-				setCensus((prev) => [data[0], ...prev]);
+				setCensus((prev) => [data[0], ...prev])
 				setNewEntry({
 					email: "",
 					nombre: "",
@@ -296,94 +364,25 @@ export function useAdminMutations(
 					trabajadera: "",
 					altura: "",
 					proyecto_id: newEntry.proyecto_id,
-				});
+				})
 
 				if (trabajaderaNum && newEntry.proyecto_id) {
 					const displayName =
 						newEntry.apodo?.trim() ||
-						`${newEntry.nombre} ${newEntry.apellidos}`.trim();
+						`${newEntry.nombre} ${newEntry.apellidos}`.trim()
 					await syncCostaleroToProject(
 						newEntry.proyecto_id,
 						trabajaderaNum,
 						displayName,
-					);
+					)
 				}
 			} else {
-				alert(error?.message || "Error al añadir al censo");
+				alert(error?.message || "Error al añadir al censo")
 			}
-			setSaving(false);
-			// eslint-disable-next-line react-hooks/exhaustive-deps
+			setSaving(false)
 		},
-		[newEntry, activeTemporadaId, setCensus],
-	);
-
-	const syncCostaleroToProject = useCallback(
-		async (proyectoId: string, trabajaderaId: number, displayName: string) => {
-			const {
-				data: { session },
-			} = await supabase.auth.getSession();
-			const { data: proj, error: fetchErr } = await supabase
-				.from("proyectos")
-				.select("content, user_id")
-				.eq("id", proyectoId)
-				.single();
-
-			if (fetchErr || !proj) {
-				// eslint-disable-next-line no-console
-				console.error("syncCostalero: no se pudo leer el proyecto", fetchErr);
-				return;
-			}
-
-			if (proj.user_id && proj.user_id !== session?.user?.id) {
-				alert("No tenes permiso para modificar este proyecto.");
-				return;
-			}
-
-			const content = proj.content as {
-				trabajaderas: {
-					id: number;
-					nombres: string[];
-					roles?: { pri: string; sec: string }[];
-				}[];
-			};
-			const trab = content.trabajaderas.find((t) => t.id === trabajaderaId);
-			if (!trab) {
-				// eslint-disable-next-line no-console
-				console.error(
-					`syncCostalero: no existe trabajadera ${trabajaderaId} en el proyecto`,
-				);
-				return;
-			}
-
-			const slotIdx = trab.nombres.findIndex((n) => /^Costalero \d+$/.test(n));
-			if (slotIdx === -1) {
-				trab.nombres.push(displayName);
-				if (trab.roles) trab.roles.push({ pri: "COR", sec: "FIJ" });
-			} else {
-				trab.nombres[slotIdx] = displayName;
-			}
-
-			const updatePayload: Record<string, unknown> = { content };
-			if (!proj.user_id) updatePayload.user_id = session?.user?.id;
-
-			const { error: updateErr } = await supabase
-				.from("proyectos")
-				.update(updatePayload)
-				.eq("id", proyectoId);
-
-			if (updateErr) {
-				// eslint-disable-next-line no-console
-				console.error(
-					"syncCostalero: error al actualizar el proyecto",
-					updateErr,
-				);
-				alert(
-					`⚠️ No se pudo actualizar la cuadrilla: ${updateErr.message}.\nUsá el botón "🔄 Sincronizar Cuadrilla" manualmente.`,
-				);
-			}
-		},
-		[],
-	);
+		[newEntry, activeTemporadaId, setCensus, syncCostaleroToProject],
+	)
 
 	const deleteFromCensus = useCallback(
 		async (id: string) => {

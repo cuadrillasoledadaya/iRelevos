@@ -50,7 +50,7 @@ export function migrarDatos(datos: DatosPerfil): DatosPerfil {
     } else if (t.roles.length !== t.nombres.length) {
       // Rellenar o truncar sin perder los roles existentes
       while (t.roles.length < t.nombres.length) {
-        t.roles.push({ pri: 'COR', sec: 'FIJ' })
+        t.roles.push({ pri: 'COR', sec: 'FIJ_I' })
       }
       if (t.roles.length > t.nombres.length) {
         t.roles = t.roles.slice(0, t.nombres.length)
@@ -59,7 +59,7 @@ export function migrarDatos(datos: DatosPerfil): DatosPerfil {
     // Sanitizar: rellenar huecos undefined (arrays sparse)
     for (let i = 0; i < t.roles.length; i++) {
       if (!t.roles[i]) {
-        t.roles[i] = { pri: 'COR', sec: 'FIJ' }
+        t.roles[i] = { pri: 'COR', sec: 'FIJ_I' }
       }
     }
     if (!t.puntuaciones) t.puntuaciones = {}
@@ -362,7 +362,7 @@ export function completarAuto(t: Trabajadera): { plan: TramoSlot[]; obj: Record<
     plan.push({ dentro, fuera })
   }
 
-  // Aplicar orden físico bajo el paso (PAT/COS -> FIJ -> COR -> FIJ -> PAT/COS)
+  // Aplicar orden físico bajo el paso (PAT_I/COS_I -> FIJ_I -> COR -> FIJ_D -> PAT_D/COS_D)
   const planOrdenado = ordenarDentroFisico(t, plan)
 
   const an = analizar(planOrdenado, total, obj, t)
