@@ -175,8 +175,10 @@ function CapatazTrabajadera({ t }: { t: Trabajadera }) {
 							>
 								{est.map((rol: RolCode, posIdx: number) => {
 									const ci = dentroFisico[posIdx] ?? null;
-									const isPri = ci !== null ? getRol(t, ci).pri === rol : false;
-									const estrella = isPri ? "★" : "●";
+									const rolCostalero = ci !== null ? getRol(t, ci) : null;
+									const isPri = rolCostalero?.pri === rol;
+									const isSec = rolCostalero?.sec === rol;
+									const estrella = isPri ? "★" : isSec ? "☆" : "●";
 									const tClass =
 										ci !== null
 											? getTapClass({

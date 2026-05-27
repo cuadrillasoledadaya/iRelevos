@@ -134,7 +134,10 @@ export function esRolHabitual(
 ): boolean {
   if (rol === null) return true
   const r = getRol(t, ci)
-  return r.pri === rol || r.sec === rol
+  // Rol exacto (pri o sec)
+  if (r.pri === rol || r.sec === rol) return true
+  // Mismo rol base (ej: PAT_I puede ir en posición PAT_D)
+  return rolBase(r.pri) === rolBase(rol) || rolBase(r.sec) === rolBase(rol)
 }
 
 export function idealRoles(tid: number): Partial<Record<RolCode, number>> {
@@ -208,8 +211,11 @@ export function asignarRolesTramo(
         } else if (rolesCostalero.sec === rolNecesario) {
           score += 50
         } else if (rolBase(rolesCostalero.pri) === rolBase(rolNecesario)) {
-          // Mismo rol base pero lado distinto: parcialmente compatible
-          score += 25
+          // Mismo rol base pero lado distinto como principal
+          score += 75
+        } else if (rolesCostalero.pri !== 'COR' && rolBase(rolesCostalero.sec) === rolBase(rolNecesario)) {
+          // Secundario con mismo rol base pero lado distinto
+          score += 35
         } else {
           score -= 1000
         }
@@ -261,7 +267,8 @@ export function asignarRolesTramo(
         let score = 0
         if (r.pri === rolNecesario) score = 100
         else if (r.sec === rolNecesario) score = 50
-        else if (rolBase(r.pri) === rolBase(rolNecesario)) score = 25
+        else if (rolBase(r.pri) === rolBase(rolNecesario)) score = 75
+        else if (r.pri !== 'COR' && rolBase(r.sec) === rolBase(rolNecesario)) score = 35
         else score = -1000
 
         if (score > mejorScore) {
