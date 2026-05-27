@@ -468,8 +468,8 @@ function HeightAnalysis({
 				}}
 			>
 				{[
-					{ rol: "PAT/COS", c: ROL_COLOR.PAT_D, hint: "Los más altos" },
-					{ rol: "FIJ", c: ROL_COLOR.FIJ_D, hint: "Altura media" },
+					{ rol: "PAT/COS", c: ROL_COLOR.PAT, hint: "Los más altos" },
+					{ rol: "FIJ", c: ROL_COLOR.FIJ, hint: "Altura media" },
 					{ rol: "COR", c: ROL_COLOR.COR, hint: "Los más bajos" },
 				].map(({ rol, c, hint }) => (
 					<div
@@ -659,8 +659,9 @@ function HeightAnalysis({
 										}}
 									>
 										{vShape.map((e) => {
-											const rolKey = rolBase(e.rol as RolCode)
-											const rc = ROL_COLOR[e.rol] ?? ROL_COLOR[rolKey] ?? ROL_COLOR.COR
+											const rolKey = rolBase(e.rol as RolCode);
+											const rc =
+												ROL_COLOR[e.rol] ?? ROL_COLOR[rolKey] ?? ROL_COLOR.COR;
 											return (
 												<div
 													key={e.idx}
