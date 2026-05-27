@@ -113,21 +113,21 @@ export default function AdminPage() {
 
 	const handleToggleSelected = useCallback(
 		(idx: number) => {
-			if (!m.importPreview) return
-			const next = [...m.importPreview]
-			next[idx].selected = !next[idx].selected
-			m.setImportPreview(next)
+			if (!m.importPreview) return;
+			const next = [...m.importPreview];
+			next[idx].selected = !next[idx].selected;
+			m.setImportPreview(next);
 		},
 		[m],
-	)
+	);
 
 	const handleToggleAllSelected = useCallback(() => {
-		if (!m.importPreview) return
-		const allSelected = m.importPreview.every((c) => c.selected)
+		if (!m.importPreview) return;
+		const allSelected = m.importPreview.every((c) => c.selected);
 		m.setImportPreview(
 			m.importPreview.map((c) => ({ ...c, selected: !allSelected })),
-		)
-	}, [m])
+		);
+	}, [m]);
 
 	const handleStartEdit = useCallback(
 		(entry: import("@/components/admin/types").CensusEntry) => {
