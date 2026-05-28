@@ -60,11 +60,11 @@ export default function CapatazPage() {
 	);
 }
 
-function CapatazTrabajadera({
-	t,
-	isOpen,
+function CapatazTrabajadera({ 
+	t, 
+	isOpen, 
 	onToggle,
-}: {
+}: { 
 	t: Trabajadera;
 	isOpen: boolean;
 	onToggle: () => void;
@@ -72,6 +72,9 @@ function CapatazTrabajadera({
 	const swapSel = uiStore((s) => s.swapSel);
 	const setSwapSel = uiStore.getState().setSwapSel;
 	const openSheet = uiStore.getState().openSheet;
+
+	// Debug: verificar que isOpen cambia
+	console.log(`[CapatazPage] Trabajadera ${t.id} isOpen:`, isOpen);
 
 	// swapSel local para saber si estamos interactuando con esta trabajadera
 	const localSwapSel = swapSel?.a?.tid === t.id ? (swapSel as SwapState) : null;
@@ -164,7 +167,7 @@ function CapatazTrabajadera({
 				<div className="t-chev">▼</div>
 			</div>
 
-			<div className="trab-body fc g3">
+			<div className="trab-body fc g2">
 				{t.tramos.map((nombre: string, ti: number) => {
 					const r = t.plan![ti];
 					const dentroFisico = getDentroFisico(t, r);
