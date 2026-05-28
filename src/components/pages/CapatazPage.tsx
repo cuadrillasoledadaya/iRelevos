@@ -16,6 +16,8 @@ export default function CapatazPage() {
 	const S = projectStore((s) => s.S);
 	const calcularTodo = planStore.getState().calcularTodo;
 	const openSheet = uiStore.getState().openSheet;
+	const openEqs = uiStore((s) => s.openEqs);
+	const toggleEq = uiStore.getState().toggleEq;
 
 	const conPlan = S.trabajaderas.filter(
 		(t: Trabajadera) => t.plan && t.analisis,
@@ -47,13 +49,26 @@ export default function CapatazPage() {
 				</button>
 			</div>
 			{conPlan.map((t: Trabajadera) => (
-				<CapatazTrabajadera key={t.id} t={t} />
+				<CapatazTrabajadera 
+					key={t.id} 
+					t={t} 
+					isOpen={openEqs.has(t.id)}
+					onToggle={() => toggleEq(t.id)}
+				/>
 			))}
 		</>
 	);
 }
 
-function CapatazTrabajadera({ t }: { t: Trabajadera }) {
+function CapatazTrabajadera({ 
+	t, 
+	isOpen, 
+	onToggle,
+}: { 
+	t: Trabajadera;
+	isOpen: boolean;
+	onToggle: () => void;
+}) {
 	const swapSel = uiStore((s) => s.swapSel);
 	const setSwapSel = uiStore.getState().setSwapSel;
 	const openSheet = uiStore.getState().openSheet;
@@ -127,18 +142,22 @@ function CapatazTrabajadera({ t }: { t: Trabajadera }) {
 	const est = estructuraPaso(t.id);
 
 	return (
-		<div
-			className="card mb4"
+		<div 
+			className={`card mb4 ${isOpen ? "open" : ""}`}
 			onClick={() => {
 				if (localSwapSel) setSwapSel(null);
 			}}
 		>
-			<div className="trab-hdr">
+			<div className="trab-hdr" onClick={(e) => {
+				e.stopPropagation();
+				onToggle();
+			}} style={{ cursor: "pointer" }}>
 				<div className="t-badge">{t.id}</div>
 				<div className="t-info">
 					<div className="t-name">Trabajadera {t.id}</div>
 					<div className="t-meta">{t.tramos.length} tramos</div>
 				</div>
+				<div className="t-chev">▼</div>
 			</div>
 
 			<div className="trab-body fc g3" style={{ display: "flex" }}>
