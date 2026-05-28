@@ -835,7 +835,9 @@ body {
 	border-top: 1px solid rgba(201, 168, 76, 0.1);
 }
 .card.open .trab-body {
-	display: block;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
 }
 .tramos-list {
 	display: flex;

@@ -142,16 +142,20 @@ function CapatazTrabajadera({
 	const est = estructuraPaso(t.id);
 
 	return (
-		<div 
+		<div
 			className={`card mb4 ${isOpen ? "open" : ""}`}
 			onClick={() => {
 				if (localSwapSel) setSwapSel(null);
 			}}
 		>
-			<div className="trab-hdr" onClick={(e) => {
-				e.stopPropagation();
-				onToggle();
-			}} style={{ cursor: "pointer" }}>
+			<div
+				className="trab-hdr"
+				onClick={(e) => {
+					e.stopPropagation();
+					onToggle();
+				}}
+				style={{ cursor: "pointer" }}
+			>
 				<div className="t-badge">{t.id}</div>
 				<div className="t-info">
 					<div className="t-name">Trabajadera {t.id}</div>
