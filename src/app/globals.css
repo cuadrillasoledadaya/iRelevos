@@ -93,7 +93,7 @@ html.light .trab-body {
 	border-top: 1px solid rgba(139, 100, 30, 0.12);
 }
 html.light .card.open .trab-body {
-	display: flex;
+	display: flex !important;
 	flex-direction: column;
 	gap: 0.5rem;
 }
@@ -840,7 +840,7 @@ body {
 	border-top: 1px solid rgba(201, 168, 76, 0.1);
 }
 .card.open .trab-body {
-	display: flex;
+	display: flex !important;
 	flex-direction: column;
 	gap: 0.5rem;
 }
