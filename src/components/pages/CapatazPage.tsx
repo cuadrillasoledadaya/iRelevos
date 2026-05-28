@@ -49,9 +49,9 @@ export default function CapatazPage() {
 				</button>
 			</div>
 			{conPlan.map((t: Trabajadera) => (
-				<CapatazTrabajadera 
-					key={t.id} 
-					t={t} 
+				<CapatazTrabajadera
+					key={t.id}
+					t={t}
 					isOpen={openEqs.has(t.id)}
 					onToggle={() => toggleEq(t.id)}
 				/>
@@ -60,11 +60,11 @@ export default function CapatazPage() {
 	);
 }
 
-function CapatazTrabajadera({ 
-	t, 
-	isOpen, 
+function CapatazTrabajadera({
+	t,
+	isOpen,
 	onToggle,
-}: { 
+}: {
 	t: Trabajadera;
 	isOpen: boolean;
 	onToggle: () => void;
@@ -160,7 +160,7 @@ function CapatazTrabajadera({
 				<div className="t-chev">▼</div>
 			</div>
 
-			<div className="trab-body fc g3" style={{ display: "flex" }}>
+			<div className="trab-body fc g3">
 				{t.tramos.map((nombre: string, ti: number) => {
 					const r = t.plan![ti];
 					const dentroFisico = getDentroFisico(t, r);
