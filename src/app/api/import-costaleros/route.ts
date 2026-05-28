@@ -22,8 +22,11 @@ interface ICuadrillaRaw {
 	fila?: number;
 	altura?: number;
 	estado?: string;
+	// Campo rol/puesto en iCuadrilla - puede venir con varios nombres posibles
 	puesto?: string;
 	rol?: string;
+	role?: string;
+	posicion?: string;
 }
 
 interface NormalizedCostalero {
@@ -159,12 +162,15 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 		const rawEmail = (u.email || u.correo || u.mail || "").toLowerCase().trim();
 		const email = rawEmail === "" ? null : rawEmail;
 
-		// Mapear el puesto/rol desde iCuadrilla
-		const puesto = u.puesto || u.rol || null;
+		// Mapear el puesto/rol desde iCuadrilla (probar múltiples nombres de campo posibles)
+		const puesto = u.puesto || u.rol || u.role || u.posicion || null;
 		const rolCostalero = mapPuestoToRolCode(puesto);
 
 		console.log(
 			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: puesto="${puesto}" → rol="${rolCostalero}"`,
+		);
+		console.log(
+			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}"`,
 		);
 
 		return {
