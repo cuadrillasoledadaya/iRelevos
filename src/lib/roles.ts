@@ -4,6 +4,35 @@
 
 import type { Trabajadera, Rol, RolCode, TramoSlot } from "./types";
 
+// ── Mapeo de puestos iCuadrilla → RolCode ──────────────────────────
+
+export function mapPuestoToRolCode(puesto: string | null | undefined): RolCode {
+	if (!puesto) return "COR";
+
+	const cleanPuesto = puesto.trim().toLowerCase();
+
+	// Patero / PAT
+	if (cleanPuesto.startsWith("patero") || cleanPuesto.includes("pater")) {
+		return cleanPuesto.includes("izq") || cleanPuesto.endsWith("i")
+			? "PAT_I"
+			: "PAT_D";
+	}
+	// Costero / COS
+	if (cleanPuesto.startsWith("coster") || cleanPuesto.includes("cos")) {
+		return cleanPuesto.includes("izq") || cleanPuesto.endsWith("i")
+			? "COS_I"
+			: "COS_D";
+	}
+	// Fijador / FIJ
+	if (cleanPuesto.startsWith("fij") || cleanPuesto.includes("fija")) {
+		return cleanPuesto.includes("izq") || cleanPuesto.endsWith("i")
+			? "FIJ_I"
+			: "FIJ_D";
+	}
+	// Corriente / COR (por defecto)
+	return "COR";
+}
+
 // ── Helpers para roles con lado ──────────────────────────────────
 
 /** Extrae el rol base sin lado: PAT_D → PAT, COR → COR */

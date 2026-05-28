@@ -8,6 +8,7 @@ import {
 	rolLabel,
 	rolEmoji,
 	defaultRoles,
+	mapPuestoToRolCode,
 	getRol,
 	esRolHabitual,
 	idealRoles,
@@ -126,6 +127,38 @@ describe("roles", () => {
 			expect(rolEmoji("FIJ_D")).toBe("🔩");
 			expect(rolEmoji("FIJ_I")).toBe("🔩");
 			expect(rolEmoji("COR")).toBe("〰️");
+		});
+	});
+
+	describe("mapPuestoToRolCode", () => {
+		it("debería mapear Patero correctamente", () => {
+			expect(mapPuestoToRolCode("Patero Der")).toBe("PAT_D");
+			expect(mapPuestoToRolCode("Patero Izq")).toBe("PAT_I");
+			expect(mapPuestoToRolCode("Patero Derecho")).toBe("PAT_D");
+			expect(mapPuestoToRolCode("Patero Izquierdo")).toBe("PAT_I");
+			expect(mapPuestoToRolCode("patero der")).toBe("PAT_D");
+			expect(mapPuestoToRolCode("PATERO IZQUIERDO")).toBe("PAT_I");
+		});
+
+		it("debería mapear Costero correctamente", () => {
+			expect(mapPuestoToRolCode("Costero Der")).toBe("COS_D");
+			expect(mapPuestoToRolCode("Costero Izq")).toBe("COS_I");
+			expect(mapPuestoToRolCode("Costero Derecho")).toBe("COS_D");
+			expect(mapPuestoToRolCode("cos")).toBe("COS_D");
+		});
+
+		it("debería mapear Fijador correctamente", () => {
+			expect(mapPuestoToRolCode("Fijador Der")).toBe("FIJ_D");
+			expect(mapPuestoToRolCode("Fijador Izq")).toBe("FIJ_I");
+			expect(mapPuestoToRolCode("Fijador Derecho")).toBe("FIJ_D");
+			expect(mapPuestoToRolCode("fij")).toBe("FIJ_D");
+		});
+
+		it("debería retornar COR para valores nulos o desconocidos", () => {
+			expect(mapPuestoToRolCode(null)).toBe("COR");
+			expect(mapPuestoToRolCode(undefined)).toBe("COR");
+			expect(mapPuestoToRolCode("")).toBe("COR");
+			expect(mapPuestoToRolCode("Administrador")).toBe("COR");
 		});
 	});
 

@@ -4,8 +4,8 @@
 
 import { useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import type { PasoDB, Trabajadera, RolCode } from "@/lib/types";
 import type { UserRole } from "@/hooks/useAuth";
-import type { PasoDB, Trabajadera } from "@/lib/types";
 import type {
 	CensusEntry,
 	ImportEntry,
@@ -506,7 +506,7 @@ export function useAdminMutations(
 
 			const { data: censusData } = await supabase
 				.from("census")
-				.select("nombre, apellidos, apodo, trabajadera")
+				.select("nombre, apellidos, apodo, trabajadera, rol")
 				.eq("proyecto_id", proyectoId)
 				.not("trabajadera", "is", null)
 				.order("trabajadera", { ascending: true });
@@ -529,7 +529,11 @@ export function useAdminMutations(
 			}
 
 			const content = proj.content as {
-				trabajaderas: { id: number; nombres: string[] }[];
+				trabajaderas: {
+					id: number;
+					nombres: string[];
+					roles?: { pri: string; sec: string }[];
+				}[];
 			};
 
 			content.trabajaderas.forEach((t) => {
@@ -538,24 +542,75 @@ export function useAdminMutations(
 					.map((_, i) => `Costalero ${i + 1}`);
 			});
 
-			const byTrab: Record<number, string[]> = {};
+			// Agrupar nombres y roles por trabajadera
+			const byTrab: Record<number, { name: string; rol?: string | null }[]> =
+				{};
 			censusData.forEach((c) => {
 				const tid = c.trabajadera as number;
 				const name = c.apodo?.trim() || `${c.nombre} ${c.apellidos}`.trim();
 				if (!byTrab[tid]) byTrab[tid] = [];
-				byTrab[tid].push(name);
+				byTrab[tid].push({ name, rol: c.rol });
 			});
 
-			Object.entries(byTrab).forEach(([tidStr, names]) => {
+			Object.entries(byTrab).forEach(([tidStr, entries]) => {
 				const tid = parseInt(tidStr);
 				const trab = content.trabajaderas.find((t) => t.id === tid);
 				if (!trab) return;
 
-				names.forEach((name, i) => {
+				// Asegurar array roles con longitud correcta
+				if (!trab.roles) trab.roles = [];
+				while (trab.roles.length < trab.nombres.length) {
+					trab.roles.push({ pri: "COR", sec: "FIJ_I" });
+				}
+
+				const rolesValidos = [
+					"PAT_D",
+					"PAT_I",
+					"COS_D",
+					"COS_I",
+					"FIJ_D",
+					"FIJ_I",
+					"COR",
+				];
+				const esPrimero = tid === 1 || tid === 7;
+
+				entries.forEach((entry, i) => {
 					if (i < trab.nombres.length) {
-						trab.nombres[i] = name;
+						trab.nombres[i] = entry.name;
+						// Aplicar rol del censo si existe y es válido para esta trabajadera
+						if (entry.rol && rolesValidos.includes(entry.rol)) {
+							// Validar compatibilidad: PAT/COS según tipo de trabajadera
+							const rolBase = entry.rol.replace(/_?[DI]$/, "") as
+								| "PAT"
+								| "COS"
+								| "FIJ"
+								| "COR";
+							const rolCompatible = esPrimero
+								? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
+									? entry.rol
+									: "COR"
+								: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
+									? entry.rol
+									: "COR";
+							trab.roles![i] = { pri: rolCompatible as RolCode, sec: "FIJ_I" };
+						}
 					} else {
-						trab.nombres.push(name);
+						trab.nombres.push(entry.name);
+						if (entry.rol && rolesValidos.includes(entry.rol)) {
+							const rolBase = entry.rol.replace(/_?[DI]$/, "") as
+								| "PAT"
+								| "COS"
+								| "FIJ"
+								| "COR";
+							const rolCompatible = esPrimero
+								? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
+									? entry.rol
+									: "COR"
+								: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
+									? entry.rol
+									: "COR";
+							trab.roles!.push({ pri: rolCompatible as RolCode, sec: "FIJ_I" });
+						}
 					}
 				});
 			});
