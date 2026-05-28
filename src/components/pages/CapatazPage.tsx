@@ -60,11 +60,11 @@ export default function CapatazPage() {
 	);
 }
 
-function CapatazTrabajadera({ 
-	t, 
-	isOpen, 
+function CapatazTrabajadera({
+	t,
+	isOpen,
 	onToggle,
-}: { 
+}: {
 	t: Trabajadera;
 	isOpen: boolean;
 	onToggle: () => void;
