@@ -89,7 +89,7 @@ html.light .card.warn {
 html.light .trab-hdr {
 	background: rgba(201, 168, 76, 0.05);
 }
-html.light .trab-body {
+html.light .card .trab-body {
 	border-top: 1px solid rgba(139, 100, 30, 0.12);
 }
 html.light .card.open .trab-body {
@@ -834,8 +834,8 @@ body {
 .card.open .t-chev {
 	transform: rotate(180deg);
 }
-.trab-body {
-	display: none;
+.card .trab-body {
+	display: none !important;
 	padding: 0.85rem;
 	border-top: 1px solid rgba(201, 168, 76, 0.1);
 }

@@ -73,9 +73,6 @@ function CapatazTrabajadera({
 	const setSwapSel = uiStore.getState().setSwapSel;
 	const openSheet = uiStore.getState().openSheet;
 
-	// Debug: verificar que isOpen cambia
-	console.log(`[CapatazPage] Trabajadera ${t.id} isOpen:`, isOpen);
-
 	// swapSel local para saber si estamos interactuando con esta trabajadera
 	const localSwapSel = swapSel?.a?.tid === t.id ? (swapSel as SwapState) : null;
 
@@ -155,7 +152,6 @@ function CapatazTrabajadera({
 				className="trab-hdr"
 				onClick={(e) => {
 					e.stopPropagation();
-					console.log(`[Capataz] Click en header tid=${t.id}, toggleEq`);
 					onToggle();
 				}}
 				style={{ cursor: "pointer" }}
@@ -170,7 +166,7 @@ function CapatazTrabajadera({
 				<div className="t-chev">▼</div>
 			</div>
 
-			<div className="trab-body fc g2">
+			<div className="trab-body">
 				{t.tramos.map((nombre: string, ti: number) => {
 					const r = t.plan![ti];
 					const dentroFisico = getDentroFisico(t, r);
