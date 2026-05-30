@@ -2498,6 +2498,14 @@ html.light .swap-card.COR {
 		margin-left: 25px;
 	}
 
+/* ── PREVIEW SUGERENCIAS ── */
+.pcell.highlight-sug {
+	border-color: var(--oro) !important;
+	box-shadow: 0 0 12px rgba(201, 168, 76, 0.6) !important;
+	transform: scale(1.05);
+	z-index: 10;
+}
+
 	.cost-row .fc.g2 {
 		flex-direction: row !important;
 		width: auto !important;

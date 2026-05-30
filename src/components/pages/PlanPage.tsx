@@ -518,15 +518,28 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											let hasWarn = false;
 											let hasCons = false;
 
+											// Preview visual: resaltar celdas afectadas por sugerencia hover
+											const sugerencias = generarSugerenciasCorreccion(t);
+											const hoveredCorr =
+												hoverSugerencia !== null
+													? sugerencias.correcciones[hoverSugerencia]
+													: null;
+											const isHighlighted =
+												hoveredCorr &&
+												hoveredCorr.tramoOrigen >= 0 &&
+												((ti === hoveredCorr.tramoOrigen &&
+													(ci === hoveredCorr.costaleroA.idx ||
+														ci === hoveredCorr.costaleroB.idx)) ||
+													(ti === hoveredCorr.tramoDestino &&
+														(ci === hoveredCorr.costaleroA.idx ||
+															ci === hoveredCorr.costaleroB.idx)));
+
 											if (r) {
 												isAutoD = v === "L" && r.dentro.includes(ci);
 												isAutoF =
 													(v === "L" || v === "LF") && r.fuera.includes(ci);
 												if (r.fuera.includes(ci)) {
-													if (
-														an?.rep.includes(ci) &&
-														ti === t.tramos.length - 1
-													)
+													if (an?.rep.includes(ci) && ti === t.tramos.length - 1)
 														hasWarn = true;
 													if (ti > 0 && t.plan?.[ti - 1]?.fuera.includes(ci))
 														hasCons = true;
@@ -542,6 +555,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											let cls = clsMap[v];
 											if (hasWarn) cls += " warn-v";
 											if (hasCons && !hasWarn) cls += " cons-v";
+											if (isHighlighted) cls += " highlight-sug";
 
 											const lbl =
 												v === "L"
@@ -646,7 +660,9 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 							return sugerencias.correcciones.map((corr, i) => (
 								<div
 									key={i}
-									className="text-[0.7rem] mb-2 last:mb-0 flex items-center gap-2"
+									className="text-[0.7rem] mb-2 last:mb-0 flex items-center gap-2 cursor-pointer"
+									onMouseEnter={() => setHoverSugerencia(i)}
+									onMouseLeave={() => setHoverSugerencia(null)}
 								>
 									<span className="text-[var(--oro)] font-bold shrink-0">
 										{corr.tipo === "saldo"
