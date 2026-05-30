@@ -3,400 +3,510 @@
 // Las funciones son puras — no tocan DOM ni estado React
 // ══════════════════════════════════════════════════════════════════
 
-import type { Trabajadera, TramoSlot, Analisis, PinState, DatosPerfil } from './types'
-import { defaultNombres } from './nombres'
-import { defaultRoles, ordenarDentroFisico } from './roles'
+import type {
+	Trabajadera,
+	TramoSlot,
+	Analisis,
+	PinState,
+	DatosPerfil,
+} from "./types";
+import { defaultNombres } from "./nombres";
+import { defaultRoles, ordenarDentroFisico } from "./roles";
 
 // ── Datos por defecto ──────────────────────────────────────────────
 
 const BANCO_DEFAULT = [
-  'Salida Iglesia', 'Calle Real', 'Plaza Mayor', 'Calle Nueva',
-  'Vuelta Esquina', 'Bajada Cuesta', 'Paso Puerta', 'Tramo Largo',
-  'Calle Ancha', 'Entrada Carrera', 'Final Carrera', 'Calle Estrecha',
-]
+	"Salida Iglesia",
+	"Calle Real",
+	"Plaza Mayor",
+	"Calle Nueva",
+	"Vuelta Esquina",
+	"Bajada Cuesta",
+	"Paso Puerta",
+	"Tramo Largo",
+	"Calle Ancha",
+	"Entrada Carrera",
+	"Final Carrera",
+	"Calle Estrecha",
+];
 
 export function datosVacios(): DatosPerfil {
-  return {
-    banco: [...BANCO_DEFAULT],
-    planes: [],
-    trabajaderas: Array.from({ length: 7 }, (_, i) => ({
-      id: i + 1,
-      nombres: defaultNombres(6),
-      salidas: 2,
-      roles: defaultRoles(6, i + 1),
-      tramos: [`Tramo 1 (T${i + 1})`, `Tramo 2 (T${i + 1})`, `Tramo 3 (T${i + 1})`],
-      plan: null, obj: null, analisis: null, pinned: null, bajas: [],
-      regla5costaleros: false,
-      puntuaciones: {},
-      tramosClaves: [],
-    })),
-  }
+	return {
+		banco: [...BANCO_DEFAULT],
+		planes: [],
+		trabajaderas: Array.from({ length: 7 }, (_, i) => ({
+			id: i + 1,
+			nombres: defaultNombres(6),
+			salidas: 2,
+			roles: defaultRoles(6, i + 1),
+			tramos: [
+				`Tramo 1 (T${i + 1})`,
+				`Tramo 2 (T${i + 1})`,
+				`Tramo 3 (T${i + 1})`,
+			],
+			plan: null,
+			obj: null,
+			analisis: null,
+			pinned: null,
+			bajas: [],
+			regla5costaleros: false,
+			puntuaciones: {},
+			tramosClaves: [],
+		})),
+	};
 }
 
 export function migrarDatos(datos: DatosPerfil): DatosPerfil {
-  if (!datos.planes) {
-    datos.planes = []
-  }
-  datos.trabajaderas = datos.trabajaderas.map(t => {
-    if (!t.nombres) {
-      t.nombres = defaultNombres(6)
-    }
-    if (!t.salidas) t.salidas = 2
-    if (!t.pinned) t.pinned = null
-    if (!t.bajas) t.bajas = []
-    if (!t.regla5costaleros) t.regla5costaleros = false
-    if (!t.roles) {
-      t.roles = defaultRoles(t.nombres.length, t.id)
-    } else if (t.roles.length !== t.nombres.length) {
-      // Rellenar o truncar sin perder los roles existentes
-      while (t.roles.length < t.nombres.length) {
-        t.roles.push({ pri: 'COR', sec: 'FIJ_I' })
-      }
-      if (t.roles.length > t.nombres.length) {
-        t.roles = t.roles.slice(0, t.nombres.length)
-      }
-    }
-    // Sanitizar: rellenar huecos undefined (arrays sparse)
-    for (let i = 0; i < t.roles.length; i++) {
-      if (!t.roles[i]) {
-        t.roles[i] = { pri: 'COR', sec: 'FIJ_I' }
-      }
-    }
-    if (!t.puntuaciones) t.puntuaciones = {}
-    if (!t.tramosClaves) t.tramosClaves = []
+	if (!datos.planes) {
+		datos.planes = [];
+	}
+	datos.trabajaderas = datos.trabajaderas.map((t) => {
+		if (!t.nombres) {
+			t.nombres = defaultNombres(6);
+		}
+		if (!t.salidas) t.salidas = 2;
+		if (!t.pinned) t.pinned = null;
+		if (!t.bajas) t.bajas = [];
+		if (!t.regla5costaleros) t.regla5costaleros = false;
+		if (!t.roles) {
+			t.roles = defaultRoles(t.nombres.length, t.id);
+		} else if (t.roles.length !== t.nombres.length) {
+			// Rellenar o truncar sin perder los roles existentes
+			while (t.roles.length < t.nombres.length) {
+				t.roles.push({ pri: "COR", sec: "FIJ_I" });
+			}
+			if (t.roles.length > t.nombres.length) {
+				t.roles = t.roles.slice(0, t.nombres.length);
+			}
+		}
+		// Sanitizar: rellenar huecos undefined (arrays sparse)
+		for (let i = 0; i < t.roles.length; i++) {
+			if (!t.roles[i]) {
+				t.roles[i] = { pri: "COR", sec: "FIJ_I" };
+			}
+		}
+		if (!t.puntuaciones) t.puntuaciones = {};
+		if (!t.tramosClaves) t.tramosClaves = [];
 
-    if (t.plan && t.plan[0]?.dentro?.length) {
-      const idx = +t.plan[0].dentro[0]
-      if (isNaN(idx) || idx >= t.nombres.length) {
-        t.plan = null; t.obj = null; t.analisis = null
-      }
-    }
-    return t
-  })
-  return datos
+		if (t.plan && t.plan[0]?.dentro?.length) {
+			const idx = +t.plan[0].dentro[0];
+			if (isNaN(idx) || idx >= t.nombres.length) {
+				t.plan = null;
+				t.obj = null;
+				t.analisis = null;
+			}
+		}
+		return t;
+	});
+	return datos;
 }
 
 // ── Matemáticas de rotación ────────────────────────────────────────
 
 export function objSalidas(
-  total: number,
-  numTramos: number,
-  salidas: number,
-  aplicaRegla5: boolean,
+	total: number,
+	numTramos: number,
+	salidas: number,
+	aplicaRegla5: boolean,
 ): Record<number, number> {
-  // Caso especial: 1 costalero recibe todos los turnos
-  if (total === 1) {
-    return { 0: numTramos * salidas }
-  }
-  
-  // Caso especial: regla 5 aplicada a 5 costaleros
-  if (aplicaRegla5 && total === 5) {
-    // Cada costalero sale exactamente salidas veces → total * salidas asignaciones
-    const totalAsignaciones = total * salidas
-    const base = Math.floor(totalAsignaciones / 5)
-    const extras = totalAsignaciones % 5
-    const obj: Record<number, number> = {}
-    for (let i = 0; i < 5; i++) {
-      obj[i] = base + (i < extras ? 1 : 0)
-    }
-    return obj
-  }
-  
-  const F = aplicaRegla5 ? 1 : (total - 5)
-  if (F <= 0) {
-    // Fallback para casos inválidos
-    const obj: Record<number, number> = {}
-    const base = Math.floor(numTramos / total)
-    const extras = numTramos % total
-    for (let i = 0; i < total; i++) obj[i] = i < extras ? base + 1 : base
-    return obj
-  }
-  
-  // F = costaleros fuera por tramo, plazas totales = tramos × fuera_por_tramo
-  const plazas = numTramos * F
-  const base = Math.floor(plazas / total)
-  const extras = plazas % total
-  const obj: Record<number, number> = {}
-  for (let i = 0; i < total; i++) obj[i] = i < extras ? base + 1 : base
-  return obj
+	// Caso especial: 1 costalero recibe todos los turnos
+	if (total === 1) {
+		return { 0: numTramos * salidas };
+	}
+
+	// Caso especial: regla 5 aplicada a 5 costaleros
+	if (aplicaRegla5 && total === 5) {
+		// Cada costalero sale exactamente salidas veces → total * salidas asignaciones
+		const totalAsignaciones = total * salidas;
+		const base = Math.floor(totalAsignaciones / 5);
+		const extras = totalAsignaciones % 5;
+		const obj: Record<number, number> = {};
+		for (let i = 0; i < 5; i++) {
+			obj[i] = base + (i < extras ? 1 : 0);
+		}
+		return obj;
+	}
+
+	const F = aplicaRegla5 ? 1 : total - 5;
+	if (F <= 0) {
+		// Fallback para casos inválidos
+		const obj: Record<number, number> = {};
+		const base = Math.floor(numTramos / total);
+		const extras = numTramos % total;
+		for (let i = 0; i < total; i++) obj[i] = i < extras ? base + 1 : base;
+		return obj;
+	}
+
+	// F = costaleros fuera por tramo, plazas totales = tramos × fuera_por_tramo
+	const plazas = numTramos * F;
+	const base = Math.floor(plazas / total);
+	const extras = plazas % total;
+	const obj: Record<number, number> = {};
+	for (let i = 0; i < total; i++) obj[i] = i < extras ? base + 1 : base;
+	return obj;
 }
 
-export function calcularCiclo(t: Trabajadera): { plan: TramoSlot[], objetivo: Record<number, number> } {
-  const total = t.nombres.length
-  const numTramos = t.tramos.length
-  const salidas = t.salidas ?? 2
-  const aplicaRegla5 = t.regla5costaleros && total === 5
-  const F = aplicaRegla5 ? 1 : (total - 5)
-  if (F <= 0 || numTramos <= 0) return { plan: [], objetivo: {} }
+export function calcularCiclo(t: Trabajadera): {
+	plan: TramoSlot[];
+	objetivo: Record<number, number>;
+} {
+	const total = t.nombres.length;
+	const numTramos = t.tramos.length;
+	const salidas = t.salidas ?? 2;
+	const aplicaRegla5 = t.regla5costaleros && total === 5;
+	const F = aplicaRegla5 ? 1 : total - 5;
+	if (F <= 0 || numTramos <= 0) return { plan: [], objetivo: {} };
 
-  const todos = Array.from({ length: total }, (_, i) => i)
-  const obj = objSalidas(total, numTramos, salidas, aplicaRegla5)
-  const rest: Record<number, number> = {}
-  const ult: Record<number, number> = {}
-  todos.forEach(c => { rest[c] = obj[c]; ult[c] = -99 })
+	const todos = Array.from({ length: total }, (_, i) => i);
+	const obj = objSalidas(total, numTramos, salidas, aplicaRegla5);
+	const rest: Record<number, number> = {};
+	const ult: Record<number, number> = {};
+	todos.forEach((c) => {
+		rest[c] = obj[c];
+		ult[c] = -99;
+	});
 
-  const plan: TramoSlot[] = []
-  for (let ti = 0; ti < numTramos; ti++) {
-    const esU = ti === numTramos - 1
-    const dT0 = esU && plan[0] ? plan[0].fuera : []
-    let cands = todos.filter(c => rest[c] > 0 && ult[c] !== ti - 1 && !(esU && dT0.includes(c)))
-    if (cands.length < F) cands = todos.filter(c => rest[c] > 0 && ult[c] !== ti - 1)
-    if (cands.length < F) cands = todos.filter(c => rest[c] > 0)
-    cands.sort((a, b) => {
-      if (rest[b] !== rest[a]) return rest[b] - rest[a]
-      const aR = esU && dT0.includes(a) ? 1 : 0
-      const bR = esU && dT0.includes(b) ? 1 : 0
-      if (aR !== bR) return aR - bR
-      return ult[a] - ult[b]
-    })
-    const fuera = cands.slice(0, F)
-    fuera.forEach(c => { rest[c]--; ult[c] = ti })
-    const dentro = todos.filter(c => !fuera.includes(c)).sort((a, b) => a - b)
-    plan.push({ dentro: [...dentro], fuera: [...fuera].sort((a, b) => a - b) })
-  }
-  return { plan, objetivo: obj }
+	const plan: TramoSlot[] = [];
+	for (let ti = 0; ti < numTramos; ti++) {
+		const esU = ti === numTramos - 1;
+		const dT0 = esU && plan[0] ? plan[0].fuera : [];
+		let cands = todos.filter(
+			(c) => rest[c] > 0 && ult[c] !== ti - 1 && !(esU && dT0.includes(c)),
+		);
+		if (cands.length < F)
+			cands = todos.filter((c) => rest[c] > 0 && ult[c] !== ti - 1);
+		if (cands.length < F) cands = todos.filter((c) => rest[c] > 0);
+		cands.sort((a, b) => {
+			if (rest[b] !== rest[a]) return rest[b] - rest[a];
+			const aR = esU && dT0.includes(a) ? 1 : 0;
+			const bR = esU && dT0.includes(b) ? 1 : 0;
+			if (aR !== bR) return aR - bR;
+			return ult[a] - ult[b];
+		});
+		const fuera = cands.slice(0, F);
+		fuera.forEach((c) => {
+			rest[c]--;
+			ult[c] = ti;
+		});
+		const dentro = todos
+			.filter((c) => !fuera.includes(c))
+			.sort((a, b) => a - b);
+		plan.push({ dentro: [...dentro], fuera: [...fuera].sort((a, b) => a - b) });
+	}
+	return { plan, objetivo: obj };
 }
 
-export function tramosOptimos(total: number, salidas: number, regla5costaleros?: boolean): number {
-  // Caso especial: regla 5 costaleros activa con exactamente 5 costaleros
-  if (regla5costaleros && total === 5) {
-    // Con regla5: 1 fuera por tramo, cada costalero sale salidas veces
-    // Total slots fuera necesarios = total * salidas = tramos necesarios
-    return total * salidas
-  }
-  
-  const F = total - 5
-  if (F <= 0) return 0
-  const base = Math.ceil((total * salidas) / F)
-  for (let n = base; n <= base + total * 3; n++) {
-    const t: Trabajadera = {
-      id: 1, nombres: Array(total).fill(''), tramos: Array(n).fill(''),
-      salidas, roles: [], bajas: [], regla5costaleros: false,
-      plan: null, obj: null, analisis: null, pinned: null,
-      puntuaciones: {}, tramosClaves: [],
-    }
-    const { plan } = calcularCiclo(t)
-    if (!plan || !plan.every(s => s.dentro.length === 5)) continue
-    if (plan[0].fuera.filter(c => plan[n - 1].fuera.includes(c)).length === 0) return n
-  }
-  return base
+export function tramosOptimos(
+	total: number,
+	salidas: number,
+	regla5costaleros?: boolean,
+): number {
+	// Caso especial: regla 5 costaleros activa con exactamente 5 costaleros
+	if (regla5costaleros && total === 5) {
+		// Con regla5: 1 fuera por tramo, cada costalero sale salidas veces
+		// Total slots fuera necesarios = total * salidas = tramos necesarios
+		return total * salidas;
+	}
+
+	const F = total - 5;
+	if (F <= 0) return 0;
+	const base = Math.ceil((total * salidas) / F);
+	for (let n = base; n <= base + total * 3; n++) {
+		const t: Trabajadera = {
+			id: 1,
+			nombres: Array(total).fill(""),
+			tramos: Array(n).fill(""),
+			salidas,
+			roles: [],
+			bajas: [],
+			regla5costaleros: false,
+			plan: null,
+			obj: null,
+			analisis: null,
+			pinned: null,
+			puntuaciones: {},
+			tramosClaves: [],
+		};
+		const { plan } = calcularCiclo(t);
+		if (!plan || !plan.every((s) => s.dentro.length === 5)) continue;
+		if (plan[0].fuera.filter((c) => plan[n - 1].fuera.includes(c)).length === 0)
+			return n;
+	}
+	return base;
 }
 
 export function analizar(
-  plan: TramoSlot[],
-  total: number,
-  obj: Record<number, number>,
-  t?: Trabajadera,
+	plan: TramoSlot[],
+	total: number,
+	obj: Record<number, number>,
+	t?: Trabajadera,
 ): Analisis {
-  const conteo: Record<number, number> = {}
-  for (let i = 0; i < total; i++) conteo[i] = 0
-  plan.forEach(tramo => tramo.fuera.forEach(i => { conteo[i]++ }))
-  const okObj = Object.keys(conteo).every(i => conteo[+i] === (obj[+i] ?? 0))
-  const aplicaRegla5 = t?.regla5costaleros && total === 5
-  const dentro_esperado = aplicaRegla5 ? 4 : 5
-  const dentro5 = plan.every(tramo => tramo.dentro.length === dentro_esperado)
-  const primer = plan[0]?.fuera ?? []
-  const ultimo = plan[plan.length - 1]?.fuera ?? []
-  const rep = primer.filter(c => ultimo.includes(c))
-  let cons = 0
-  for (let ti = 1; ti < plan.length; ti++) {
-    plan[ti].fuera.forEach(c => { if (plan[ti - 1].fuera.includes(c)) cons++ })
-  }
-  return { conteo, okObj, dentro5, primer, ultimo, rep, cons }
+	const conteo: Record<number, number> = {};
+	for (let i = 0; i < total; i++) conteo[i] = 0;
+	plan.forEach((tramo) =>
+		tramo.fuera.forEach((i) => {
+			conteo[i]++;
+		}),
+	);
+	const okObj = Object.keys(conteo).every((i) => conteo[+i] === (obj[+i] ?? 0));
+	const aplicaRegla5 = t?.regla5costaleros && total === 5;
+	const dentro_esperado = aplicaRegla5 ? 4 : 5;
+	const dentro5 = plan.every(
+		(tramo) => tramo.dentro.length === dentro_esperado,
+	);
+	const primer = plan[0]?.fuera ?? [];
+	const ultimo = plan[plan.length - 1]?.fuera ?? [];
+	const rep = primer.filter((c) => ultimo.includes(c));
+	let cons = 0;
+	for (let ti = 1; ti < plan.length; ti++) {
+		plan[ti].fuera.forEach((c) => {
+			if (plan[ti - 1].fuera.includes(c)) cons++;
+		});
+	}
+	return { conteo, okObj, dentro5, primer, ultimo, rep, cons };
 }
 
 // ── Plan Híbrido ───────────────────────────────────────────────────
 
 export function getPinned(t: Trabajadera): PinState[][] {
-  if (!t.pinned) {
-    t.pinned = Array.from({ length: t.tramos.length }, () =>
-      Array<PinState>(t.nombres.length).fill('L'))
-  }
-  while (t.pinned.length < t.tramos.length) {
-    t.pinned.push(Array<PinState>(t.nombres.length).fill('L'))
-  }
-  t.pinned = t.pinned.slice(0, t.tramos.length)
-  t.pinned = t.pinned.map(row => {
-    while (row.length < t.nombres.length) row.push('L')
-    return row.slice(0, t.nombres.length)
-  })
-  return t.pinned
+	if (!t.pinned) {
+		t.pinned = Array.from({ length: t.tramos.length }, () =>
+			Array<PinState>(t.nombres.length).fill("L"),
+		);
+	}
+	while (t.pinned.length < t.tramos.length) {
+		t.pinned.push(Array<PinState>(t.nombres.length).fill("L"));
+	}
+	t.pinned = t.pinned.slice(0, t.tramos.length);
+	t.pinned = t.pinned.map((row) => {
+		while (row.length < t.nombres.length) row.push("L");
+		return row.slice(0, t.nombres.length);
+	});
+	return t.pinned;
 }
 
-export function countPinned(t: Trabajadera): { d: number; f: number; total: number } {
-  const p = getPinned(t)
-  let d = 0, f = 0
-  p.forEach(row => row.forEach(v => { if (v === 'D') d++; if (v === 'F' || v === 'LF') f++ }))
-  return { d, f, total: d + f }
+export function countPinned(t: Trabajadera): {
+	d: number;
+	f: number;
+	total: number;
+} {
+	const p = getPinned(t);
+	let d = 0,
+		f = 0;
+	p.forEach((row) =>
+		row.forEach((v) => {
+			if (v === "D") d++;
+			if (v === "F" || v === "LF") f++;
+		}),
+	);
+	return { d, f, total: d + f };
 }
 
 export function validarPinned(t: Trabajadera): string[] {
-  const p = getPinned(t)
-  const total = t.nombres.length
-  const aplicaRegla5 = t.regla5costaleros && total === 5
-  const F = aplicaRegla5 ? 1 : (total - 5)
-  const nAct = t.tramos.length
-  const errs: string[] = []
+	const p = getPinned(t);
+	const total = t.nombres.length;
+	const aplicaRegla5 = t.regla5costaleros && total === 5;
+	const F = aplicaRegla5 ? 1 : total - 5;
+	const nAct = t.tramos.length;
+	const errs: string[] = [];
 
-  for (let ti = 0; ti < nAct; ti++) {
-    const row = p[ti]
-    const forzDentro = row.filter(v => v === 'D').length
-    const forzFuera = row.filter(v => v === 'F' || v === 'LF').length
-    const libres = row.filter(v => v === 'L').length
-    if (forzDentro > 5) errs.push(`Tramo ${ti + 1}: ${forzDentro} fijados dentro (máx. 5)`)
-    if (forzFuera > F) errs.push(`Tramo ${ti + 1}: ${forzFuera} fijados fuera (máx. ${F})`)
-    if (forzDentro + libres < 5) errs.push(`Tramo ${ti + 1}: imposible completar 5 dentro con ${forzDentro} fijos y ${libres} libres`)
-    if (forzFuera + libres < F) errs.push(`Tramo ${ti + 1}: imposible completar ${F} fuera con ${forzFuera} fijos y ${libres} libres`)
-  }
-  return errs
+	for (let ti = 0; ti < nAct; ti++) {
+		const row = p[ti];
+		const forzDentro = row.filter((v) => v === "D").length;
+		const forzFuera = row.filter((v) => v === "F" || v === "LF").length;
+		const libres = row.filter((v) => v === "L").length;
+		if (forzDentro > 5)
+			errs.push(`Tramo ${ti + 1}: ${forzDentro} fijados dentro (máx. 5)`);
+		if (forzFuera > F)
+			errs.push(`Tramo ${ti + 1}: ${forzFuera} fijados fuera (máx. ${F})`);
+		if (forzDentro + libres < 5)
+			errs.push(
+				`Tramo ${ti + 1}: imposible completar 5 dentro con ${forzDentro} fijos y ${libres} libres`,
+			);
+		if (forzFuera + libres < F)
+			errs.push(
+				`Tramo ${ti + 1}: imposible completar ${F} fuera con ${forzFuera} fijos y ${libres} libres`,
+			);
+	}
+	return errs;
 }
 
 export interface SugerenciaRes {
-  top3: { nombre: string; idx: number; puntuacion: number }[]
-  tramosClaves: number[]
-  ultimoIdx: number
+	top3: { nombre: string; idx: number; puntuacion: number }[];
+	tramosClaves: number[];
+	ultimoIdx: number;
 }
 
 export function generarSugerencias(t: Trabajadera): SugerenciaRes {
-  const top3 = t.nombres
-    .map((nombre, idx) => ({
-      nombre,
-      idx,
-      puntuacion: t.puntuaciones[nombre] || 0,
-    }))
-    .filter((x) => x.puntuacion > 0)
-    .sort((a, b) => b.puntuacion - a.puntuacion)
-    .slice(0, 3)
+	const top3 = t.nombres
+		.map((nombre, idx) => ({
+			nombre,
+			idx,
+			puntuacion: t.puntuaciones[nombre] || 0,
+		}))
+		.filter((x) => x.puntuacion > 0)
+		.sort((a, b) => b.puntuacion - a.puntuacion)
+		.slice(0, 3);
 
-  return { top3, tramosClaves: t.tramosClaves || [], ultimoIdx: t.tramos.length - 1 }
+	return {
+		top3,
+		tramosClaves: t.tramosClaves || [],
+		ultimoIdx: t.tramos.length - 1,
+	};
 }
 
 export function aplicarSugerencias(t: Trabajadera): void {
-  const { top3, tramosClaves, ultimoIdx } = generarSugerencias(t)
-  if (top3.length === 0) {
-    throw new Error('¡Error! No hay ningún costalero con valoración asignada (Página de Equipo).')
-  }
+	const { top3, tramosClaves, ultimoIdx } = generarSugerencias(t);
+	if (top3.length === 0) {
+		throw new Error(
+			"¡Error! No hay ningún costalero con valoración asignada (Página de Equipo).",
+		);
+	}
 
-  const p = getPinned(t)
-  const targets = Array.from(new Set([...tramosClaves, ultimoIdx]))
+	const p = getPinned(t);
+	const targets = Array.from(new Set([...tramosClaves, ultimoIdx]));
 
-  // 1. Limpiar PINS actuales 'D' en los tramos objetivo
-  targets.forEach(ti => {
-    if (p[ti]) {
-      p[ti] = p[ti].map(v => v === 'D' ? 'L' : v)
-    }
-  })
+	// 1. Limpiar PINS actuales 'D' en los tramos objetivo
+	targets.forEach((ti) => {
+		if (p[ti]) {
+			p[ti] = p[ti].map((v) => (v === "D" ? "L" : v));
+		}
+	});
 
-  // 2. Aplicar PINS: Los 3 mejores van D (Dentro)
-  targets.forEach(ti => {
-    if (p[ti]) {
-      top3.forEach(c => {
-        p[ti][c.idx] = 'D'
-      })
-    }
-  })
+	// 2. Aplicar PINS: Los 3 mejores van D (Dentro)
+	targets.forEach((ti) => {
+		if (p[ti]) {
+			top3.forEach((c) => {
+				p[ti][c.idx] = "D";
+			});
+		}
+	});
 }
 
-export function completarAuto(t: Trabajadera): { plan: TramoSlot[]; obj: Record<number, number>; analisis: Analisis } | { error: string[] } {
-  const errs = validarPinned(t)
-  if (errs.length) return { error: errs }
+export function completarAuto(
+	t: Trabajadera,
+):
+	| { plan: TramoSlot[]; obj: Record<number, number>; analisis: Analisis }
+	| { error: string[] } {
+	const errs = validarPinned(t);
+	if (errs.length) return { error: errs };
 
-  const p = getPinned(t)
-  const total = t.nombres.length
-  const aplicaRegla5 = t.regla5costaleros && total === 5
-  const F = aplicaRegla5 ? 1 : (total - 5)
-  const nAct = t.tramos.length
-  const todos = Array.from({ length: total }, (_, i) => i)
-  const salidas = t.salidas ?? 2
-  const obj = objSalidas(total, nAct, salidas, aplicaRegla5)
+	const p = getPinned(t);
+	const total = t.nombres.length;
+	const aplicaRegla5 = t.regla5costaleros && total === 5;
+	const F = aplicaRegla5 ? 1 : total - 5;
+	const nAct = t.tramos.length;
+	const todos = Array.from({ length: total }, (_, i) => i);
+	const salidas = t.salidas ?? 2;
+	const obj = objSalidas(total, nAct, salidas, aplicaRegla5);
 
-  const usadas: Record<number, number> = {}
-  todos.forEach(c => { usadas[c] = 0 })
-  for (let ti = 0; ti < nAct; ti++) {
-    p[ti].forEach((v, ci) => { if (v === 'F' || v === 'LF') usadas[ci]++ })
-  }
+	const usadas: Record<number, number> = {};
+	todos.forEach((c) => {
+		usadas[c] = 0;
+	});
+	for (let ti = 0; ti < nAct; ti++) {
+		p[ti].forEach((v, ci) => {
+			if (v === "F" || v === "LF") usadas[ci]++;
+		});
+	}
 
-  const rest: Record<number, number> = {}
-  todos.forEach(c => { rest[c] = Math.max(0, (obj[c] ?? 0) - usadas[c]) })
+	const rest: Record<number, number> = {};
+	todos.forEach((c) => {
+		rest[c] = Math.max(0, (obj[c] ?? 0) - usadas[c]);
+	});
 
-  const ult: Record<number, number> = {}
-  todos.forEach(c => { ult[c] = -99 })
-  const plan: TramoSlot[] = []
+	const ult: Record<number, number> = {};
+	todos.forEach((c) => {
+		ult[c] = -99;
+	});
+	const plan: TramoSlot[] = [];
 
-  for (let ti = 0; ti < nAct; ti++) {
-    const row = p[ti]
-    const esU = ti === nAct - 1
-    const dT0 = esU && plan[0] ? plan[0].fuera : []
+	for (let ti = 0; ti < nAct; ti++) {
+		const row = p[ti];
+		const esU = ti === nAct - 1;
+		const dT0 = esU && plan[0] ? plan[0].fuera : [];
 
-    const forzDentro = todos.filter(c => row[c] === 'D')
-    const forzFuera = todos.filter(c => row[c] === 'F' || row[c] === 'LF')
-    const libres = todos.filter(c => row[c] === 'L')
-    const needFuera = F - forzFuera.length
+		const forzDentro = todos.filter((c) => row[c] === "D");
+		const forzFuera = todos.filter((c) => row[c] === "F" || row[c] === "LF");
+		const libres = todos.filter((c) => row[c] === "L");
+		const needFuera = F - forzFuera.length;
 
-    let candsFuera = libres.filter(c => {
-      if (rest[c] <= 0) return false
-      if (ult[c] === ti - 1) return false
-      if (esU && dT0.includes(c)) return false
-      return true
-    })
-    if (candsFuera.length < needFuera) candsFuera = libres.filter(c => rest[c] > 0 && ult[c] !== ti - 1)
-    if (candsFuera.length < needFuera) candsFuera = libres.filter(c => rest[c] > 0)
-    if (candsFuera.length < needFuera) candsFuera = libres.filter(c => !forzDentro.includes(c))
+		let candsFuera = libres.filter((c) => {
+			if (rest[c] <= 0) return false;
+			if (ult[c] === ti - 1) return false;
+			if (esU && dT0.includes(c)) return false;
+			return true;
+		});
+		if (candsFuera.length < needFuera)
+			candsFuera = libres.filter((c) => rest[c] > 0 && ult[c] !== ti - 1);
+		if (candsFuera.length < needFuera)
+			candsFuera = libres.filter((c) => rest[c] > 0);
+		if (candsFuera.length < needFuera)
+			candsFuera = libres.filter((c) => !forzDentro.includes(c));
 
-    candsFuera.sort((a, b) => {
-      if (rest[b] !== rest[a]) return rest[b] - rest[a]
-      const aR = esU && dT0.includes(a) ? 1 : 0
-      const bR = esU && dT0.includes(b) ? 1 : 0
-      if (aR !== bR) return aR - bR
-      return ult[a] - ult[b]
-    })
+		candsFuera.sort((a, b) => {
+			if (rest[b] !== rest[a]) return rest[b] - rest[a];
+			const aR = esU && dT0.includes(a) ? 1 : 0;
+			const bR = esU && dT0.includes(b) ? 1 : 0;
+			if (aR !== bR) return aR - bR;
+			return ult[a] - ult[b];
+		});
 
-    const autoFuera = candsFuera.slice(0, needFuera)
-    const fuera = [...forzFuera, ...autoFuera].sort((a, b) => a - b)
-    fuera.forEach(c => {
-      if (p[ti][c] === 'L' || p[ti][c] === 'LF') { rest[c] = Math.max(0, rest[c] - 1) }
-      ult[c] = ti
-    })
+		const autoFuera = candsFuera.slice(0, needFuera);
+		const fuera = [...forzFuera, ...autoFuera].sort((a, b) => a - b);
+		fuera.forEach((c) => {
+			if (p[ti][c] === "L" || p[ti][c] === "LF") {
+				rest[c] = Math.max(0, rest[c] - 1);
+			}
+			ult[c] = ti;
+		});
 
-    const dentro = todos.filter(c => !fuera.includes(c)).sort((a, b) => a - b)
-    plan.push({ dentro, fuera })
-  }
+		const dentro = todos
+			.filter((c) => !fuera.includes(c))
+			.sort((a, b) => a - b);
+		plan.push({ dentro, fuera });
+	}
 
-  // Aplicar orden físico bajo el paso (PAT_I/COS_I -> FIJ_I -> COR -> FIJ_D -> PAT_D/COS_D)
-  const planOrdenado = ordenarDentroFisico(t, plan)
+	// Aplicar orden físico bajo el paso (PAT_I/COS_I -> FIJ_I -> COR -> FIJ_D -> PAT_D/COS_D)
+	const planOrdenado = ordenarDentroFisico(t, plan);
 
-  const an = analizar(planOrdenado, total, obj, t)
-  return { plan: planOrdenado, obj, analisis: an }
+	const an = analizar(planOrdenado, total, obj, t);
+	return { plan: planOrdenado, obj, analisis: an };
 }
 
 export function getFueraPorTramo(t: Trabajadera): number {
-  const aplicaRegla5 = t.regla5costaleros && t.nombres.length === 5
-  return aplicaRegla5 ? 1 : (t.nombres.length - 5)
+	const aplicaRegla5 = t.regla5costaleros && t.nombres.length === 5;
+	return aplicaRegla5 ? 1 : t.nombres.length - 5;
 }
 
 // ── Planes de Relevos ───────────────────────────────────────────────
 
 /** Detecta si un nombre de tramo es genérico ("Tramo N (TN)") */
 export function isGenericTramo(n: string): boolean {
-  return /^Tramo \d+ \(T\d+\)$/.test(n)
+	return /^Tramo \d+ \(T\d+\)$/.test(n);
 }
 
 // ── Sugerencias de Corrección ─────────────────────────────────────────
 
 export interface CorreccionSugerida {
-  tipo: 'saldo' | 'repetido' | 'consecutivo'
-  costaleroA: { nombre: string; idx: number; problema: string }
-  costaleroB: { nombre: string; idx: number; solucion: string }
-  tramoOrigen: number
-  tramoDestino: number
-  impacto: string
+	tipo: "saldo" | "repetido" | "consecutivo";
+	costaleroA: { nombre: string; idx: number; problema: string };
+	costaleroB: { nombre: string; idx: number; solucion: string };
+	tramoOrigen: number;
+	tramoDestino: number;
+	impacto: string;
 }
 
 export interface AnalisisCorrecciones {
-  correcciones: CorreccionSugerida[]
-  erroresSaldo: { nombre: string; idx: number; tiene: number; necesita: number }[]
-  repetidos: { nombre: string; idx: number; tramos: number[] }[]
-  consecutivos: { nombre: string; idx: number; tramos: [number, number][] }[]
+	correcciones: CorreccionSugerida[];
+	erroresSaldo: {
+		nombre: string;
+		idx: number;
+		tiene: number;
+		necesita: number;
+	}[];
+	repetidos: { nombre: string; idx: number; tramos: number[] }[];
+	consecutivos: { nombre: string; idx: number; tramos: [number, number][] }[];
 }
 
 /**
@@ -406,148 +516,170 @@ export interface AnalisisCorrecciones {
  * - Eliminar repeticiones de 1º/último
  * - Separar costaleros consecutivos
  */
-export function generarSugerenciasCorreccion(t: Trabajadera): AnalisisCorrecciones {
-  if (!t.plan || !t.analisis) {
-    return { correcciones: [], erroresSaldo: [], repetidos: [], consecutivos: [] }
-  }
+export function generarSugerenciasCorreccion(
+	t: Trabajadera,
+): AnalisisCorrecciones {
+	if (!t.plan || !t.analisis) {
+		return {
+			correcciones: [],
+			erroresSaldo: [],
+			repetidos: [],
+			consecutivos: [],
+		};
+	}
 
-  const erroresSaldo: { nombre: string; idx: number; tiene: number; necesita: number }[] = []
-  const repetidos: { nombre: string; idx: number; tramos: number[] }[] = []
-  const consecutivos: { nombre: string; idx: number; tramos: [number, number][] }[] = []
-  const correcciones: CorreccionSugerida[] = []
+	const erroresSaldo: {
+		nombre: string;
+		idx: number;
+		tiene: number;
+		necesita: number;
+	}[] = [];
+	const repetidos: { nombre: string; idx: number; tramos: number[] }[] = [];
+	const consecutivos: {
+		nombre: string;
+		idx: number;
+		tramos: [number, number][];
+	}[] = [];
+	const correcciones: CorreccionSugerida[] = [];
 
-  // 1. Analizar desviaciones de saldo
-  if (t.analisis.conteo) {
-    Object.entries(t.analisis.conteo).forEach(([idxStr, tiene]) => {
-      const idx = +idxStr
-      const necesita = t.obj ? t.obj[idx] ?? 0 : 0
-      if (tiene !== necesita) {
-        erroresSaldo.push({
-          nombre: t.nombres[idx],
-          idx,
-          tiene,
-          necesita
-        })
-      }
-    })
-  }
+	// 1. Analizar desviaciones de saldo
+	if (t.analisis.conteo) {
+		Object.entries(t.analisis.conteo).forEach(([idxStr, tiene]) => {
+			const idx = +idxStr;
+			const necesita = t.obj ? (t.obj[idx] ?? 0) : 0;
+			if (tiene !== necesita) {
+				erroresSaldo.push({
+					nombre: t.nombres[idx],
+					idx,
+					tiene,
+					necesita,
+				});
+			}
+		});
+	}
 
-  // 2. Analizar repeticiones 1º/último
-  if (t.analisis.rep && t.analisis.rep.length > 0) {
-    t.analisis.rep.forEach(idx => {
-      repetidos.push({
-        nombre: t.nombres[idx],
-        idx,
-        tramos: [0, t.tramos.length - 1]
-      })
-    })
-  }
+	// 2. Analizar repeticiones 1º/último
+	if (t.analisis.rep && t.analisis.rep.length > 0) {
+		t.analisis.rep.forEach((idx) => {
+			repetidos.push({
+				nombre: t.nombres[idx],
+				idx,
+				tramos: [0, t.tramos.length - 1],
+			});
+		});
+	}
 
-  // 3. Analizar consecutivos
-  for (let ti = 1; ti < t.plan.length; ti++) {
-    t.plan[ti].fuera.forEach(idx => {
-      if (t.plan && t.plan[ti - 1].fuera.includes(idx)) {
-        const existente = consecutivos.find(c => c.idx === idx)
-        if (existente) {
-          existente.tramos.push([ti - 1, ti])
-        } else {
-          consecutivos.push({
-            nombre: t.nombres[idx],
-            idx,
-            tramos: [[ti - 1, ti]]
-          })
-        }
-      }
-    })
-  }
+	// 3. Analizar consecutivos
+	for (let ti = 1; ti < t.plan.length; ti++) {
+		t.plan[ti].fuera.forEach((idx) => {
+			if (t.plan && t.plan[ti - 1].fuera.includes(idx)) {
+				const existente = consecutivos.find((c) => c.idx === idx);
+				if (existente) {
+					existente.tramos.push([ti - 1, ti]);
+				} else {
+					consecutivos.push({
+						nombre: t.nombres[idx],
+						idx,
+						tramos: [[ti - 1, ti]],
+					});
+				}
+			}
+		});
+	}
 
-  // 4. Generar correcciones concretas
-  // Si un costalero tiene desbalance de saldo, sugerir intercambio
-  if (erroresSaldo.length >= 2) {
-    const conMenos = erroresSaldo.filter(e => e.tiene < e.necesita).sort((a, b) => a.tiene - b.tiene)
-    const conMas = erroresSaldo.filter(e => e.tiene > e.necesita).sort((a, b) => b.tiene - a.tiene)
+	// 4. Generar correcciones concretas
+	// Si un costalero tiene desbalance de saldo, sugerir intercambio
+	if (erroresSaldo.length >= 2) {
+		const conMenos = erroresSaldo
+			.filter((e) => e.tiene < e.necesita)
+			.sort((a, b) => a.tiene - b.tiene);
+		const conMas = erroresSaldo
+			.filter((e) => e.tiene > e.necesita)
+			.sort((a, b) => b.tiene - a.tiene);
 
-    if (conMenos.length > 0 && conMas.length > 0) {
-      const receptor = conMenos[0]
-      const donante = conMas[0]
-      correcciones.push({
-        tipo: 'saldo',
-        costaleroA: {
-          nombre: receptor.nombre,
-          idx: receptor.idx,
-          problema: `Necesita ${receptor.necesita - receptor.tiene} salida(s) más`
-        },
-        costaleroB: {
-          nombre: donante.nombre,
-          idx: donante.idx,
-          solucion: `Puede ceder ${donante.tiene - donante.necesita} salida(s)`
-        },
-        tramoOrigen: -1, // Se resolverá dinámicamente
-        tramoDestino: -1,
-        impacto: `Intercambiar en tramo donde ${donante.nombre} está fuera y ${receptor.nombre} está dentro`
-      })
-    }
-  }
+		if (conMenos.length > 0 && conMas.length > 0) {
+			const receptor = conMenos[0];
+			const donante = conMas[0];
+			correcciones.push({
+				tipo: "saldo",
+				costaleroA: {
+					nombre: receptor.nombre,
+					idx: receptor.idx,
+					problema: `Necesita ${receptor.necesita - receptor.tiene} salida(s) más`,
+				},
+				costaleroB: {
+					nombre: donante.nombre,
+					idx: donante.idx,
+					solucion: `Puede ceder ${donante.tiene - donante.necesita} salida(s)`,
+				},
+				tramoOrigen: -1, // Se resolverá dinámicamente
+				tramoDestino: -1,
+				impacto: `Intercambiar en tramo donde ${donante.nombre} está fuera y ${receptor.nombre} está dentro`,
+			});
+		}
+	}
 
-  // Corrección de repeticiones
-  repetidos.forEach(r => {
-    // Buscar un costalero que no esté en el último tramo para intercambiar
-    const candidatos = t.nombres
-      .map((nombre, idx) => ({ nombre, idx }))
-      .filter(c => !t.analisis?.rep?.includes(c.idx))
-      .filter(c => t.plan && t.plan[t.tramos.length - 1].dentro.includes(c.idx))
+	// Corrección de repeticiones
+	repetidos.forEach((r) => {
+		// Buscar un costalero que no esté en el último tramo para intercambiar
+		const candidatos = t.nombres
+			.map((nombre, idx) => ({ nombre, idx }))
+			.filter((c) => !t.analisis?.rep?.includes(c.idx))
+			.filter(
+				(c) => t.plan && t.plan[t.tramos.length - 1].dentro.includes(c.idx),
+			);
 
-    if (candidatos.length > 0) {
-      correcciones.push({
-        tipo: 'repetido',
-        costaleroA: {
-          nombre: r.nombre,
-          idx: r.idx,
-          problema: `Repite en 1º y último tramo`
-        },
-        costaleroB: {
-          nombre: candidatos[0].nombre,
-          idx: candidatos[0].idx,
-          solucion: `Intercambiar con este costalero en último tramo`
-        },
-        tramoOrigen: 0,
-        tramoDestino: t.tramos.length - 1,
-        impacto: `Eliminar repetición 1º/último`
-      })
-    }
-  })
+		if (candidatos.length > 0) {
+			correcciones.push({
+				tipo: "repetido",
+				costaleroA: {
+					nombre: r.nombre,
+					idx: r.idx,
+					problema: `Repite en 1º y último tramo`,
+				},
+				costaleroB: {
+					nombre: candidatos[0].nombre,
+					idx: candidatos[0].idx,
+					solucion: `Intercambiar con este costalero en último tramo`,
+				},
+				tramoOrigen: 0,
+				tramoDestino: t.tramos.length - 1,
+				impacto: `Eliminar repetición 1º/último`,
+			});
+		}
+	});
 
-  // Corrección de consecutivos - buscar intercambio con costalero del tramo intermedio
-  consecutivos.forEach(c => {
-    c.tramos.forEach(([ti1, ti2]) => {
-      // En ti2, buscar alguien que pueda intercambiar con quien está fuera en ti1
-      if (t.plan) {
-        const fueraEnT1 = t.plan[ti1].fuera
-        const dentroEnT2 = t.plan[ti2].dentro
+	// Corrección de consecutivos - buscar intercambio con costalero del tramo intermedio
+	consecutivos.forEach((c) => {
+		c.tramos.forEach(([ti1, ti2]) => {
+			// En ti2, buscar alguien que pueda intercambiar con quien está fuera en ti1
+			if (t.plan) {
+				const fueraEnT1 = t.plan[ti1].fuera;
+				const dentroEnT2 = t.plan[ti2].dentro;
 
-        // Encontrar un candidato que pueda intercambiar
-        const cand = dentroEnT2.find(idx => !fueraEnT1.includes(idx))
-        if (cand !== undefined) {
-          correcciones.push({
-            tipo: 'consecutivo',
-            costaleroA: {
-              nombre: c.nombre,
-              idx: c.idx,
-              problema: `Está fuera en tramos ${ti1 + 1} y ${ti2 + 1}`
-            },
-            costaleroB: {
-              nombre: t.nombres[cand],
-              idx: cand,
-              solucion: `Intercambiar en tramo ${ti2 + 1}`
-            },
-            tramoOrigen: ti1,
-            tramoDestino: ti2,
-            impacto: `Separar consecutividad`
-          })
-        }
-      }
-    })
-  })
+				// Encontrar un candidato que pueda intercambiar
+				const cand = dentroEnT2.find((idx) => !fueraEnT1.includes(idx));
+				if (cand !== undefined) {
+					correcciones.push({
+						tipo: "consecutivo",
+						costaleroA: {
+							nombre: c.nombre,
+							idx: c.idx,
+							problema: `Está fuera en tramos ${ti1 + 1} y ${ti2 + 1}`,
+						},
+						costaleroB: {
+							nombre: t.nombres[cand],
+							idx: cand,
+							solucion: `Intercambiar en tramo ${ti2 + 1}`,
+						},
+						tramoOrigen: ti1,
+						tramoDestino: ti2,
+						impacto: `Separar consecutividad`,
+					});
+				}
+			}
+		});
+	});
 
-  return { correcciones, erroresSaldo, repetidos, consecutivos }
+	return { correcciones, erroresSaldo, repetidos, consecutivos };
 }

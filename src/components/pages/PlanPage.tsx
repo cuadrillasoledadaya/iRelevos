@@ -2,7 +2,7 @@
 
 import { useState, memo } from "react";
 import { uiStore, projectStore, trabajaderaStore, planStore } from "@/stores";
-import { getPinned, countPinned, getFueraPorTramo } from "@/lib/algoritmos";
+import { getPinned, countPinned, getFueraPorTramo, generarSugerenciasCorreccion } from "@/lib/algoritmos";
 import { nameAt, shortName } from "@/lib/nombres";
 import type { Trabajadera } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
@@ -617,6 +617,34 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 								×
 							</button>
 						)}
+					</div>
+				)}
+
+				{/* Sugerencias de corrección */}
+				{an && !statusOk && (
+					<div className="mt-3 p-3 bg-[rgba(201,168,76,0.1)] border border-[var(--oro)] rounded-xl">
+						<div className="text-[0.65rem] uppercase tracking-wider text-[var(--oro)] font-bold mb-2">
+							Sugerencias de Corrección
+						</div>
+						{(() => {
+							const sugerencias = generarSugerenciasCorreccion(t);
+							if (sugerencias.correcciones.length === 0) {
+								return (
+									<div className="text-[0.75rem] text-[var(--cre-o)]">
+										No hay sugerencias automáticas disponibles. Edita manualmente en la vista Capataz.
+									</div>
+								);
+							}
+							return sugerencias.correcciones.map((corr, i) => (
+								<div key={i} className="text-[0.7rem] mb-2 last:mb-0">
+									<span className="text-[var(--oro)] font-bold">
+										{corr.tipo === 'saldo' ? '📊' : corr.tipo === 'repetido' ? '🔄' : '↪'}
+									</span>{' '}
+									<strong>{corr.costaleroA.nombre}</strong> {corr.costaleroA.problema} ↔{' '}
+									<strong>{corr.costaleroB.nombre}</strong> {corr.costaleroB.solucion}
+								</div>
+							));
+						})()}
 					</div>
 				)}
 
