@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { uiStore, temporadaStore, trabajaderaStore } from "@/stores";
 import { supabase } from "@/lib/supabase";
+import type { RolCode } from "@/lib/types";
 
 interface CensusEntry {
 	id: string;
@@ -10,6 +11,8 @@ interface CensusEntry {
 	apellidos: string;
 	apodo?: string;
 	trabajadera?: number;
+	rol?: RolCode;
+	rol_sec?: RolCode;
 }
 
 export default function CensusSheet() {
@@ -18,6 +21,8 @@ export default function CensusSheet() {
 	const censusTarget = uiStore((s) => s.censusTarget);
 	const setCensusTarget = uiStore.getState().setCensusTarget;
 	const setNombre = trabajaderaStore.getState().setNombre;
+	const setRolPri = trabajaderaStore.getState().setRolPri;
+	const setRolSec = trabajaderaStore.getState().setRolSec;
 	const activeTemporadaId = temporadaStore((s) => s.activeTemporadaId);
 	const [census, setCensus] = useState<CensusEntry[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -31,7 +36,7 @@ export default function CensusSheet() {
 			setLoading(true);
 			const { data, error } = await supabase
 				.from("census")
-				.select("id, nombre, apellidos, apodo, trabajadera")
+				.select("id, nombre, apellidos, apodo, trabajadera, rol, rol_sec")
 				.eq("temporada_id", activeTemporadaId)
 				.order("nombre", { ascending: true });
 
@@ -50,6 +55,14 @@ export default function CensusSheet() {
 		if (censusTarget) {
 			const display = c.apodo ? c.apodo : `${c.nombre} ${c.apellidos}`;
 			setNombre(censusTarget.tid, censusTarget.ci, display);
+			// Aplicar rol principal si existe
+			if (c.rol) {
+				setRolPri(censusTarget.tid, censusTarget.ci, c.rol);
+			}
+			// Aplicar rol secundario si existe
+			if (c.rol_sec) {
+				setRolSec(censusTarget.tid, censusTarget.ci, c.rol_sec);
+			}
 			setCensusTarget(null);
 			closeSheet();
 		}

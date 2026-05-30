@@ -27,6 +27,10 @@ interface ICuadrillaRaw {
 	rol?: string;
 	role?: string;
 	posicion?: string;
+	// Puesto secundario (rol secundario)
+	puesto_sec?: string;
+	rol_sec?: string;
+	role_sec?: string;
 }
 
 interface NormalizedCostalero {
@@ -37,6 +41,7 @@ interface NormalizedCostalero {
 	email: string | null;
 	trabajadera: number | null;
 	rol: RolCode;
+	rol_sec: RolCode;
 	source: string;
 }
 
@@ -162,15 +167,20 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 		const rawEmail = (u.email || u.correo || u.mail || "").toLowerCase().trim();
 		const email = rawEmail === "" ? null : rawEmail;
 
-		// Mapear el puesto/rol desde iCuadrilla (probar múltiples nombres de campo posibles)
+		// Mapear el puesto/rol principal desde iCuadrilla (probar múltiples nombres de campo posibles)
 		const puesto = u.puesto || u.rol || u.role || u.posicion || null;
 		const rolCostalero = mapPuestoToRolCode(puesto);
 
+		// Mapear el puesto secundario (rol secundario) - múltiples nombres de campo posibles
+		const puestoSec =
+			u.puesto_sec || u.rol_sec || u.role_sec || null;
+		const rolSecCostalero = mapPuestoToRolCode(puestoSec);
+
 		console.log(
-			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: puesto="${puesto}" → rol="${rolCostalero}"`,
+			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: puesto="${puesto}" → rol="${rolCostalero}", puesto_sec="${puestoSec}" → rol_sec="${rolSecCostalero}"`,
 		);
 		console.log(
-			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}"`,
+			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}", puesto_sec="${u.puesto_sec}", rol_sec="${u.rol_sec}"`,
 		);
 
 		return {
@@ -181,6 +191,7 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 			email: email,
 			trabajadera: u.trabajadera || u.fila || u.altura || null,
 			rol: rolCostalero,
+			rol_sec: rolSecCostalero,
 			source: "icuadrilla",
 		};
 	});

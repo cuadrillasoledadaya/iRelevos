@@ -5,11 +5,7 @@
 import type { Trabajadera } from "../../types";
 import type { RolCode } from "../../types";
 import type { RelevosTableData } from "../types";
-import {
-	estructuraPaso,
-	getDentroFisico,
-	rolLado,
-} from "../../roles";
+import { estructuraPaso, getDentroFisico, rolLado } from "../../roles";
 import { pillName } from "../../nombres";
 
 /**
