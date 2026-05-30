@@ -281,6 +281,7 @@ describe("POST /api/import-costaleros", () => {
 					email: "juan@test.com",
 					trabajadera: 3,
 					rol: "PAT_D",
+					rol_sec: "COR",
 					source: "icuadrilla",
 				},
 				{
@@ -291,6 +292,7 @@ describe("POST /api/import-costaleros", () => {
 					email: null,
 					trabajadera: 5,
 					rol: "FIJ_I",
+					rol_sec: "COR",
 					source: "icuadrilla",
 				},
 			],
