@@ -696,6 +696,12 @@ export function generarSugerenciasCorreccion(
 					(idx) => !fueraEnT1.includes(idx) && !t.bajas?.includes(idx),
 				);
 				if (cand !== undefined) {
+					// Validar que el intercambio no crea repetición nueva en 1º/último
+					const causariaRepeticion =
+						ti1 === 0 &&
+						t.plan[ti2].dentro.includes(c.idx) &&
+						t.plan[t.tramos.length - 1]?.dentro.includes(cand!);
+
 					correcciones.push({
 						tipo: "consecutivo",
 						costaleroA: {
@@ -710,8 +716,10 @@ export function generarSugerenciasCorreccion(
 						},
 						tramoOrigen: ti1,
 						tramoDestino: ti2,
-						impacto: `Separar consecutividad`,
-						prioridad: 2, // Alta prioridad
+						impacto: causariaRepeticion
+							? `Separar consecutividad (cuidado: podría crear repetición)`
+							: `Separar consecutividad`,
+						prioridad: causariaRepeticion ? 3 : 2, // Media si crea conflicto
 					});
 				}
 			}
