@@ -274,6 +274,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 	const getErroresPinned = planStore.getState().getErroresPinned;
 	const quitarBloqueos = planStore.getState().quitarBloqueos;
 	const sugerirYCalcular = trabajaderaStore.getState().sugerirYCalcular;
+	const aplicarSugerencia = planStore.getState().aplicarSugerencia;
 	const { profile } = useAuth();
 	const esMando =
 		profile?.role === "superadmin" ||
@@ -660,9 +661,32 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 										{corr.costaleroB.solucion}
 									</span>
 									{corr.tramoOrigen >= 0 && corr.tramoDestino >= 0 && (
-										<span className="text-[0.65rem] text-[var(--cre-o)]">
-											T{corr.tramoOrigen + 1} ↔ T{corr.tramoDestino + 1}
-										</span>
+										<>
+											<span className="text-[0.65rem] text-[var(--cre-o)]">
+												T{corr.tramoOrigen + 1} ↔ T{corr.tramoDestino + 1}
+											</span>
+											<button
+												className="btn btn-sm ml-1"
+												style={{
+													padding: "2px 6px",
+													fontSize: "0.7rem",
+													backgroundColor: "var(--oro)",
+													color: "#000",
+												}}
+												onClick={() => {
+													aplicarSugerencia(
+														t.id,
+														corr.tramoOrigen,
+														corr.tramoDestino,
+														corr.costaleroA.idx,
+														corr.costaleroB.idx,
+													);
+												}}
+												title={`Aplicar intercambio: ${corr.costaleroA.nombre} ↔ ${corr.costaleroB.nombre}`}
+											>
+												✓
+											</button>
+										</>
 									)}
 								</div>
 							));

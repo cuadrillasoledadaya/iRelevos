@@ -6,6 +6,7 @@
 import { create } from 'zustand'
 import {
   calcularCiclo, completarAuto, analizar, getPinned, validarPinned,
+  aplicarIntercambio,
 } from '@/lib/algoritmos'
 import { ordenarDentroFisico } from '@/lib/roles'
 import type { DatosPerfil, PinState, SwapState, Trabajadera } from '@/lib/types'
@@ -19,6 +20,7 @@ export interface PlanStore {
   setPinned: (tid: number, ti: number, ci: number, v: PinState) => void
   getErroresPinned: (tid: number) => string[]
   confirmarSwap: (ws: SwapState) => void
+  aplicarSugerencia: (tid: number, ti1: number, ti2: number, ciA: number, ciB: number) => boolean
   limpiarPlanificacion: () => void
   limpiarTrabajaderas: () => void
   resetTodo: () => void
@@ -118,6 +120,11 @@ export function createPlanStore(mutar: MutarFn, getTrabFn: GetTrabFn, getS: GetS
           t.analisis = analizar(t.plan!, t.nombres.length, nuevoObj, t)
         }
       })
+    },
+
+    aplicarSugerencia: (tid, ti1, ti2, ciA, ciB) => {
+      const t = getTrabFn(getS(), tid)
+      return aplicarIntercambio(t, ti1, ti2, ciA, ciB)
     },
 
     limpiarPlanificacion: () => {

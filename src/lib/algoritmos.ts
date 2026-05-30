@@ -686,3 +686,57 @@ export function generarSugerenciasCorreccion(
 
 	return { correcciones, erroresSaldo, repetidos, consecutivos };
 }
+
+// ── Aplicar Intercambio ────────────────────────────────────────────
+
+/**
+ * Intercambia la posición de dos costaleros entre dos tramos.
+ * Útil para aplicar sugerencias de corrección.
+ * @param t - Trabajadera (se modifica in place)
+ * @param ti1 - Tramo origen (donde está fuera el costaleroA)
+ * @param ti2 - Tramo destino (donde está dentro el costaleroB)
+ * @param ciA - Índice del costalero que sale (en ti1)
+ * @param ciB - Índice del costalero que entra (en ti2)
+ */
+export function aplicarIntercambio(
+	t: Trabajadera,
+	ti1: number,
+	ti2: number,
+	ciA: number,
+	ciB: number,
+): boolean {
+	if (!t.plan || !t.obj) return false;
+
+	const r1 = t.plan[ti1];
+	const r2 = t.plan[ti2];
+
+	// Validar que ciA está fuera en ti1 y ciB está dentro en ti2
+	if (!r1.fuera.includes(ciA) || !r2.dentro.includes(ciB)) {
+		return false;
+	}
+
+	// Intercambiar
+	const idxAenR1 = r1.fuera.indexOf(ciA);
+	const idxBenR2 = r2.dentro.indexOf(ciB);
+
+	if (idxAenR1 !== -1) {
+		r1.fuera[idxAenR1] = ciB;
+	}
+	if (idxBenR2 !== -1) {
+		r2.dentro[idxBenR2] = ciA;
+		r2.fuera = [...r1.fuera]; // Reset fuera de r2 basado en nuevos dentro
+	}
+
+	// Recalcular objetivo y análisis
+	const nuevoObj: Record<number, number> = {};
+	for (let i = 0; i < t.nombres.length; i++) nuevoObj[i] = 0;
+	t.plan.forEach((tramo) =>
+		tramo.fuera.forEach((ci) => {
+			nuevoObj[ci]++;
+		}),
+	);
+	t.obj = nuevoObj;
+	t.analisis = analizar(t.plan, t.nombres.length, nuevoObj, t);
+
+	return true;
+}
