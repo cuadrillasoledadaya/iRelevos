@@ -159,9 +159,7 @@ function CapatazTrabajadera({
 				<div className="t-badge">{t.id}</div>
 				<div className="t-info">
 					<div className="t-name">Trabajadera {t.id}</div>
-					<div className="t-meta">
-						{t.tramos.length} tramos {isOpen ? "(ABIERTO)" : "(CERRADO)"}
-					</div>
+					<div className="t-meta">{t.tramos.length} tramos</div>
 				</div>
 				<div className="t-chev">▼</div>
 			</div>
