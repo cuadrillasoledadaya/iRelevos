@@ -495,7 +495,11 @@ export interface CorreccionSugerida {
 	tramoOrigen: number;
 	tramoDestino: number;
 	impacto: string;
+	prioridad?: Prioridad; // 1=crítica, 2=alta, 3=media
 }
+
+/** Prioridad de corrección: 1=crítica, 2=alta, 3=media */
+type Prioridad = 1 | 2 | 3;
 
 export interface AnalisisCorrecciones {
 	correcciones: CorreccionSugerida[];
@@ -600,6 +604,30 @@ export function generarSugerenciasCorreccion(
 		if (conMenos.length > 0 && conMas.length > 0) {
 			const receptor = conMenos[0];
 			const donante = conMas[0];
+			// Encontrar tramo origen (donde donante está fuera y receptor dentro)
+			let tramoOrigen = -1;
+			let tramoDestino = -1;
+			if (t.plan) {
+				for (let ti = 0; ti < t.plan.length; ti++) {
+					if (
+						t.plan[ti].fuera.includes(donante.idx) &&
+						t.plan[ti].dentro.includes(receptor.idx)
+					) {
+						tramoOrigen = ti;
+						break;
+					}
+				}
+				// Encontrar otro tramo donde los roles están invertidos
+				for (let ti = 0; ti < t.plan.length; ti++) {
+					if (
+						t.plan[ti].fuera.includes(receptor.idx) &&
+						t.plan[ti].dentro.includes(donante.idx)
+					) {
+						tramoDestino = ti;
+						break;
+					}
+				}
+			}
 			correcciones.push({
 				tipo: "saldo",
 				costaleroA: {
@@ -612,9 +640,13 @@ export function generarSugerenciasCorreccion(
 					idx: donante.idx,
 					solucion: `Puede ceder ${donante.tiene - donante.necesita} salida(s)`,
 				},
-				tramoOrigen: -1, // Se resolverá dinámicamente
-				tramoDestino: -1,
-				impacto: `Intercambiar en tramo donde ${donante.nombre} está fuera y ${receptor.nombre} está dentro`,
+				tramoOrigen,
+				tramoDestino,
+				impacto:
+					tramoOrigen >= 0 && tramoDestino >= 0
+						? `Intercambiar en tramos ${tramoOrigen + 1} y ${tramoDestino + 1}`
+						: `Intercambiar en tramos con roles invertidos`,
+				prioridad: 2, // Alta prioridad
 			});
 		}
 	}
@@ -646,6 +678,7 @@ export function generarSugerenciasCorreccion(
 				tramoOrigen: 0,
 				tramoDestino: t.tramos.length - 1,
 				impacto: `Eliminar repetición 1º/último`,
+				prioridad: 1, // Crítica prioridad
 			});
 		}
 	});
@@ -678,11 +711,15 @@ export function generarSugerenciasCorreccion(
 						tramoOrigen: ti1,
 						tramoDestino: ti2,
 						impacto: `Separar consecutividad`,
+						prioridad: 2, // Alta prioridad
 					});
 				}
 			}
 		});
 	});
+
+	// Ordenar por prioridad (crítica primero)
+	correcciones.sort((a, b) => (a.prioridad ?? 3) - (b.prioridad ?? 3));
 
 	return { correcciones, erroresSaldo, repetidos, consecutivos };
 }
