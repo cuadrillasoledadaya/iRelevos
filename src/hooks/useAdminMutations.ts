@@ -543,8 +543,10 @@ export function useAdminMutations(
 			});
 
 			// Agrupar nombres y roles por trabajadera
-			const byTrab: Record<number, { name: string; rol?: string | null; rol_sec?: string | null }[]> =
-				{};
+			const byTrab: Record<
+				number,
+				{ name: string; rol?: string | null; rol_sec?: string | null }[]
+			> = {};
 			censusData.forEach((c) => {
 				const tid = c.trabajadera as number;
 				const name = c.apodo?.trim() || `${c.nombre} ${c.apellidos}`.trim();
@@ -580,7 +582,7 @@ export function useAdminMutations(
 						// Aplicar rol principal del censo si existe y es válido
 						let rolCompatible = "COR" as RolCode;
 						let secCompatible = "FIJ_I" as RolCode;
-						
+
 						// Procesar rol principal
 						if (entry.rol && rolesValidos.includes(entry.rol)) {
 							const rolBase = entry.rol.replace(/_?[DI]$/, "") as
@@ -588,15 +590,17 @@ export function useAdminMutations(
 								| "COS"
 								| "FIJ"
 								| "COR";
-							rolCompatible = (esPrimero
-								? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
-									? entry.rol
-									: "COR"
-								: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
-									? entry.rol
-									: "COR") as RolCode;
+							rolCompatible = (
+								esPrimero
+									? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
+										? entry.rol
+										: "COR"
+									: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
+										? entry.rol
+										: "COR"
+							) as RolCode;
 						}
-						
+
 						// Procesar rol secundario
 						if (entry.rol_sec && rolesValidos.includes(entry.rol_sec)) {
 							const rolSecBase = entry.rol_sec.replace(/_?[DI]$/, "") as
@@ -604,21 +608,27 @@ export function useAdminMutations(
 								| "COS"
 								| "FIJ"
 								| "COR";
-							secCompatible = (esPrimero
-								? rolSecBase === "PAT" || rolSecBase === "FIJ" || rolSecBase === "COR"
-									? entry.rol_sec
-									: "COR"
-								: rolSecBase === "COS" || rolSecBase === "FIJ" || rolSecBase === "COR"
-									? entry.rol_sec
-									: "COR") as RolCode;
+							secCompatible = (
+								esPrimero
+									? rolSecBase === "PAT" ||
+										rolSecBase === "FIJ" ||
+										rolSecBase === "COR"
+										? entry.rol_sec
+										: "COR"
+									: rolSecBase === "COS" ||
+											rolSecBase === "FIJ" ||
+											rolSecBase === "COR"
+										? entry.rol_sec
+										: "COR"
+							) as RolCode;
 						}
-						
+
 						trab.roles![i] = { pri: rolCompatible, sec: secCompatible };
 					} else {
 						trab.nombres.push(entry.name);
 						let rolCompatible = "COR" as RolCode;
 						let secCompatible = "FIJ_I" as RolCode;
-						
+
 						// Procesar rol principal
 						if (entry.rol && rolesValidos.includes(entry.rol)) {
 							const rolBase = entry.rol.replace(/_?[DI]$/, "") as
@@ -626,15 +636,17 @@ export function useAdminMutations(
 								| "COS"
 								| "FIJ"
 								| "COR";
-							rolCompatible = (esPrimero
-								? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
-									? entry.rol
-									: "COR"
-								: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
-									? entry.rol
-									: "COR") as RolCode;
+							rolCompatible = (
+								esPrimero
+									? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
+										? entry.rol
+										: "COR"
+									: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
+										? entry.rol
+										: "COR"
+							) as RolCode;
 						}
-						
+
 						// Procesar rol secundario
 						if (entry.rol_sec && rolesValidos.includes(entry.rol_sec)) {
 							const rolSecBase = entry.rol_sec.replace(/_?[DI]$/, "") as
@@ -642,15 +654,21 @@ export function useAdminMutations(
 								| "COS"
 								| "FIJ"
 								| "COR";
-							secCompatible = (esPrimero
-								? rolSecBase === "PAT" || rolSecBase === "FIJ" || rolSecBase === "COR"
-									? entry.rol_sec
-									: "COR"
-								: rolSecBase === "COS" || rolSecBase === "FIJ" || rolSecBase === "COR"
-									? entry.rol_sec
-									: "COR") as RolCode;
+							secCompatible = (
+								esPrimero
+									? rolSecBase === "PAT" ||
+										rolSecBase === "FIJ" ||
+										rolSecBase === "COR"
+										? entry.rol_sec
+										: "COR"
+									: rolSecBase === "COS" ||
+											rolSecBase === "FIJ" ||
+											rolSecBase === "COR"
+										? entry.rol_sec
+										: "COR"
+							) as RolCode;
 						}
-						
+
 						trab.roles!.push({ pri: rolCompatible, sec: secCompatible });
 					}
 				});

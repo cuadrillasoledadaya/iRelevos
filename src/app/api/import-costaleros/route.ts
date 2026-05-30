@@ -27,10 +27,8 @@ interface ICuadrillaRaw {
 	rol?: string;
 	role?: string;
 	posicion?: string;
-	// Puesto secundario (rol secundario)
-	puesto_sec?: string;
-	rol_sec?: string;
-	role_sec?: string;
+	// Puesto secundario - el campo exacto en iCuadrilla
+	puesto_secundario?: string;
 }
 
 interface NormalizedCostalero {
@@ -145,10 +143,14 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 		`[Import API] Recibidos ${raw.length} registros de iCuadrilla — activos: ${activos.length}, filtrados (baja): ${filtrados}`,
 	);
 	if (activos.length > 0) {
-		console.log(
-			`[Import API] Muestra del primero activo:`,
-			JSON.stringify(activos[0]),
-		);
+		// Log TODOS los campos del primer registro para debug
+		const firstRecord = activos[0];
+		console.log(`[Import API] TODOS LOS CAMPOS DEL REGISTRO (CRUDO):`);
+		Object.keys(firstRecord).forEach((key) => {
+			console.log(
+				`  ${key} = "${firstRecord[key as keyof typeof firstRecord]}"`,
+			);
+		});
 	}
 
 	return activos.map((u: ICuadrillaRaw) => {
@@ -171,15 +173,15 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 		const puesto = u.puesto || u.rol || u.role || u.posicion || null;
 		const rolCostalero = mapPuestoToRolCode(puesto);
 
-		// Mapear el puesto secundario (rol secundario) - múltiples nombres de campo posibles
-		const puestoSec = u.puesto_sec || u.rol_sec || u.role_sec || null;
+		// Mapear el puesto secundario (rol secundario) - el campo en iCuadrilla es puesto_secundario
+		const puestoSec = u.puesto_secundario || null;
 		const rolSecCostalero = mapPuestoToRolCode(puestoSec);
 
 		console.log(
 			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: puesto="${puesto}" → rol="${rolCostalero}", puesto_sec="${puestoSec}" → rol_sec="${rolSecCostalero}"`,
 		);
 		console.log(
-			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}", puesto_sec="${u.puesto_sec}", rol_sec="${u.rol_sec}"`,
+			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}", puesto_secundario="${u.puesto_secundario}"`,
 		);
 
 		return {
@@ -207,6 +209,7 @@ export async function GET(request: Request) {
 		const authResult = await authenticateAdmin(request);
 		if (authResult instanceof NextResponse) return authResult;
 
+		// Llamar a la función que ya hace el fetch y devuelve los datos
 		const normalized = await fetchICuadrillaCostaleros();
 		return NextResponse.json(normalized);
 	} catch (err) {
