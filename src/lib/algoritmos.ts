@@ -625,6 +625,7 @@ export function generarSugerenciasCorreccion(
 		const candidatos = t.nombres
 			.map((nombre, idx) => ({ nombre, idx }))
 			.filter((c) => !t.analisis?.rep?.includes(c.idx))
+			.filter((c) => !t.bajas?.includes(c.idx))
 			.filter(
 				(c) => t.plan && t.plan[t.tramos.length - 1].dentro.includes(c.idx),
 			);
@@ -640,7 +641,7 @@ export function generarSugerenciasCorreccion(
 				costaleroB: {
 					nombre: candidatos[0].nombre,
 					idx: candidatos[0].idx,
-					solucion: `Intercambiar con este costalero en último tramo`,
+					solucion: `Intercambiar en último tramo (T${t.tramos.length})`,
 				},
 				tramoOrigen: 0,
 				tramoDestino: t.tramos.length - 1,
@@ -657,8 +658,10 @@ export function generarSugerenciasCorreccion(
 				const fueraEnT1 = t.plan[ti1].fuera;
 				const dentroEnT2 = t.plan[ti2].dentro;
 
-				// Encontrar un candidato que pueda intercambiar
-				const cand = dentroEnT2.find((idx) => !fueraEnT1.includes(idx));
+				// Encontrar un candidato que pueda intercambiar (que no esté de baja)
+				const cand = dentroEnT2.find(
+					(idx) => !fueraEnT1.includes(idx) && !t.bajas?.includes(idx),
+				);
 				if (cand !== undefined) {
 					correcciones.push({
 						tipo: "consecutivo",
