@@ -380,3 +380,174 @@ export function getFueraPorTramo(t: Trabajadera): number {
 export function isGenericTramo(n: string): boolean {
   return /^Tramo \d+ \(T\d+\)$/.test(n)
 }
+
+// ── Sugerencias de Corrección ─────────────────────────────────────────
+
+export interface CorreccionSugerida {
+  tipo: 'saldo' | 'repetido' | 'consecutivo'
+  costaleroA: { nombre: string; idx: number; problema: string }
+  costaleroB: { nombre: string; idx: number; solucion: string }
+  tramoOrigen: number
+  tramoDestino: number
+  impacto: string
+}
+
+export interface AnalisisCorrecciones {
+  correcciones: CorreccionSugerida[]
+  erroresSaldo: { nombre: string; idx: number; tiene: number; necesita: number }[]
+  repetidos: { nombre: string; idx: number; tramos: number[] }[]
+  consecutivos: { nombre: string; idx: number; tramos: [number, number][] }[]
+}
+
+/**
+ * Genera sugerencias de corrección para discrepancias en el plan.
+ * Analiza el análisis y propone intercambios para:
+ * - Equilibrar saldos (desviación de salidas)
+ * - Eliminar repeticiones de 1º/último
+ * - Separar costaleros consecutivos
+ */
+export function generarSugerenciasCorreccion(t: Trabajadera): AnalisisCorrecciones {
+  if (!t.plan || !t.analisis) {
+    return { correcciones: [], erroresSaldo: [], repetidos: [], consecutivos: [] }
+  }
+
+  const erroresSaldo: { nombre: string; idx: number; tiene: number; necesita: number }[] = []
+  const repetidos: { nombre: string; idx: number; tramos: number[] }[] = []
+  const consecutivos: { nombre: string; idx: number; tramos: [number, number][] }[] = []
+  const correcciones: CorreccionSugerida[] = []
+
+  // 1. Analizar desviaciones de saldo
+  if (t.analisis.conteo) {
+    Object.entries(t.analisis.conteo).forEach(([idxStr, tiene]) => {
+      const idx = +idxStr
+      const necesita = t.obj ? t.obj[idx] ?? 0 : 0
+      if (tiene !== necesita) {
+        erroresSaldo.push({
+          nombre: t.nombres[idx],
+          idx,
+          tiene,
+          necesita
+        })
+      }
+    })
+  }
+
+  // 2. Analizar repeticiones 1º/último
+  if (t.analisis.rep && t.analisis.rep.length > 0) {
+    t.analisis.rep.forEach(idx => {
+      repetidos.push({
+        nombre: t.nombres[idx],
+        idx,
+        tramos: [0, t.tramos.length - 1]
+      })
+    })
+  }
+
+  // 3. Analizar consecutivos
+  for (let ti = 1; ti < t.plan.length; ti++) {
+    t.plan[ti].fuera.forEach(idx => {
+      if (t.plan && t.plan[ti - 1].fuera.includes(idx)) {
+        const existente = consecutivos.find(c => c.idx === idx)
+        if (existente) {
+          existente.tramos.push([ti - 1, ti])
+        } else {
+          consecutivos.push({
+            nombre: t.nombres[idx],
+            idx,
+            tramos: [[ti - 1, ti]]
+          })
+        }
+      }
+    })
+  }
+
+  // 4. Generar correcciones concretas
+  // Si un costalero tiene desbalance de saldo, sugerir intercambio
+  if (erroresSaldo.length >= 2) {
+    const conMenos = erroresSaldo.filter(e => e.tiene < e.necesita).sort((a, b) => a.tiene - b.tiene)
+    const conMas = erroresSaldo.filter(e => e.tiene > e.necesita).sort((a, b) => b.tiene - a.tiene)
+
+    if (conMenos.length > 0 && conMas.length > 0) {
+      const receptor = conMenos[0]
+      const donante = conMas[0]
+      correcciones.push({
+        tipo: 'saldo',
+        costaleroA: {
+          nombre: receptor.nombre,
+          idx: receptor.idx,
+          problema: `Necesita ${receptor.necesita - receptor.tiene} salida(s) más`
+        },
+        costaleroB: {
+          nombre: donante.nombre,
+          idx: donante.idx,
+          solucion: `Puede ceder ${donante.tiene - donante.necesita} salida(s)`
+        },
+        tramoOrigen: -1, // Se resolverá dinámicamente
+        tramoDestino: -1,
+        impacto: `Intercambiar en tramo donde ${donante.nombre} está fuera y ${receptor.nombre} está dentro`
+      })
+    }
+  }
+
+  // Corrección de repeticiones
+  repetidos.forEach(r => {
+    // Buscar un costalero que no esté en el último tramo para intercambiar
+    const candidatos = t.nombres
+      .map((nombre, idx) => ({ nombre, idx }))
+      .filter(c => !t.analisis?.rep?.includes(c.idx))
+      .filter(c => t.plan && t.plan[t.tramos.length - 1].dentro.includes(c.idx))
+
+    if (candidatos.length > 0) {
+      correcciones.push({
+        tipo: 'repetido',
+        costaleroA: {
+          nombre: r.nombre,
+          idx: r.idx,
+          problema: `Repite en 1º y último tramo`
+        },
+        costaleroB: {
+          nombre: candidatos[0].nombre,
+          idx: candidatos[0].idx,
+          solucion: `Intercambiar con este costalero en último tramo`
+        },
+        tramoOrigen: 0,
+        tramoDestino: t.tramos.length - 1,
+        impacto: `Eliminar repetición 1º/último`
+      })
+    }
+  })
+
+  // Corrección de consecutivos - buscar intercambio con costalero del tramo intermedio
+  consecutivos.forEach(c => {
+    c.tramos.forEach(([ti1, ti2]) => {
+      // En ti2, buscar alguien que pueda intercambiar con quien está fuera en ti1
+      if (t.plan) {
+        const fueraEnT1 = t.plan[ti1].fuera
+        const dentroEnT2 = t.plan[ti2].dentro
+
+        // Encontrar un candidato que pueda intercambiar
+        const cand = dentroEnT2.find(idx => !fueraEnT1.includes(idx))
+        if (cand !== undefined) {
+          correcciones.push({
+            tipo: 'consecutivo',
+            costaleroA: {
+              nombre: c.nombre,
+              idx: c.idx,
+              problema: `Está fuera en tramos ${ti1 + 1} y ${ti2 + 1}`
+            },
+            costaleroB: {
+              nombre: t.nombres[cand],
+              idx: cand,
+              solucion: `Intercambiar en tramo ${ti2 + 1}`
+            },
+            tramoOrigen: ti1,
+            tramoDestino: ti2,
+            impacto: `Separar consecutividad`
+          })
+        }
+      }
+    })
+  })
+
+  return { correcciones, erroresSaldo, repetidos, consecutivos }
+}
