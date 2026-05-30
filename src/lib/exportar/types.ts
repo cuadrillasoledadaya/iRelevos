@@ -34,7 +34,7 @@ export interface CapatazTableData {
 export interface RelevosTableData {
   trabajaderaId: number
   fecha: string
-  headers: { emoji: string; label: string }[]
+  headers: Array<{ emoji: string; label: string }>
   rows: {
     tramoNombre: string
     cells: { nombre: string; highlighted: boolean }[]

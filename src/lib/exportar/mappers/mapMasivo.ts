@@ -4,8 +4,26 @@
 
 import type { Trabajadera } from '../../types'
 import type { MasivoPageData } from '../types'
-import { getDentroFisico, estructuraPaso, rolLabel } from '../../roles'
+import type { RolCode } from '../../types'
+import { getDentroFisico, estructuraPaso, rolLado } from '../../roles'
 import { filaColorStyle } from '../styles/masivo'
+
+/**
+ * Convierte RolCode a label con lado: PAT_D → "Patero_D", COS_I → "Costero_I"
+ */
+function rolCodeToLabel(rol: RolCode): string {
+  const nombres: Record<string, string> = {
+    PAT: 'Patero',
+    COS: 'Costero',
+    FIJ: 'Fijador',
+    COR: 'Corriente',
+  }
+  const base = rol.split('_')[0]
+  const nombre = nombres[base] ?? base
+  if (rol === 'COR') return nombre
+  const lado = rolLado(rol)
+  return lado ? `${nombre}_${lado}` : nombre
+}
 
 /**
  * Transforma los datos de un costalero dentro de una trabajadera en
@@ -48,7 +66,7 @@ export function mapMasivo(
       const posIdx = dentroF.findIndex(ci => ci === costaleroIdx)
       const estructura = estructuraPaso(t.id)
       const rolCode = posIdx !== -1 ? estructura[posIdx] : null
-      if (rolCode) rolLabelStr = rolLabel(rolCode, t.id)
+      if (rolCode) rolLabelStr = rolCodeToLabel(rolCode) // Mostrar como "Patero_I", "Costero_D", etc.
     }
 
     const estado: 'DENTRO' | 'FUERA' | '—' = esDentro

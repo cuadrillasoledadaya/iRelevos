@@ -3,9 +3,27 @@
 // ══════════════════════════════════════════════════════════════════
 
 import type { Trabajadera } from '../../types'
+import type { RolCode } from '../../types'
 import type { RelevosTableData } from '../types'
-import { estructuraPaso, getDentroFisico, rolEmoji, rolLabel } from '../../roles'
+import { estructuraPaso, getDentroFisico, rolEmoji, rolLado } from '../../roles'
 import { pillName } from '../../nombres'
+
+/**
+ * Convierte RolCode a label con lado: PAT_D → "Patero_D", COS_I → "Costero_I"
+ */
+function rolCodeToLabel(rol: RolCode): string {
+  const nombres: Record<string, string> = {
+    PAT: 'Patero',
+    COS: 'Costero',
+    FIJ: 'Fijador',
+    COR: 'Corriente',
+  }
+  const base = rol.split('_')[0]
+  const nombre = nombres[base] ?? base
+  if (rol === 'COR') return nombre
+  const lado = rolLado(rol)
+  return lado ? `${nombre}_${lado}` : nombre
+}
 
 /**
  * Transforma una Trabajadera en los datos estructurados que el template
@@ -29,9 +47,9 @@ export function mapRelevos(t: Trabajadera, costaleroIdx = -1): RelevosTableData 
   const estructura = estructuraPaso(t.id)
 
   // ── Headers (roles + FUERA) ────────────────────────────────────
-  const headers = estructura.map(rol => ({
+  const headers: Array<{ emoji: string; label: string }> = estructura.map(rol => ({
     emoji: rolEmoji(rol),
-    label: rolLabel(rol, t.id).split(' ')[0],
+    label: rolCodeToLabel(rol), // Mostrar rol con lado: Patero_D, Patero_I, etc.
   }))
   headers.push({ emoji: '💤', label: 'FUERA' })
 

@@ -115,22 +115,22 @@ describe('mapRelevos — diferentes tid', () => {
     const t = createTrabajaderaValida(1, 2, 6)
     const data = mapRelevos(t)
     // PAT = Patero (⚓), FIJ = Fijador (🔩), COR = Corriente (〰️)
-    // Estructura: PAT, FIJ, COR, FIJ, PAT + FUERA = 6 headers
+    // Estructura: PAT_I, FIJ_I, COR, FIJ_D, PAT_D + FUERA = 6 headers
     expect(data.headers).toHaveLength(6)
-    expect(data.headers[0].label).toBe('Patero')
+    expect(data.headers[0].label).toBe('Patero_I') // Primer puesto: izquierdo
     expect(data.headers[0].emoji).toBe('⚓')
   })
 
   it('tid=7 debe usar estructura PAT/FIJ/COR/FIJ/PAT', () => {
     const t = createTrabajaderaValida(7, 2, 6)
     const data = mapRelevos(t)
-    expect(data.headers[0].label).toBe('Patero')
+    expect(data.headers[0].label).toBe('Patero_I')
   })
 
   it('tid=3 debe usar estructura COS/FIJ/COR/FIJ/COS', () => {
     const t = createTrabajaderaValida(3, 2, 6)
     const data = mapRelevos(t)
-    expect(data.headers[0].label).toBe('Costero')
+    expect(data.headers[0].label).toBe('Costero_I') // Primer puesto: izquierdo
     expect(data.headers[0].emoji).toBe('⚓')
   })
 })
