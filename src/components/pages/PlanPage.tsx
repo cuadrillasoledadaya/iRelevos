@@ -288,6 +288,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 	const myApodo = profile?.apodo?.toLowerCase().trim();
 
 	const [isOpen, setIsOpen] = useState(false);
+	const [hoverSugerencia, setHoverSugerencia] = useState<number | null>(null);
 	const pinStatus = countPinned(t);
 	const hasPins = pinStatus.total > 0;
 	const nBajas = t.bajas?.length ?? 0;

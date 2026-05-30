@@ -729,7 +729,20 @@ export function generarSugerenciasCorreccion(
 	// Ordenar por prioridad (crítica primero)
 	correcciones.sort((a, b) => (a.prioridad ?? 3) - (b.prioridad ?? 3));
 
-	return { correcciones, erroresSaldo, repetidos, consecutivos };
+	// 5. Agrupar correcciones por tramos (mostrar resumen si hay múltiples)
+	const porTramos: Record<string, CorreccionSugerida[]> = {};
+	correcciones.forEach((corr) => {
+		const key = `T${corr.tramoOrigen + 1}↔T${corr.tramoDestino + 1}`;
+		if (!porTramos[key]) porTramos[key] = [];
+		porTramos[key].push(corr);
+	});
+
+	return {
+		correcciones,
+		erroresSaldo,
+		repetidos,
+		consecutivos,
+	};
 }
 
 // ── Aplicar Intercambio ────────────────────────────────────────────
