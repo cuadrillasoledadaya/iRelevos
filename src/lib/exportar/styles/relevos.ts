@@ -19,7 +19,9 @@ export function pageTitleCSS(bg?: string): string {
  * Replica exactamente el HTML inline de relevos.ts.
  */
 export function roleHeaderHTML(emoji: string, label: string, bg?: string): string {
-  return `<td style="${theadCell(bg)}"><strong>${emoji}<br>${label}</strong></td>`
+  // Si emoji está vacío, solo mostrar label sin <br> extra
+  const content = emoji ? `<strong>${emoji}<br>${label}</strong>` : `<strong>${label}</strong>`
+  return `<td style="${theadCell(bg)}">${content}</td>`
 }
 
 /**
