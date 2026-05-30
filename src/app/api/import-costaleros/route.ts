@@ -172,8 +172,7 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 		const rolCostalero = mapPuestoToRolCode(puesto);
 
 		// Mapear el puesto secundario (rol secundario) - múltiples nombres de campo posibles
-		const puestoSec =
-			u.puesto_sec || u.rol_sec || u.role_sec || null;
+		const puestoSec = u.puesto_sec || u.rol_sec || u.role_sec || null;
 		const rolSecCostalero = mapPuestoToRolCode(puestoSec);
 
 		console.log(

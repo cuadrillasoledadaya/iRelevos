@@ -506,7 +506,7 @@ export function useAdminMutations(
 
 			const { data: censusData } = await supabase
 				.from("census")
-				.select("nombre, apellidos, apodo, trabajadera, rol")
+				.select("nombre, apellidos, apodo, trabajadera, rol, rol_sec")
 				.eq("proyecto_id", proyectoId)
 				.not("trabajadera", "is", null)
 				.order("trabajadera", { ascending: true });
@@ -543,13 +543,13 @@ export function useAdminMutations(
 			});
 
 			// Agrupar nombres y roles por trabajadera
-			const byTrab: Record<number, { name: string; rol?: string | null }[]> =
+			const byTrab: Record<number, { name: string; rol?: string | null; rol_sec?: string | null }[]> =
 				{};
 			censusData.forEach((c) => {
 				const tid = c.trabajadera as number;
 				const name = c.apodo?.trim() || `${c.nombre} ${c.apellidos}`.trim();
 				if (!byTrab[tid]) byTrab[tid] = [];
-				byTrab[tid].push({ name, rol: c.rol });
+				byTrab[tid].push({ name, rol: c.rol, rol_sec: c.rol_sec });
 			});
 
 			Object.entries(byTrab).forEach(([tidStr, entries]) => {
@@ -577,40 +577,81 @@ export function useAdminMutations(
 				entries.forEach((entry, i) => {
 					if (i < trab.nombres.length) {
 						trab.nombres[i] = entry.name;
-						// Aplicar rol del censo si existe y es válido para esta trabajadera
+						// Aplicar rol principal del censo si existe y es válido
+						let rolCompatible = "COR" as RolCode;
+						let secCompatible = "FIJ_I" as RolCode;
+						
+						// Procesar rol principal
 						if (entry.rol && rolesValidos.includes(entry.rol)) {
-							// Validar compatibilidad: PAT/COS según tipo de trabajadera
 							const rolBase = entry.rol.replace(/_?[DI]$/, "") as
 								| "PAT"
 								| "COS"
 								| "FIJ"
 								| "COR";
-							const rolCompatible = esPrimero
+							rolCompatible = (esPrimero
 								? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
 									? entry.rol
 									: "COR"
 								: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
 									? entry.rol
-									: "COR";
-							trab.roles![i] = { pri: rolCompatible as RolCode, sec: "FIJ_I" };
+									: "COR") as RolCode;
 						}
+						
+						// Procesar rol secundario
+						if (entry.rol_sec && rolesValidos.includes(entry.rol_sec)) {
+							const rolSecBase = entry.rol_sec.replace(/_?[DI]$/, "") as
+								| "PAT"
+								| "COS"
+								| "FIJ"
+								| "COR";
+							secCompatible = (esPrimero
+								? rolSecBase === "PAT" || rolSecBase === "FIJ" || rolSecBase === "COR"
+									? entry.rol_sec
+									: "COR"
+								: rolSecBase === "COS" || rolSecBase === "FIJ" || rolSecBase === "COR"
+									? entry.rol_sec
+									: "COR") as RolCode;
+						}
+						
+						trab.roles![i] = { pri: rolCompatible, sec: secCompatible };
 					} else {
 						trab.nombres.push(entry.name);
+						let rolCompatible = "COR" as RolCode;
+						let secCompatible = "FIJ_I" as RolCode;
+						
+						// Procesar rol principal
 						if (entry.rol && rolesValidos.includes(entry.rol)) {
 							const rolBase = entry.rol.replace(/_?[DI]$/, "") as
 								| "PAT"
 								| "COS"
 								| "FIJ"
 								| "COR";
-							const rolCompatible = esPrimero
+							rolCompatible = (esPrimero
 								? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
 									? entry.rol
 									: "COR"
 								: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
 									? entry.rol
-									: "COR";
-							trab.roles!.push({ pri: rolCompatible as RolCode, sec: "FIJ_I" });
+									: "COR") as RolCode;
 						}
+						
+						// Procesar rol secundario
+						if (entry.rol_sec && rolesValidos.includes(entry.rol_sec)) {
+							const rolSecBase = entry.rol_sec.replace(/_?[DI]$/, "") as
+								| "PAT"
+								| "COS"
+								| "FIJ"
+								| "COR";
+							secCompatible = (esPrimero
+								? rolSecBase === "PAT" || rolSecBase === "FIJ" || rolSecBase === "COR"
+									? entry.rol_sec
+									: "COR"
+								: rolSecBase === "COS" || rolSecBase === "FIJ" || rolSecBase === "COR"
+									? entry.rol_sec
+									: "COR") as RolCode;
+						}
+						
+						trab.roles!.push({ pri: rolCompatible, sec: secCompatible });
 					}
 				});
 			});
