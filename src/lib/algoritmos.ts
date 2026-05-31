@@ -867,3 +867,36 @@ export function aplicarIntercambio(
 
 	return true;
 }
+
+// ── Aplicar Todas las Correcciones ─────────────────────────────────
+
+/**
+ * Aplica todas las sugerencias de corrección disponibles en orden de prioridad.
+ * Modifica la Trabajadera in-place.
+ * @returns true si al menos una corrección fue aplicada
+ */
+export function aplicarTodasLasCorrecciones(t: Trabajadera): boolean {
+	if (!t.plan || !t.analisis) return false;
+
+	const sugerencias = generarSugerenciasCorreccion(t);
+	if (sugerencias.correcciones.length === 0) return false;
+
+	// Sort by priority (1 = crítica first)
+	const ordenadas = [...sugerencias.correcciones].sort(
+		(a, b) => (a.prioridad ?? 3) - (b.prioridad ?? 3),
+	);
+
+	let aplicadas = 0;
+	for (const corr of ordenadas) {
+		const ok = aplicarIntercambio(
+			t,
+			corr.tramoOrigen,
+			corr.tramoDestino,
+			corr.costaleroA.idx,
+			corr.costaleroB.idx,
+		);
+		if (ok) aplicadas++;
+	}
+
+	return aplicadas > 0;
+}

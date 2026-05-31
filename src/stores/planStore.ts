@@ -11,6 +11,7 @@ import {
 	getPinned,
 	validarPinned,
 	aplicarIntercambio,
+	aplicarTodasLasCorrecciones,
 } from "@/lib/algoritmos";
 import { ordenarDentroFisico } from "@/lib/roles";
 import type {
@@ -36,6 +37,7 @@ export interface PlanStore {
 		ciA: number,
 		ciB: number,
 	) => boolean;
+	confirmarAsignacion: (tid: number) => void;
 	limpiarPlanificacion: () => void;
 	limpiarTrabajaderas: () => void;
 	resetTodo: () => void;
@@ -152,6 +154,42 @@ export function createPlanStore(
 				result = aplicarIntercambio(t, ti1, ti2, ciA, ciB);
 			});
 			return result;
+		},
+
+		confirmarAsignacion: (tid) => {
+			mutar((d) => {
+				const t = getTrabFn(d, tid);
+				if (!t.plan) return;
+
+				// 1. Aplicar todas las correcciones sugeridas
+				aplicarTodasLasCorrecciones(t);
+
+				// 2. Obtener pinned actual
+				const p = getPinned(t);
+
+				// 3. Fijar (pinned) el estado actual del plan, respetando pins manuales existentes
+				t.plan.forEach((tramo, ti) => {
+					tramo.dentro.forEach((ci) => {
+						if (p[ti] && p[ti][ci] === "L") p[ti][ci] = "D";
+					});
+					tramo.fuera.forEach((ci) => {
+						if (p[ti] && p[ti][ci] === "L") p[ti][ci] = "F";
+					});
+				});
+
+				t.pinned = p;
+
+				// 4. Recalcular objetivo y análisis post-correcciones
+				const nuevoObj: Record<number, number> = {};
+				for (let i = 0; i < t.nombres.length; i++) nuevoObj[i] = 0;
+				t.plan.forEach((tramo) =>
+					tramo.fuera.forEach((ci) => {
+						nuevoObj[ci]++;
+					}),
+				);
+				t.obj = nuevoObj;
+				t.analisis = analizar(t.plan, t.nombres.length, nuevoObj, t);
+			});
 		},
 
 		limpiarPlanificacion: () => {

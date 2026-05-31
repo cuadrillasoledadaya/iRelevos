@@ -275,6 +275,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 	const quitarBloqueos = planStore.getState().quitarBloqueos;
 	const sugerirYCalcular = trabajaderaStore.getState().sugerirYCalcular;
 	const aplicarSugerencia = planStore.getState().aplicarSugerencia;
+	const confirmarAsignacion = planStore.getState().confirmarAsignacion;
 	const { profile } = useAuth();
 	const esMando =
 		profile?.role === "superadmin" ||
@@ -660,58 +661,81 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 									</div>
 								);
 							}
-							return sugerencias.correcciones.map((corr, i) => (
-								<div
-									key={i}
-									className="text-[0.7rem] mb-2 last:mb-0 flex items-center gap-2 cursor-pointer"
-									onMouseEnter={() => setHoverSugerencia(i)}
-									onMouseLeave={() => setHoverSugerencia(null)}
-								>
-									<span className="text-[var(--oro)] font-bold shrink-0">
-										{corr.tipo === "saldo"
-											? "📊"
-											: corr.tipo === "repetido"
-												? "🔄"
-												: "↪"}
-									</span>
-									<span className="flex-1">
-										<strong>{corr.costaleroA.nombre}</strong>{" "}
-										{corr.costaleroA.problema} ↔{" "}
-										<strong>{corr.costaleroB.nombre}</strong>{" "}
-										{corr.costaleroB.solucion}
-									</span>
-									{corr.tramoOrigen >= 0 && corr.tramoDestino >= 0 && (
-										<>
-											<span className="text-[0.65rem] text-[var(--cre-o)]">
-												T{corr.tramoOrigen + 1} ↔ T{corr.tramoDestino + 1}
+							return (
+								<>
+									{sugerencias.correcciones.map((corr, i) => (
+										<div
+											key={i}
+											className="text-[0.7rem] mb-2 last:mb-0 flex items-center gap-2 cursor-pointer"
+											onMouseEnter={() => setHoverSugerencia(i)}
+											onMouseLeave={() => setHoverSugerencia(null)}
+										>
+											<span className="text-[var(--oro)] font-bold shrink-0">
+												{corr.tipo === "saldo"
+													? "📊"
+													: corr.tipo === "repetido"
+														? "🔄"
+														: "↪"}
 											</span>
+											<span className="flex-1">
+												<strong>{corr.costaleroA.nombre}</strong>{" "}
+												{corr.costaleroA.problema} ↔{" "}
+												<strong>{corr.costaleroB.nombre}</strong>{" "}
+												{corr.costaleroB.solucion}
+											</span>
+											{corr.tramoOrigen >= 0 && corr.tramoDestino >= 0 && (
+												<>
+													<span className="text-[0.65rem] text-[var(--cre-o)]">
+														T{corr.tramoOrigen + 1} ↔ T{corr.tramoDestino + 1}
+													</span>
+													<button
+														className="btn btn-sm ml-1"
+														style={{
+															padding: "2px 6px",
+															fontSize: "0.7rem",
+															backgroundColor: "var(--oro)",
+															color: "#000",
+														}}
+														onClick={() => {
+															aplicarSugerencia(
+																t.id,
+																corr.tramoOrigen,
+																corr.tramoDestino,
+																corr.costaleroA.idx,
+																corr.costaleroB.idx,
+															);
+														}}
+														title={`Aplicar intercambio: ${corr.costaleroA.nombre} ↔ ${corr.costaleroB.nombre}`}
+													>
+														✓
+													</button>
+												</>
+											)}
+										</div>
+									))}
+									{/* Botón Confirmar asignación - aplica todas y fija */}
+									{sugerencias.correcciones.length > 0 && (
+										<div className="mt-3 flex justify-end">
 											<button
-												className="btn btn-sm ml-1"
+												className="btn btn-sm"
 												style={{
-													padding: "2px 6px",
-													fontSize: "0.7rem",
-													backgroundColor: "var(--oro)",
-													color: "#000",
+													padding: "4px 14px",
+													fontSize: "0.75rem",
+													backgroundColor: "var(--verde)",
+													color: "#fff",
+													fontWeight: 600,
 												}}
 												onClick={() => {
-													aplicarSugerencia(
-														t.id,
-														corr.tramoOrigen,
-														corr.tramoDestino,
-														corr.costaleroA.idx,
-														corr.costaleroB.idx,
-													);
-													// El plan se actualiza automáticamente en la UI
-													// El panel de relevos se abre con el botón "Generar relevos" abajo
+													confirmarAsignacion(t.id);
 												}}
-												title={`Aplicar intercambio: ${corr.costaleroA.nombre} ↔ ${corr.costaleroB.nombre}`}
+												title="Aplica todas las sugerencias y fija la asignación actual"
 											>
-												✓
+												✅ Confirmar asignación
 											</button>
-										</>
+										</div>
 									)}
-								</div>
-							));
+								</>
+							);
 						})()}
 					</div>
 				)}
