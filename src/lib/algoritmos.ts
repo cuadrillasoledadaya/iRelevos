@@ -750,19 +750,19 @@ export function generarSugerenciasCorreccion(
 /**
  * Intercambia la posición de dos costaleros entre dos tramos.
  * Útil para aplicar sugerencias de corrección.
- * 
- * Para "saldo" y "consecutivo": 
+ *
+ * Para "saldo" y "consecutivo":
  * - ciA está fuera en ti1 (el que necesita SALIR menos)
  * - ciB está dentro en ti2 (el que necesita ENTRAR más)
  * - El intercambio: en ti2, ciB pasa a fuera y ciA pasa a dentro
- * 
+ *
  * Para "repetido" (ti1=0, ti2=último):
  * - ciA está dentro en ambos tramos (el que repite)
  * - ciB está dentro en ti2 (candidato para intercambiar)
  * - El intercambio: ciA pasa a fuera en ambos tramos
- * 
+ *
  * @param t - Trabajadera (se modifica in place)
- * @param ti1 - Tramo origen 
+ * @param ti1 - Tramo origen
  * @param ti2 - Tramo destino
  * @param ciA - Índice del costalero con problema
  * @param ciB - Índice del costalero candidato
@@ -782,13 +782,15 @@ export function aplicarIntercambio(
 
 	// Caso "repetido": ti1=0 (primer tramo) y ti2 es el último tramo
 	// ADICIONALMENTE: ciA debe estar DENTRO en ti1 (no fuera)
-	const esRepetido = ti1 === 0 && ti2 === t.tramos.length - 1 && 
+	const esRepetido =
+		ti1 === 0 &&
+		ti2 === t.tramos.length - 1 &&
 		t.plan[ti1]?.dentro.includes(ciA);
 
 	if (esRepetido) {
 		const r1 = t.plan[ti1];
 		const r2 = t.plan[ti2];
-		
+
 		// Verificar que ciA está dentro en ambos tramos
 		if (!r1.dentro.includes(ciA) || !r2.dentro.includes(ciA)) {
 			return false;
@@ -800,19 +802,23 @@ export function aplicarIntercambio(
 
 		// En ti1 (primer tramo): ciA pasa de dentro a fuera, intercambiamos con alguien
 		const idxCiAenT1 = r1.dentro.indexOf(ciA);
-		const alguienEnT1 = r1.dentro.find(idx => idx !== ciA);
+		const alguienEnT1 = r1.dentro.find((idx) => idx !== ciA);
 		if (alguienEnT1 === undefined) return false;
-		
+
 		r1.dentro[idxCiAenT1] = alguienEnT1;
-		r1.fuera = todos.filter((i) => !r1.dentro.includes(i)).sort((a, b) => a - b);
+		r1.fuera = todos
+			.filter((i) => !r1.dentro.includes(i))
+			.sort((a, b) => a - b);
 
 		// En ti2 (último tramo): ciA pasa de dentro a fuera, ciB pasa de dentro a dentro
 		const idxCiAenT2 = r2.dentro.indexOf(ciA);
 		const idxCiBenT2 = r2.dentro.indexOf(ciB);
 		if (idxCiAenT2 === -1 || idxCiBenT2 === -1) return false;
-		
+
 		r2.dentro[idxCiAenT2] = ciB;
-		r2.fuera = todos.filter((i) => !r2.dentro.includes(i)).sort((a, b) => a - b);
+		r2.fuera = todos
+			.filter((i) => !r2.dentro.includes(i))
+			.sort((a, b) => a - b);
 
 		// Recalcular objetivo y análisis
 		const nuevoObj: Record<number, number> = {};

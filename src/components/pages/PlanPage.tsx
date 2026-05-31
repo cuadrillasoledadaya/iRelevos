@@ -539,7 +539,10 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 												isAutoF =
 													(v === "L" || v === "LF") && r.fuera.includes(ci);
 												if (r.fuera.includes(ci)) {
-													if (an?.rep.includes(ci) && ti === t.tramos.length - 1)
+													if (
+														an?.rep.includes(ci) &&
+														ti === t.tramos.length - 1
+													)
 														hasWarn = true;
 													if (ti > 0 && t.plan?.[ti - 1]?.fuera.includes(ci))
 														hasCons = true;
@@ -691,13 +694,16 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 													color: "#000",
 												}}
 												onClick={() => {
-													aplicarSugerencia(
+													const success = aplicarSugerencia(
 														t.id,
 														corr.tramoOrigen,
 														corr.tramoDestino,
 														corr.costaleroA.idx,
 														corr.costaleroB.idx,
 													);
+													if (success) {
+														openSheet("relevos");
+													}
 												}}
 												title={`Aplicar intercambio: ${corr.costaleroA.nombre} ↔ ${corr.costaleroB.nombre}`}
 											>
