@@ -694,16 +694,15 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 													color: "#000",
 												}}
 												onClick={() => {
-													const success = aplicarSugerencia(
+													aplicarSugerencia(
 														t.id,
 														corr.tramoOrigen,
 														corr.tramoDestino,
 														corr.costaleroA.idx,
 														corr.costaleroB.idx,
 													);
-													if (success) {
-														openSheet("relevos");
-													}
+													// El plan se actualiza automáticamente en la UI
+													// El panel de relevos se abre con el botón "Generar relevos" abajo
 												}}
 												title={`Aplicar intercambio: ${corr.costaleroA.nombre} ↔ ${corr.costaleroB.nombre}`}
 											>
@@ -733,6 +732,25 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 							</div>
 						)}
 						{an.cons > 0 && <div>• Hay salidas consecutivas.</div>}
+					</div>
+				)}
+
+				{/* Botón generar relevos - solo visible cuando el plan está correcto */}
+				{an && statusOk && (
+					<div className="mt-4">
+						<button
+							className="btn btn-sm"
+							style={{
+								padding: "6px 12px",
+								fontSize: "0.8rem",
+								backgroundColor: "var(--verde)",
+								color: "#fff",
+							}}
+							onClick={() => openSheet("relevos")}
+							title="Generar y descargar relevos en PDF"
+						>
+							📄 Generar relevos
+						</button>
 					</div>
 				)}
 			</div>
