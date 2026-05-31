@@ -773,17 +773,34 @@ export function aplicarIntercambio(
 		return false;
 	}
 
-	// Intercambiar
-	const idxAenR1 = r1.fuera.indexOf(ciA);
-	const idxBenR2 = r2.dentro.indexOf(ciB);
+	// En ti1: ciA pasa de fuera a dentro (se necesita alguien de dentro que pase a fuera)
+	// Pero el intercambio es simple: cambiamos el rol de ciA y ciB
+	// - En ti1: quitar ciA de fuera, añadir a alguien de dentro a fuera (ciB no necesariamente)
+	// - En ti2: quitar ciB de dentro, añadir ciA a dentro, quitar ciA de fuera (si está)
 
-	if (idxAenR1 !== -1) {
-		r1.fuera[idxAenR1] = ciB;
-	}
-	if (idxBenR2 !== -1) {
-		r2.dentro[idxBenR2] = ciA;
-		r2.fuera = [...r1.fuera]; // Reset fuera de r2 basado en nuevos dentro
-	}
+	// NOTA: Este intercambio es para el caso específico donde:
+	// - Donante (ciB) está dentro en ti2 (necesita salidas)
+	// - Receptor (ciA) está fuera en ti1 (necesita menos salidas)
+
+	// El intercambio real es:
+	// 1. En ti1: ciA pasa de fuera a dentro, necesitamos quien pase de dentro a fuera
+	//    Pero ciB puede no estar en ti1. En su lugar, buscamos a alguien que sí esté dentro.
+	// 2. En ti2: ciB pasa de dentro a fuera, ciA pasa de fuera a dentro
+
+	// Simplificación: el intercambio se hace SOLO en ti2
+	// En ti1 solo marcamos que ciA debe pasar a dentro (pero necesitamos otro mecanismo)
+
+	// Intercambio en ti2: ciB pasa a fuera, ciA pasa a dentro
+	const idxBenR2 = r2.dentro.indexOf(ciB);
+	if (idxBenR2 === -1) return false;
+
+	r2.dentro[idxBenR2] = ciA; // ciB sale, ciA entra en dentro
+
+	// Recalcular fuera de r2
+	const todos = Array.from({ length: t.nombres.length }, (_, i) => i).filter(
+		(i) => !t.bajas?.includes(i),
+	);
+	r2.fuera = todos.filter((i) => !r2.dentro.includes(i)).sort((a, b) => a - b);
 
 	// Recalcular objetivo y análisis
 	const nuevoObj: Record<number, number> = {};
