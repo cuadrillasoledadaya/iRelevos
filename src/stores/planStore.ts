@@ -146,8 +146,12 @@ export function createPlanStore(
 		},
 
 		aplicarSugerencia: (tid, ti1, ti2, ciA, ciB) => {
-			const t = getTrabFn(getS(), tid);
-			return aplicarIntercambio(t, ti1, ti2, ciA, ciB);
+			let result = false;
+			mutar((d) => {
+				const t = getTrabFn(d, tid);
+				result = aplicarIntercambio(t, ti1, ti2, ciA, ciB);
+			});
+			return result;
 		},
 
 		limpiarPlanificacion: () => {

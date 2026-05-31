@@ -750,11 +750,22 @@ export function generarSugerenciasCorreccion(
 /**
  * Intercambia la posición de dos costaleros entre dos tramos.
  * Útil para aplicar sugerencias de corrección.
+ * 
+ * Para "saldo" y "consecutivo": 
+ * - ciA está fuera en ti1 (el que necesita SALIR menos)
+ * - ciB está dentro en ti2 (el que necesita ENTRAR más)
+ * - El intercambio: en ti2, ciB pasa a fuera y ciA pasa a dentro
+ * 
+ * Para "repetido" (ti1=0, ti2=último):
+ * - ciA está dentro en ambos tramos (el que repite)
+ * - ciB está dentro en ti2 (candidato para intercambiar)
+ * - El intercambio: ciA pasa a fuera en ambos tramos
+ * 
  * @param t - Trabajadera (se modifica in place)
- * @param ti1 - Tramo origen (donde está fuera el costaleroA)
- * @param ti2 - Tramo destino (donde está dentro el costaleroB)
- * @param ciA - Índice del costalero que sale (en ti1)
- * @param ciB - Índice del costalero que entra (en ti2)
+ * @param ti1 - Tramo origen 
+ * @param ti2 - Tramo destino
+ * @param ciA - Índice del costalero con problema
+ * @param ciB - Índice del costalero candidato
  */
 export function aplicarIntercambio(
 	t: Trabajadera,
@@ -765,25 +776,77 @@ export function aplicarIntercambio(
 ): boolean {
 	if (!t.plan || !t.obj) return false;
 
+	const todos = Array.from({ length: t.nombres.length }, (_, i) => i).filter(
+		(i) => !t.bajas?.includes(i),
+	);
+
+	// Caso "repetido": ti1=0 (primer tramo) y ti2 es el último tramo
+	// ADICIONALMENTE: ciA debe estar DENTRO en ti1 (no fuera)
+	const esRepetido = ti1 === 0 && ti2 === t.tramos.length - 1 && 
+		t.plan[ti1]?.dentro.includes(ciA);
+
+	if (esRepetido) {
+		const r1 = t.plan[ti1];
+		const r2 = t.plan[ti2];
+		
+		// Verificar que ciA está dentro en ambos tramos
+		if (!r1.dentro.includes(ciA) || !r2.dentro.includes(ciA)) {
+			return false;
+		}
+		// Verificar que ciB está dentro en ti2
+		if (!r2.dentro.includes(ciB)) {
+			return false;
+		}
+
+		// En ti1 (primer tramo): ciA pasa de dentro a fuera, intercambiamos con alguien
+		const idxCiAenT1 = r1.dentro.indexOf(ciA);
+		const alguienEnT1 = r1.dentro.find(idx => idx !== ciA);
+		if (alguienEnT1 === undefined) return false;
+		
+		r1.dentro[idxCiAenT1] = alguienEnT1;
+		r1.fuera = todos.filter((i) => !r1.dentro.includes(i)).sort((a, b) => a - b);
+
+		// En ti2 (último tramo): ciA pasa de dentro a fuera, ciB pasa de dentro a dentro
+		const idxCiAenT2 = r2.dentro.indexOf(ciA);
+		const idxCiBenT2 = r2.dentro.indexOf(ciB);
+		if (idxCiAenT2 === -1 || idxCiBenT2 === -1) return false;
+		
+		r2.dentro[idxCiAenT2] = ciB;
+		r2.fuera = todos.filter((i) => !r2.dentro.includes(i)).sort((a, b) => a - b);
+
+		// Recalcular objetivo y análisis
+		const nuevoObj: Record<number, number> = {};
+		for (let i = 0; i < t.nombres.length; i++) nuevoObj[i] = 0;
+		t.plan.forEach((tramo) =>
+			tramo.fuera.forEach((ci) => {
+				nuevoObj[ci]++;
+			}),
+		);
+		t.obj = nuevoObj;
+		t.analisis = analizar(t.plan, t.nombres.length, nuevoObj, t);
+
+		return true;
+	}
+
+	// Caso "saldo" y "consecutivo": ciA está fuera en ti1
 	const r1 = t.plan[ti1];
 	const r2 = t.plan[ti2];
 
-	// Validar que ciA está fuera en ti1 y ciB está dentro en ti2
-	if (!r1.fuera.includes(ciA) || !r2.dentro.includes(ciB)) {
+	if (!r1.fuera.includes(ciA)) {
 		return false;
 	}
 
-	// Intercambiar
-	const idxAenR1 = r1.fuera.indexOf(ciA);
-	const idxBenR2 = r2.dentro.indexOf(ciB);
+	// Validar que ciB está dentro en ti2
+	if (!r2.dentro.includes(ciB)) {
+		return false;
+	}
 
-	if (idxAenR1 !== -1) {
-		r1.fuera[idxAenR1] = ciB;
-	}
-	if (idxBenR2 !== -1) {
-		r2.dentro[idxBenR2] = ciA;
-		r2.fuera = [...r1.fuera]; // Reset fuera de r2 basado en nuevos dentro
-	}
+	// Intercambio en ti2: ciB pasa de dentro a fuera, ciA pasa de fuera a dentro
+	const idxCiBenT2 = r2.dentro.indexOf(ciB);
+	if (idxCiBenT2 === -1) return false;
+
+	r2.dentro[idxCiBenT2] = ciA;
+	r2.fuera = todos.filter((i) => !r2.dentro.includes(i)).sort((a, b) => a - b);
 
 	// Recalcular objetivo y análisis
 	const nuevoObj: Record<number, number> = {};
