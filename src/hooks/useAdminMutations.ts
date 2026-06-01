@@ -1,19 +1,17 @@
 // ══════════════════════════════════════════════════════════════════
-// USE ADMIN MUTATIONS — Hook de mutaciones para el panel de admin
+// USE ADMIN MUTATIONS — Thin orchestrator (UI + service calls)
 // ══════════════════════════════════════════════════════════════════
 
-import { useState, useCallback } from "react";
+import { useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import type { PasoDB, Trabajadera, RolCode } from "@/lib/types";
+import type { PasoDB } from "@/lib/types";
 import type { UserRole } from "@/hooks/useAuth";
 import type {
 	CensusEntry,
-	ImportEntry,
-	NewCensusEntry,
-	NewPasoForm,
 	NewTempForm,
-	CensusEditForm,
 } from "@/components/admin/types";
+import { useAdminForms } from "@/hooks/useAdminForms";
+import * as adminService from "@/services/adminService";
 
 export function useAdminMutations(
 	activeTemporadaId: string,
@@ -27,49 +25,7 @@ export function useAdminMutations(
 	fetchPasos: () => Promise<void>,
 	onSyncComplete?: (proyectoId: string, updatedContent?: unknown) => void,
 ) {
-	const [saving, setSaving] = useState(false);
-	const [importLoading, setImportLoading] = useState(false);
-
-	// ── Form states ──────────────────────────────────────────────────
-
-	const [newEntry, setNewEntry] = useState<NewCensusEntry>({
-		email: "",
-		nombre: "",
-		apellidos: "",
-		apodo: "",
-		telefono: "",
-		trabajadera: "",
-		altura: "",
-		proyecto_id: "",
-	});
-	const [newPaso, setNewPaso] = useState<NewPasoForm>({
-		nombre_paso: "",
-		nombre_cuadrilla: "",
-		num_trabajaderas: 6,
-	});
-	const [newTemp, setNewTemp] = useState<NewTempForm>({
-		nombre: "",
-		clonarCenso: true,
-		clonarPasos: true,
-		sourceTempId: "",
-	});
-	const [editingId, setEditingId] = useState<string | null>(null);
-	const [editForm, setEditForm] = useState<CensusEditForm>({
-		email: "",
-		nombre: "",
-		apellidos: "",
-		apodo: "",
-		telefono: "",
-		trabajadera: 0,
-		altura: 0,
-	});
-
-	// ── Import state ─────────────────────────────────────────────────
-
-	const [importPid, setImportPid] = useState("");
-	const [importPreview, setImportPreview] = useState<ImportEntry[] | null>(
-		null,
-	);
+	const forms = useAdminForms();
 
 	// ═════════════════════════════════════════════════════════════════
 	// USUARIOS
@@ -92,18 +48,9 @@ export function useAdminMutations(
 				return;
 			}
 
-			const res = await fetch("/api/admin/delete-user", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${session.access_token}`,
-				},
-				body: JSON.stringify({ uid }),
-			});
-
-			if (!res.ok) {
-				const data = (await res.json()) as { error?: string };
-				alert("Error al eliminar: " + (data.error ?? "desconocido"));
+			const result = await adminService.deleteUser(uid, session.access_token);
+			if (result.error) {
+				alert("Error al eliminar: " + result.error);
 				return;
 			}
 
@@ -114,12 +61,8 @@ export function useAdminMutations(
 
 	const cambiarRol = useCallback(
 		async (uid: string, nuevoRol: UserRole) => {
-			const { error } = await supabase
-				.from("profiles")
-				.update({ role: nuevoRol })
-				.eq("id", uid);
-
-			if (!error) {
+			const result = await adminService.updateUserRole(uid, nuevoRol);
+			if (!result.error) {
 				setUsuarios((prev) =>
 					prev.map((u) => (u.id === uid ? { ...u, role: nuevoRol } : u)),
 				);
@@ -140,17 +83,14 @@ export function useAdminMutations(
 			const nuevoApodo = prompt("Apodo:", u.apodo || "");
 			if (nuevoApodo === null) return;
 
-			setSaving(true);
-			const { error } = await supabase
-				.from("profiles")
-				.update({
-					nombre: nuevoNombre.trim(),
-					apellidos: nuevosApellidos.trim(),
-					apodo: nuevoApodo.trim(),
-				})
-				.eq("id", uid);
+			forms.setSaving(true);
+			const result = await adminService.updateUserProfile(uid, {
+				nombre: nuevoNombre.trim(),
+				apellidos: nuevosApellidos.trim(),
+				apodo: nuevoApodo.trim(),
+			});
 
-			if (!error) {
+			if (!result.error) {
 				setUsuarios((prev) =>
 					prev.map((x) =>
 						x.id === uid
@@ -164,11 +104,11 @@ export function useAdminMutations(
 					),
 				);
 			} else {
-				alert(error.message);
+				alert(result.error);
 			}
-			setSaving(false);
+			forms.setSaving(false);
 		},
-		[setUsuarios],
+		[setUsuarios, forms],
 	);
 
 	// ═════════════════════════════════════════════════════════════════
@@ -178,55 +118,32 @@ export function useAdminMutations(
 	const addPaso = useCallback(
 		async (e: React.FormEvent) => {
 			e.preventDefault();
-			if (!newPaso.nombre_paso || !activeTemporadaId) return;
-			setSaving(true);
+			if (!forms.newPaso.nombre_paso || !activeTemporadaId) return;
+			forms.setSaving(true);
 
 			const {
 				data: { session },
 			} = await supabase.auth.getSession();
 
-			const { error } = await supabase.from("proyectos").insert([
-				{
-					...newPaso,
-					content: {
-						banco: [],
-						trabajaderas: Array.from(
-							{ length: newPaso.num_trabajaderas },
-							(_, i) => ({
-								id: i + 1,
-								nombres: [],
-								roles: [],
-								salidas: 1,
-								tramos: ["Inicio", "Final"],
-								bajas: [],
-								regla5costaleros: false,
-								plan: null,
-								obj: {},
-								analisis: null,
-								pinned: null,
-								puntuaciones: {},
-								tramosClaves: [],
-							}),
-						),
-					},
-					temporada_id: activeTemporadaId,
-					user_id: session?.user?.id ?? null,
-				},
-			]);
+			const result = await adminService.createPaso(
+				forms.newPaso,
+				activeTemporadaId,
+				session?.user?.id ?? null,
+			);
 
-			if (!error) {
-				setNewPaso({
+			if (!result.error) {
+				forms.setNewPaso({
 					nombre_paso: "",
 					nombre_cuadrilla: "",
 					num_trabajaderas: 6,
 				});
 				fetchPasos();
 			} else {
-				alert(error.message);
+				alert(result.error);
 			}
-			setSaving(false);
+			forms.setSaving(false);
 		},
-		[newPaso, activeTemporadaId, fetchPasos],
+		[forms, activeTemporadaId, fetchPasos],
 	);
 
 	const eliminarPaso = useCallback(
@@ -241,25 +158,26 @@ export function useAdminMutations(
 			const {
 				data: { session },
 			} = await supabase.auth.getSession();
-			const { data: proyecto } = await supabase
-				.from("proyectos")
-				.select("user_id")
-				.eq("id", id)
-				.single();
 
-			if (proyecto?.user_id && proyecto.user_id !== session?.user?.id) {
-				alert("No tenes permiso para borrar este paso.");
+			const result = await adminService.deletePaso(id);
+			if (result.error) {
+				alert(result.error);
 				return;
 			}
 
-			const { error } = await supabase.from("proyectos").delete().eq("id", id);
-			if (!error) fetchPasos();
+			if (result.data?.user_id && result.data.user_id !== session?.user?.id) {
+				// Re-insert if ownership check failed (deletePaso already deleted)
+				// Actually deletePaso checks ownership BEFORE delete, so this path
+				// means it already returned an error. This is defensive only.
+			}
+
+			fetchPasos();
 		},
 		[fetchPasos],
 	);
 
 	// ═════════════════════════════════════════════════════════════════
-	// CENSO - syncCostaleroToProject debe estar antes que addToCensus
+	// CENSO
 	// ═════════════════════════════════════════════════════════════════
 
 	const syncCostaleroToProject = useCallback(
@@ -267,63 +185,19 @@ export function useAdminMutations(
 			const {
 				data: { session },
 			} = await supabase.auth.getSession();
-			const { data: proj, error: fetchErr } = await supabase
-				.from("proyectos")
-				.select("content, user_id")
-				.eq("id", proyectoId)
-				.single();
 
-			if (fetchErr || !proj) {
+			const result = await adminService.syncCostaleroToProject(
+				proyectoId,
+				trabajaderaId,
+				displayName,
+				session?.user?.id ?? null,
+			);
+
+			if (result.error) {
 				// eslint-disable-next-line no-console
-				console.error("syncCostalero: no se pudo leer el proyecto", fetchErr);
-				return;
-			}
-
-			if (proj.user_id && proj.user_id !== session?.user?.id) {
-				alert("No tenes permiso para modificar este proyecto.");
-				return;
-			}
-
-			const content = proj.content as {
-				trabajaderas: {
-					id: number;
-					nombres: string[];
-					roles?: { pri: string; sec: string }[];
-				}[];
-			};
-			const trab = content.trabajaderas.find((t) => t.id === trabajaderaId);
-			if (!trab) {
-				// eslint-disable-next-line no-console
-				console.error(
-					`syncCostalero: no existe trabajadera ${trabajaderaId} en el proyecto`,
-				);
-				return;
-			}
-
-			const slotIdx = trab.nombres.findIndex((n) => /^Costalero \d+$/.test(n));
-			if (slotIdx === -1) {
-				trab.nombres.push(displayName);
-				if (trab.roles) trab.roles.push({ pri: "COR", sec: "FIJ_I" });
-			} else {
-				trab.nombres[slotIdx] = displayName;
-			}
-
-			const updatePayload: Record<string, unknown> = { content };
-			if (!proj.user_id) updatePayload.user_id = session?.user?.id;
-
-			const { error: updateErr } = await supabase
-				.from("proyectos")
-				.update(updatePayload)
-				.eq("id", proyectoId);
-
-			if (updateErr) {
-				// eslint-disable-next-line no-console
-				console.error(
-					"syncCostalero: error al actualizar el proyecto",
-					updateErr,
-				);
+				console.error("syncCostalero:", result.error);
 				alert(
-					`⚠️ No se pudo actualizar la cuadrilla: ${updateErr.message}.\nUsá el botón "🔄 Sincronizar Cuadrilla" manualmente.`,
+					`⚠️ No se pudo actualizar la cuadrilla: ${result.error}.\nUsá el botón "🔄 Sincronizar Cuadrilla" manualmente.`,
 				);
 			}
 		},
@@ -333,29 +207,21 @@ export function useAdminMutations(
 	const addToCensus = useCallback(
 		async (e: React.FormEvent) => {
 			e.preventDefault();
-			if (!newEntry.nombre) return;
-			setSaving(true);
+			if (!forms.newEntry.nombre) return;
+			forms.setSaving(true);
 
-			const trabajaderaNum = newEntry.trabajadera
-				? parseInt(newEntry.trabajadera)
+			const trabajaderaNum = forms.newEntry.trabajadera
+				? parseInt(forms.newEntry.trabajadera)
 				: null;
-			const alturaNum = newEntry.altura ? parseFloat(newEntry.altura) : null;
 
-			const payload = {
-				...newEntry,
-				trabajadera: trabajaderaNum || null,
-				altura: alturaNum || null,
-				temporada_id: activeTemporadaId,
-			};
+			const result = await adminService.addToCensus(
+				forms.newEntry,
+				activeTemporadaId,
+			);
 
-			const { data, error } = await supabase
-				.from("census")
-				.insert([payload])
-				.select();
-
-			if (!error && data) {
-				setCensus((prev) => [data[0], ...prev]);
-				setNewEntry({
+			if (!result.error && result.data) {
+				setCensus((prev) => [result.data!, ...prev]);
+				forms.setNewEntry({
 					email: "",
 					nombre: "",
 					apellidos: "",
@@ -363,62 +229,53 @@ export function useAdminMutations(
 					telefono: "",
 					trabajadera: "",
 					altura: "",
-					proyecto_id: newEntry.proyecto_id,
+					proyecto_id: forms.newEntry.proyecto_id,
 				});
 
-				if (trabajaderaNum && newEntry.proyecto_id) {
+				if (trabajaderaNum && forms.newEntry.proyecto_id) {
 					const displayName =
-						newEntry.apodo?.trim() ||
-						`${newEntry.nombre} ${newEntry.apellidos}`.trim();
+						forms.newEntry.apodo?.trim() ||
+						`${forms.newEntry.nombre} ${forms.newEntry.apellidos}`.trim();
 					await syncCostaleroToProject(
-						newEntry.proyecto_id,
+						forms.newEntry.proyecto_id,
 						trabajaderaNum,
 						displayName,
 					);
 				}
 			} else {
-				alert(error?.message || "Error al añadir al censo");
+				alert(result.error || "Error al añadir al censo");
 			}
-			setSaving(false);
+			forms.setSaving(false);
 		},
-		[newEntry, activeTemporadaId, setCensus, syncCostaleroToProject],
+		[forms, activeTemporadaId, setCensus, syncCostaleroToProject],
 	);
 
 	const deleteFromCensus = useCallback(
 		async (id: string) => {
 			if (!confirm("¿Seguro que quieres borrar a este costalero del censo?"))
 				return;
-			const { error } = await supabase.from("census").delete().eq("id", id);
-			if (!error) setCensus((prev) => prev.filter((c) => c.id !== id));
+			const result = await adminService.deleteFromCensus(id);
+			if (!result.error) setCensus((prev) => prev.filter((c) => c.id !== id));
 		},
 		[setCensus],
 	);
 
 	const saveEdit = useCallback(
 		async (id: string) => {
-			setSaving(true);
-			const { error } = await supabase
-				.from("census")
-				.update({
-					...editForm,
-					trabajadera: editForm.trabajadera
-						? parseInt(String(editForm.trabajadera))
-						: null,
-					altura: editForm.altura ? parseFloat(String(editForm.altura)) : null,
-				})
-				.eq("id", id);
+			forms.setSaving(true);
+			const result = await adminService.saveCensusEdit(id, forms.editForm);
 
-			if (!error) {
+			if (!result.error) {
 				setCensus((prev) =>
-					prev.map((c) => (c.id === id ? { ...c, ...editForm } : c)),
+					prev.map((c) => (c.id === id ? { ...c, ...forms.editForm } : c)),
 				);
-				setEditingId(null);
+				forms.setEditingId(null);
 			} else {
-				alert(error.message);
+				alert(result.error);
 			}
-			setSaving(false);
+			forms.setSaving(false);
 		},
-		[editForm, setCensus],
+		[forms, setCensus],
 	);
 
 	const reconstruirCensoCompleto = useCallback(async () => {
@@ -430,61 +287,15 @@ export function useAdminMutations(
 		)
 			return;
 
-		setSaving(true);
+		forms.setSaving(true);
 		try {
-			const { data: projects } = await supabase
-				.from("proyectos")
-				.select("*")
-				.eq("temporada_id", activeTemporadaId);
-			if (!projects || projects.length === 0) {
-				alert("No hay proyectos en esta temporada.");
+			const result = await adminService.rebuildCensusComplete(activeTemporadaId);
+			if (result.error) {
+				alert(result.error);
 				return;
 			}
-
-			let totalNuevos = 0;
-
-			for (const p of projects) {
-				const { data: existing } = await supabase
-					.from("census")
-					.select("nombre, apellidos, apodo")
-					.eq("proyecto_id", p.id);
-				const existingNames = new Set(
-					(existing || []).map((c) =>
-						(c.apodo || `${c.nombre} ${c.apellidos}`).trim().toLowerCase(),
-					),
-				);
-
-				const content = p.content as {
-					trabajaderas: { id: number; nombres: string[] }[];
-				};
-				const toInsert: Partial<CensusEntry>[] = [];
-
-				content.trabajaderas.forEach((t) => {
-					t.nombres.forEach((n) => {
-						const name = n.trim();
-						if (!name || name.startsWith("Costalero ")) return;
-						if (!existingNames.has(name.toLowerCase())) {
-							toInsert.push({
-								temporada_id: activeTemporadaId,
-								proyecto_id: p.id,
-								nombre: name,
-								apellidos: "",
-								apodo: name,
-								trabajadera: t.id,
-							});
-							existingNames.add(name.toLowerCase());
-						}
-					});
-				});
-
-				if (toInsert.length > 0) {
-					await supabase.from("census").insert(toInsert);
-					totalNuevos += toInsert.length;
-				}
-			}
-
 			alert(
-				`✅ Sincronización completa. Se han creado ${totalNuevos} nuevas fichas de censo.`,
+				`✅ Sincronización completa. Se han creado ${result.data!.totalNuevos} nuevas fichas de censo.`,
 			);
 			fetchCensus();
 		} catch (err) {
@@ -492,9 +303,9 @@ export function useAdminMutations(
 			console.error(err);
 			alert("Error durante la reconstrucción.");
 		} finally {
-			setSaving(false);
+			forms.setSaving(false);
 		}
-	}, [activeTemporadaId, fetchCensus]);
+	}, [activeTemporadaId, fetchCensus, forms]);
 
 	// ═════════════════════════════════════════════════════════════════
 	// SYNC CENSO ↔ PROYECTO
@@ -502,201 +313,21 @@ export function useAdminMutations(
 
 	const syncTodoCenso = useCallback(
 		async (proyectoId: string) => {
-			setSaving(true);
+			forms.setSaving(true);
 
-			const { data: censusData } = await supabase
-				.from("census")
-				.select("nombre, apellidos, apodo, trabajadera, rol, rol_sec")
-				.eq("proyecto_id", proyectoId)
-				.not("trabajadera", "is", null)
-				.order("trabajadera", { ascending: true });
+			const result = await adminService.syncTodoCenso(proyectoId);
 
-			if (!censusData || censusData.length === 0) {
-				alert("No hay costaleros con trabajadera asignada en el censo.");
-				setSaving(false);
+			if (result.error) {
+				alert(result.error);
+				forms.setSaving(false);
 				return;
 			}
-
-			const { data: proj, error } = await supabase
-				.from("proyectos")
-				.select("content")
-				.eq("id", proyectoId)
-				.single();
-
-			if (error || !proj) {
-				setSaving(false);
-				return;
-			}
-
-			const content = proj.content as {
-				trabajaderas: {
-					id: number;
-					nombres: string[];
-					roles?: { pri: string; sec: string }[];
-				}[];
-			};
-
-			content.trabajaderas.forEach((t) => {
-				t.nombres = Array(6)
-					.fill("")
-					.map((_, i) => `Costalero ${i + 1}`);
-			});
-
-			// Agrupar nombres y roles por trabajadera
-			const byTrab: Record<
-				number,
-				{ name: string; rol?: string | null; rol_sec?: string | null }[]
-			> = {};
-			censusData.forEach((c) => {
-				const tid = c.trabajadera as number;
-				const name = c.apodo?.trim() || `${c.nombre} ${c.apellidos}`.trim();
-				if (!byTrab[tid]) byTrab[tid] = [];
-				byTrab[tid].push({ name, rol: c.rol, rol_sec: c.rol_sec });
-			});
-
-			Object.entries(byTrab).forEach(([tidStr, entries]) => {
-				const tid = parseInt(tidStr);
-				const trab = content.trabajaderas.find((t) => t.id === tid);
-				if (!trab) return;
-
-				// Asegurar array roles con longitud correcta
-				if (!trab.roles) trab.roles = [];
-				while (trab.roles.length < trab.nombres.length) {
-					trab.roles.push({ pri: "COR", sec: "FIJ_I" });
-				}
-
-				const rolesValidos = [
-					"PAT_D",
-					"PAT_I",
-					"COS_D",
-					"COS_I",
-					"FIJ_D",
-					"FIJ_I",
-					"COR",
-				];
-				const esPrimero = tid === 1 || tid === 7;
-
-				entries.forEach((entry, i) => {
-					if (i < trab.nombres.length) {
-						trab.nombres[i] = entry.name;
-						// Aplicar rol principal del censo si existe y es válido
-						let rolCompatible = "COR" as RolCode;
-						let secCompatible = "FIJ_I" as RolCode;
-
-						// Procesar rol principal
-						if (entry.rol && rolesValidos.includes(entry.rol)) {
-							const rolBase = entry.rol.replace(/_?[DI]$/, "") as
-								| "PAT"
-								| "COS"
-								| "FIJ"
-								| "COR";
-							rolCompatible = (
-								esPrimero
-									? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
-										? entry.rol
-										: "COR"
-									: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
-										? entry.rol
-										: "COR"
-							) as RolCode;
-						}
-
-						// Procesar rol secundario
-						if (entry.rol_sec && rolesValidos.includes(entry.rol_sec)) {
-							const rolSecBase = entry.rol_sec.replace(/_?[DI]$/, "") as
-								| "PAT"
-								| "COS"
-								| "FIJ"
-								| "COR";
-							secCompatible = (
-								esPrimero
-									? rolSecBase === "PAT" ||
-										rolSecBase === "FIJ" ||
-										rolSecBase === "COR"
-										? entry.rol_sec
-										: "COR"
-									: rolSecBase === "COS" ||
-											rolSecBase === "FIJ" ||
-											rolSecBase === "COR"
-										? entry.rol_sec
-										: "COR"
-							) as RolCode;
-						}
-
-						trab.roles![i] = { pri: rolCompatible, sec: secCompatible };
-					} else {
-						trab.nombres.push(entry.name);
-						let rolCompatible = "COR" as RolCode;
-						let secCompatible = "FIJ_I" as RolCode;
-
-						// Procesar rol principal
-						if (entry.rol && rolesValidos.includes(entry.rol)) {
-							const rolBase = entry.rol.replace(/_?[DI]$/, "") as
-								| "PAT"
-								| "COS"
-								| "FIJ"
-								| "COR";
-							rolCompatible = (
-								esPrimero
-									? rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
-										? entry.rol
-										: "COR"
-									: rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
-										? entry.rol
-										: "COR"
-							) as RolCode;
-						}
-
-						// Procesar rol secundario
-						if (entry.rol_sec && rolesValidos.includes(entry.rol_sec)) {
-							const rolSecBase = entry.rol_sec.replace(/_?[DI]$/, "") as
-								| "PAT"
-								| "COS"
-								| "FIJ"
-								| "COR";
-							secCompatible = (
-								esPrimero
-									? rolSecBase === "PAT" ||
-										rolSecBase === "FIJ" ||
-										rolSecBase === "COR"
-										? entry.rol_sec
-										: "COR"
-									: rolSecBase === "COS" ||
-											rolSecBase === "FIJ" ||
-											rolSecBase === "COR"
-										? entry.rol_sec
-										: "COR"
-							) as RolCode;
-						}
-
-						trab.roles!.push({ pri: rolCompatible, sec: secCompatible });
-					}
-				});
-			});
-
-			const { error: updateErr } = await supabase
-				.from("proyectos")
-				.update({ content })
-				.eq("id", proyectoId);
-
-			if (updateErr) {
-				alert("Error al guardar: " + updateErr.message);
-				setSaving(false);
-				return;
-			}
-
-			// Leer el proyecto actualizado para asegurar datos frescos
-			const { data: updatedProj } = await supabase
-				.from("proyectos")
-				.select("content")
-				.eq("id", proyectoId)
-				.single();
 
 			alert("✅ Cuadrilla sincronizada desde el censo.");
-			setSaving(false);
-			onSyncComplete?.(proyectoId, updatedProj?.content);
+			forms.setSaving(false);
+			onSyncComplete?.(proyectoId, result.data?.content);
 		},
-		[onSyncComplete],
+		[onSyncComplete, forms],
 	);
 
 	const syncCensoDesdeProyecto = useCallback(
@@ -707,68 +338,26 @@ export function useAdminMutations(
 				)
 			)
 				return;
-			setSaving(true);
+			forms.setSaving(true);
 
-			const { data: proj } = await supabase
-				.from("proyectos")
-				.select("content")
-				.eq("id", proyectoId)
-				.single();
-			if (!proj) {
-				setSaving(false);
-				return;
-			}
-
-			const { data: existingCensus } = await supabase
-				.from("census")
-				.select("nombre, apellidos, apodo")
-				.eq("proyecto_id", proyectoId);
-			const existingNames = new Set(
-				(existingCensus || []).map((c) =>
-					(c.apodo || `${c.nombre} ${c.apellidos}`).trim().toLowerCase(),
-				),
+			const result = await adminService.syncProjectToCensus(
+				proyectoId,
+				activeTemporadaId,
 			);
 
-			const content = proj.content as {
-				trabajaderas: { id: number; nombres: string[] }[];
-			};
-			const newEntries: Record<string, unknown>[] = [];
-
-			content.trabajaderas.forEach((t) => {
-				t.nombres.forEach((n) => {
-					const name = n.trim();
-					if (!name || name.startsWith("Costalero ")) return;
-
-					if (!existingNames.has(name.toLowerCase())) {
-						newEntries.push({
-							temporada_id: activeTemporadaId,
-							proyecto_id: proyectoId,
-							nombre: name,
-							apellidos: "",
-							apodo: name,
-							trabajadera: t.id,
-						});
-						existingNames.add(name.toLowerCase());
-					}
-				});
-			});
-
-			if (newEntries.length > 0) {
-				const { error } = await supabase.from("census").insert(newEntries);
-				if (error) {
-					alert("Error al insertar en el censo: " + error.message);
-				} else {
-					alert(`✅ Se han añadido ${newEntries.length} costaleros al censo.`);
-				}
-			} else {
+			if (result.error) {
+				alert(result.error);
+			} else if (result.data!.inserted === 0) {
 				alert(
 					"ℹ️ Todos los costaleros de la cuadrilla ya estaban en el censo (o estaban vacíos).",
 				);
+			} else {
+				alert(`✅ Se han añadido ${result.data!.inserted} costaleros al censo.`);
 			}
-			setSaving(false);
+			forms.setSaving(false);
 			fetchCensus();
 		},
-		[activeTemporadaId, fetchCensus],
+		[activeTemporadaId, fetchCensus, forms],
 	);
 
 	// ═════════════════════════════════════════════════════════════════
@@ -777,25 +366,20 @@ export function useAdminMutations(
 
 	const fetchFromICuadrilla = useCallback(
 		async (defaultPid: string) => {
-			setImportLoading(true);
+			forms.setImportLoading(true);
 			try {
 				const {
 					data: { session },
 				} = await supabase.auth.getSession();
-				const res = await fetch("/api/import-costaleros", {
-					headers: {
-						Authorization: `Bearer ${session?.access_token ?? ""}`,
-					},
-				});
+				const result = await adminService.fetchICuadrillaData(
+					session?.access_token ?? "",
+				);
 
-				if (!res.ok) {
-					const errorText = await res.text();
-					throw new Error(errorText || `Error ${res.status} al obtener datos`);
+				if (result.error) {
+					throw new Error(result.error);
 				}
 
-				const data = await res.json();
-
-				const importEntries: ImportEntry[] = data;
+				const importEntries = result.data!;
 
 				const { data: existing } = await supabase
 					.from("census")
@@ -805,65 +389,58 @@ export function useAdminMutations(
 				);
 				const existingIds = new Set((existing ?? []).map((e) => e.external_id));
 
-				const preview: ImportEntry[] = importEntries.map((c: ImportEntry) => ({
+				const preview = importEntries.map((c) => ({
 					...c,
 					selected: true,
 					_status:
 						(c.email && existingEmails.has(c.email.toLowerCase())) ||
 						(c.external_id && existingIds.has(c.external_id))
-							? "exists"
-							: "new",
+							? "exists" as const
+							: "new" as const,
 				}));
 
-				setImportPreview(preview);
-				if (defaultPid && !importPid) setImportPid(defaultPid);
+				forms.setImportPreview(preview);
+				if (defaultPid && !forms.importPid) forms.setImportPid(defaultPid);
 			} catch (err) {
 				alert(
 					`❌ Error al conectar con iCuadrilla:\n${err instanceof Error ? err.message : "desconocido"}`,
 				);
 			}
-			setImportLoading(false);
+			forms.setImportLoading(false);
 		},
-		[importPid],
+		[forms],
 	);
 
 	const ejecutarImportacion = useCallback(async () => {
-		if (!importPid) {
+		if (!forms.importPid) {
 			alert("Selecciona un paso para sincronizar.");
 			return;
 		}
-		if (!importPreview) {
+		if (!forms.importPreview) {
 			alert("Primero obtené el preview de iCuadrilla.");
 			return;
 		}
-		setSaving(true);
+		forms.setSaving(true);
 
 		try {
 			const {
 				data: { session },
 			} = await supabase.auth.getSession();
-			const res = await fetch("/api/import-costaleros", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${session?.access_token ?? ""}`,
-				},
-				body: JSON.stringify({ proyecto_id: importPid }),
-			});
+			const result = await adminService.executeImport(
+				forms.importPid,
+				session?.access_token ?? "",
+			);
 
-			if (!res.ok) {
-				const errorData = await res.json().catch(() => ({}));
-				throw new Error(errorData.error || `Error ${res.status}`);
+			if (result.error) {
+				throw new Error(result.error);
 			}
 
-			const result = await res.json();
-
-			await syncTodoCenso(importPid);
-			setImportPreview(null);
+			await syncTodoCenso(forms.importPid);
+			forms.setImportPreview(null);
 			alert(
 				`✅ Sincronización completa (full sync):\n` +
-					`- ${result.deleted ?? "?"} registros eliminados del censo local\n` +
-					`- ${result.inserted ?? "?"} costaleros importados desde iCuadrilla\n` +
+					`- ${result.data?.deleted ?? "?"} registros eliminados del censo local\n` +
+					`- ${result.data?.inserted ?? "?"} costaleros importados desde iCuadrilla\n` +
 					`- Cuadrilla sincronizada.`,
 			);
 		} catch (err) {
@@ -874,13 +451,13 @@ export function useAdminMutations(
 					(err instanceof Error ? err.message : "desconocido"),
 			);
 		} finally {
-			setSaving(false);
+			forms.setSaving(false);
 			fetchCensus();
 		}
-	}, [importPid, importPreview, syncTodoCenso, fetchCensus]);
+	}, [forms, syncTodoCenso, fetchCensus]);
 
 	const sincronizacionTotal = useCallback(async () => {
-		if (!importPid) {
+		if (!forms.importPid) {
 			alert("Selecciona un paso para sincronizar.");
 			return;
 		}
@@ -892,35 +469,21 @@ export function useAdminMutations(
 		)
 			return;
 
-		setSaving(true);
+		forms.setSaving(true);
 		try {
 			const {
 				data: { session },
 			} = await supabase.auth.getSession();
-			const res = await fetch("/api/import-costaleros", {
-				headers: {
-					Authorization: `Bearer ${session?.access_token ?? ""}`,
-				},
-			});
+			const result = await adminService.fullSyncCheck(
+				forms.importPid,
+				session?.access_token ?? "",
+			);
 
-			if (!res.ok) {
-				const errorText = await res.text();
-				throw new Error(errorText || `Error ${res.status} al sincronizar`);
+			if (result.error) {
+				throw new Error(result.error);
 			}
 
-			const remoteData: ImportEntry[] = await res.json();
-			const remoteIds = new Set(remoteData.map((r) => r.external_id));
-
-			const { data: localData } = await supabase
-				.from("census")
-				.select("id, external_id, nombre, apellidos")
-				.eq("proyecto_id", importPid)
-				.eq("source", "icuadrilla")
-				.not("external_id", "is", null);
-
-			if (!localData) return;
-
-			const aBorrar = localData.filter((l) => !remoteIds.has(l.external_id));
+			const aBorrar = result.data!.aBorrar;
 
 			if (aBorrar.length === 0) {
 				alert(
@@ -933,7 +496,7 @@ export function useAdminMutations(
 					)
 				) {
 					for (const item of aBorrar) {
-						await supabase.from("census").delete().eq("id", item.id);
+						await adminService.deleteCensusEntry(item.id);
 					}
 					alert(
 						`✅ Se han eliminado ${aBorrar.length} registros del censo local.`,
@@ -945,10 +508,10 @@ export function useAdminMutations(
 			console.error(err);
 			alert("❌ Error durante la sincronización total.");
 		} finally {
-			setSaving(false);
+			forms.setSaving(false);
 			fetchCensus();
 		}
-	}, [importPid, fetchCensus]);
+	}, [forms, fetchCensus]);
 
 	// ═════════════════════════════════════════════════════════════════
 	// TEMPORADAS
@@ -962,60 +525,12 @@ export function useAdminMutations(
 				)
 			)
 				return;
-			setSaving(true);
+			forms.setSaving(true);
 			try {
-				const { data: projects } = await supabase
-					.from("proyectos")
-					.select("id")
-					.eq("temporada_id", id);
+				const result = await adminService.deleteTemporada(id);
 
-				if (projects && projects.length > 0) {
-					const projectIds = projects.map((p) => p.id);
-					const { data: cDel, error: cErr } = await supabase
-						.from("census")
-						.delete()
-						.in("proyecto_id", projectIds)
-						.select();
-					if (cErr) {
-						// eslint-disable-next-line no-console
-						console.warn("Error borrando censo por proyecto_id:", cErr.message);
-					} else {
-						// eslint-disable-next-line no-console
-						console.log(
-							`Censo borrado (vía proyectos): ${cDel?.length || 0} registros`,
-						);
-					}
-				}
-
-				await supabase.from("census").delete().eq("temporada_id", id);
-
-				const { data: pDeleted, error: pErr } = await supabase
-					.from("proyectos")
-					.delete()
-					.eq("temporada_id", id)
-					.select();
-				if (pErr) {
-					// eslint-disable-next-line no-console
-					console.warn("Error borrando proyectos:", pErr.message);
-				} else {
-					// eslint-disable-next-line no-console
-					console.log(`Proyectos borrados: ${pDeleted?.length || 0} registros`);
-				}
-
-				const { data, error } = await supabase
-					.from("temporadas")
-					.delete()
-					.eq("id", id)
-					.select();
-
-				if (error) {
-					throw new Error(`Error en la base de datos: ${error.message}`);
-				}
-
-				if (!data || data.length === 0) {
-					throw new Error(
-						"No se pudo borrar la fila de la temporada. Verificá si tenés permisos de borrado (RLS) en Supabase.",
-					);
+				if (result.error) {
+					throw new Error(result.error);
 				}
 
 				alert("✅ Temporada eliminada con éxito");
@@ -1027,137 +542,53 @@ export function useAdminMutations(
 					`❌ ${err instanceof Error ? err.message : "Error desconocido al eliminar"}`,
 				);
 			} finally {
-				setSaving(false);
+				forms.setSaving(false);
 			}
 		},
-		[],
+		[forms],
 	);
 
 	const crearTemporada = useCallback(
 		async (form: NewTempForm, onSuccess?: () => void) => {
 			if (!form.nombre) return;
-			setSaving(true);
+			forms.setSaving(true);
 
 			try {
-				const { data: nTemp, error: tErr } = await supabase
-					.from("temporadas")
-					.insert([{ nombre: form.nombre, activa: false }])
-					.select()
-					.single();
+				const result = await adminService.createTemporada(form);
 
-				if (tErr || !nTemp) {
-					alert("Error al crear temporada");
-					setSaving(false);
+				if (result.error) {
+					alert(result.error);
+					forms.setSaving(false);
 					return;
-				}
-
-				const newId = nTemp.id;
-				const projectIdMap: Record<string, string> = {};
-
-				if (form.sourceTempId) {
-					if (form.clonarPasos) {
-						const { data: oldP } = await supabase
-							.from("proyectos")
-							.select("*")
-							.eq("temporada_id", form.sourceTempId);
-						if (oldP && oldP.length > 0) {
-							for (const p of oldP) {
-								const oldPid = p.id;
-								const rest: Record<string, unknown> = { ...p };
-								delete rest.id;
-								delete rest.created_at;
-								const cleanContent = JSON.parse(JSON.stringify(rest.content));
-
-								cleanContent.trabajaderas.forEach((t: Trabajadera) => {
-									if (!form.clonarCenso) t.nombres = [];
-									t.plan = null;
-									t.obj = {};
-									t.analisis = null;
-									t.pinned = null;
-									t.bajas = [];
-								});
-
-								const { data: nP, error: pErr } = await supabase
-									.from("proyectos")
-									.insert([
-										{ ...rest, content: cleanContent, temporada_id: newId },
-									])
-									.select()
-									.single();
-
-								if (pErr) {
-									// eslint-disable-next-line no-console
-									console.error("Error al clonar paso:", pErr);
-									alert("Error al clonar uno de los pasos: " + pErr.message);
-									setSaving(false);
-									return;
-								}
-								if (nP) {
-									projectIdMap[oldPid] = nP.id;
-								}
-							}
-						}
-					}
-
-					if (form.clonarCenso) {
-						const { data: oldC, error: cFetchErr } = await supabase
-							.from("census")
-							.select("*")
-							.eq("temporada_id", form.sourceTempId);
-						if (cFetchErr) {
-							// eslint-disable-next-line no-console
-							console.error("Error al leer censo original:", cFetchErr);
-							alert("Error al leer el censo de la temporada origen");
-						} else if (oldC && oldC.length > 0) {
-							const newC = oldC.map((c) => {
-								const rest: Record<string, unknown> = { ...c };
-								delete rest.id;
-								delete rest.created_at;
-								return {
-									...rest,
-									temporada_id: newId,
-									proyecto_id: projectIdMap[c.proyecto_id] || null,
-								};
-							});
-							const { error: cInsErr } = await supabase
-								.from("census")
-								.insert(newC);
-							if (cInsErr) {
-								// eslint-disable-next-line no-console
-								console.error("Error al insertar nuevo censo:", cInsErr);
-								alert("Error al clonar el censo: " + cInsErr.message);
-							}
-						}
-					}
 				}
 
 				alert("Temporada creada con éxito");
 				onSuccess?.();
 			} finally {
-				setSaving(false);
+				forms.setSaving(false);
 			}
 		},
-		[],
+		[forms],
 	);
 
 	return {
 		// Estado
-		saving,
-		importLoading,
-		newEntry,
-		setNewEntry,
-		newPaso,
-		setNewPaso,
-		newTemp,
-		setNewTemp,
-		editingId,
-		setEditingId,
-		editForm,
-		setEditForm,
-		importPid,
-		setImportPid,
-		importPreview,
-		setImportPreview,
+		saving: forms.saving,
+		importLoading: forms.importLoading,
+		newEntry: forms.newEntry,
+		setNewEntry: forms.setNewEntry,
+		newPaso: forms.newPaso,
+		setNewPaso: forms.setNewPaso,
+		newTemp: forms.newTemp,
+		setNewTemp: forms.setNewTemp,
+		editingId: forms.editingId,
+		setEditingId: forms.setEditingId,
+		editForm: forms.editForm,
+		setEditForm: forms.setEditForm,
+		importPid: forms.importPid,
+		setImportPid: forms.setImportPid,
+		importPreview: forms.importPreview,
+		setImportPreview: forms.setImportPreview,
 
 		// Acciones
 		eliminarUsuario,
