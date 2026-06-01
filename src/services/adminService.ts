@@ -3,7 +3,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { supabase } from "@/lib/supabase";
-import type { PasoDB, Trabajadera, RolCode } from "@/lib/types";
+import type { Trabajadera, RolCode } from "@/lib/types";
 import type { UserRole } from "@/hooks/useAuth";
 import type {
 	CensusEntry,
