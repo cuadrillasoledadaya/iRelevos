@@ -5,6 +5,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { DatosPerfil, PasoDB } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { datosVacios } from "@/lib/algoritmos";
@@ -40,115 +41,128 @@ export type ProjectStore = ProjectStoreState & ProjectStoreActions;
 // ── Helpers ───────────────────────────────────────────────────────
 
 const LS_PID = "cpwa_active_paso_id";
+const STORAGE_KEY = "cpwa_project_store";
 
 // ── Store ─────────────────────────────────────────────────────────
 
 export const createProjectStore = () =>
-	create<ProjectStore>()((set, get) => ({
-		// ── Estado inicial ──
+	create<ProjectStore>()(
+		persist(
+			(set, get) => ({
+				// ── Estado inicial ──
 
-		pasos: [],
-		pid: "",
-		nombrePaso: "Sin Paso",
-		nombreCuadrilla: "Sin Cuadrilla",
-		S: datosVacios(),
-		censusHeights: {},
+				pasos: [],
+				pid: "",
+				nombrePaso: "Sin Paso",
+				nombreCuadrilla: "Sin Cuadrilla",
+				S: datosVacios(),
+				censusHeights: {},
 
-		// ── Acciones ──
+				// ── Acciones ──
 
-		setPid: (id) => {
-			const { pasos } = get();
-			localStorage.setItem(LS_PID, id);
-			set({
-				pid: id,
-				...deriveFromPasos(pasos, id),
-			});
-		},
+				setPid: (id) => {
+					const { pasos } = get();
+					localStorage.setItem(LS_PID, id);
+					set({
+						pid: id,
+						...deriveFromPasos(pasos, id),
+					});
+				},
 
-		setPasos: (pasos) => {
-			const state = get();
-			let nextPid = state.pid;
+				setPasos: (pasos) => {
+					const state = get();
+					let nextPid = state.pid;
 
-			if (pasos.length > 0) {
-				const savedPid = localStorage.getItem(LS_PID);
-				if (savedPid && pasos.some((p) => p.id === savedPid)) {
-					nextPid = savedPid;
-				} else {
-					nextPid = pasos[0].id;
-				}
-			} else {
-				nextPid = "";
-			}
-
-			set({
-				pasos,
-				pid: nextPid,
-				...deriveFromPasos(pasos, nextPid),
-			});
-		},
-
-		refetchPasos: async () => {
-			const activeTemporadaId = getActiveTemporadaId();
-			if (!activeTemporadaId) return;
-
-			const { data, error } = await supabase
-				.from("proyectos")
-				.select(
-					"id, nombre_paso, nombre_cuadrilla, num_trabajaderas, content, created_at, temporada_id",
-				)
-				.eq("temporada_id", activeTemporadaId)
-				.order("created_at", { ascending: false });
-
-			if (!error && data) {
-				get().setPasos(data as PasoDB[]);
-			}
-		},
-
-		fetchCensusHeights: async () => {
-			const activeTemporadaId = getActiveTemporadaId();
-			if (!activeTemporadaId) return;
-
-			const { data } = await supabase
-				.from("census")
-				.select("nombre, apellidos, apodo, altura")
-				.eq("temporada_id", activeTemporadaId);
-
-			if (data) {
-				const map: Record<string, number> = {};
-				data.forEach(
-					(c: {
-						nombre: string;
-						apellidos: string;
-						apodo?: string;
-						altura?: number;
-					}) => {
-						if (c.altura) {
-							const fullName = `${c.nombre} ${c.apellidos}`.trim();
-							map[fullName] = c.altura;
-							if (c.apodo) map[c.apodo.trim()] = c.altura;
+					if (pasos.length > 0) {
+						const savedPid = localStorage.getItem(LS_PID);
+						if (savedPid && pasos.some((p) => p.id === savedPid)) {
+							nextPid = savedPid;
+						} else {
+							nextPid = pasos[0].id;
 						}
-					},
-				);
-				set({ censusHeights: map });
-			}
-		},
+					} else {
+						nextPid = "";
+					}
 
-		vaciarCenso: async () => {
-			const { pid } = get();
-			if (!pid) return;
+					set({
+						pasos,
+						pid: nextPid,
+						...deriveFromPasos(pasos, nextPid),
+					});
+				},
 
-			const { error } = await supabase
-				.from("census")
-				.delete()
-				.eq("proyecto_id", pid);
+				refetchPasos: async () => {
+					const activeTemporadaId = getActiveTemporadaId();
+					if (!activeTemporadaId) return;
 
-			if (error) {
-				console.error("Error al vaciar censo:", error.message);
-				alert("Error al vaciar el censo: " + error.message);
-			} else {
-				alert("Censo vaciado correctamente.");
-			}
-		},
-	}));
+					const { data, error } = await supabase
+						.from("proyectos")
+						.select(
+							"id, nombre_paso, nombre_cuadrilla, num_trabajaderas, content, created_at, temporada_id",
+						)
+						.eq("temporada_id", activeTemporadaId)
+						.order("created_at", { ascending: false });
+
+					if (!error && data) {
+						get().setPasos(data as PasoDB[]);
+					}
+				},
+
+				fetchCensusHeights: async () => {
+					const activeTemporadaId = getActiveTemporadaId();
+					if (!activeTemporadaId) return;
+
+					const { data } = await supabase
+						.from("census")
+						.select("nombre, apellidos, apodo, altura")
+						.eq("temporada_id", activeTemporadaId);
+
+					if (data) {
+						const map: Record<string, number> = {};
+						data.forEach(
+							(c: {
+								nombre: string;
+								apellidos: string;
+								apodo?: string;
+								altura?: number;
+							}) => {
+								if (c.altura) {
+									const fullName = `${c.nombre} ${c.apellidos}`.trim();
+									map[fullName] = c.altura;
+									if (c.apodo) map[c.apodo.trim()] = c.altura;
+								}
+							},
+						);
+						set({ censusHeights: map });
+					}
+				},
+
+				vaciarCenso: async () => {
+					const { pid } = get();
+					if (!pid) return;
+
+					const { error } = await supabase
+						.from("census")
+						.delete()
+						.eq("proyecto_id", pid);
+
+					if (error) {
+						console.error("Error al vaciar censo:", error.message);
+						alert("Error al vaciar el censo: " + error.message);
+					} else {
+						alert("Censo vaciado correctamente.");
+					}
+				},
+			}),
+			{
+				name: STORAGE_KEY,
+				storage: createJSONStorage(() => localStorage),
+				partialize: (state) => ({
+					pasos: state.pasos,
+					pid: state.pid,
+				}),
+			},
+		),
+	);
 
 export const projectStore = createProjectStore();
