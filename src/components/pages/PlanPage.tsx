@@ -721,8 +721,8 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 												style={{
 													padding: "4px 14px",
 													fontSize: "0.75rem",
-													backgroundColor: "var(--verde)",
-													color: "#fff",
+													backgroundColor: "var(--oro)",
+													color: "#000",
 													fontWeight: 600,
 												}}
 												onClick={() => {
