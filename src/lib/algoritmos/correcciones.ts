@@ -1,0 +1,415 @@
+// ══════════════════════════════════════════════════════════════════
+// CORRECCIONES — sugerencias de corrección e intercambios
+// ══════════════════════════════════════════════════════════════════
+
+import type { Trabajadera } from "../types";
+import { analizar } from "./rotacion";
+
+export interface CorreccionSugerida {
+	tipo: "saldo" | "repetido" | "consecutivo";
+	costaleroA: { nombre: string; idx: number; problema: string };
+	costaleroB: { nombre: string; idx: number; solucion: string };
+	tramoOrigen: number;
+	tramoDestino: number;
+	impacto: string;
+	prioridad?: Prioridad; // 1=crítica, 2=alta, 3=media
+}
+
+/** Prioridad de corrección: 1=crítica, 2=alta, 3=media */
+export type Prioridad = 1 | 2 | 3;
+
+export interface AnalisisCorrecciones {
+	correcciones: CorreccionSugerida[];
+	erroresSaldo: {
+		nombre: string;
+		idx: number;
+		tiene: number;
+		necesita: number;
+	}[];
+	repetidos: { nombre: string; idx: number; tramos: number[] }[];
+	consecutivos: { nombre: string; idx: number; tramos: [number, number][] }[];
+}
+
+/**
+ * Genera sugerencias de corrección para discrepancias en el plan.
+ * Analiza el análisis y propone intercambios para:
+ * - Equilibrar saldos (desviación de salidas)
+ * - Eliminar repeticiones de 1º/último
+ * - Separar costaleros consecutivos
+ */
+export function generarSugerenciasCorreccion(
+	t: Trabajadera,
+): AnalisisCorrecciones {
+	if (!t.plan || !t.analisis) {
+		return {
+			correcciones: [],
+			erroresSaldo: [],
+			repetidos: [],
+			consecutivos: [],
+		};
+	}
+
+	const erroresSaldo: {
+		nombre: string;
+		idx: number;
+		tiene: number;
+		necesita: number;
+	}[] = [];
+	const repetidos: { nombre: string; idx: number; tramos: number[] }[] = [];
+	const consecutivos: {
+		nombre: string;
+		idx: number;
+		tramos: [number, number][];
+	}[] = [];
+	const correcciones: CorreccionSugerida[] = [];
+
+	// 1. Analizar desviaciones de saldo
+	if (t.analisis.conteo) {
+		Object.entries(t.analisis.conteo).forEach(([idxStr, tiene]) => {
+			const idx = +idxStr;
+			const necesita = t.obj ? (t.obj[idx] ?? 0) : 0;
+			if (tiene !== necesita) {
+				erroresSaldo.push({
+					nombre: t.nombres[idx],
+					idx,
+					tiene,
+					necesita,
+				});
+			}
+		});
+	}
+
+	// 2. Analizar repeticiones 1º/último
+	if (t.analisis.rep && t.analisis.rep.length > 0) {
+		t.analisis.rep.forEach((idx) => {
+			repetidos.push({
+				nombre: t.nombres[idx],
+				idx,
+				tramos: [0, t.tramos.length - 1],
+			});
+		});
+	}
+
+	// 3. Analizar consecutivos
+	for (let ti = 1; ti < t.plan.length; ti++) {
+		t.plan[ti].fuera.forEach((idx) => {
+			if (t.plan && t.plan[ti - 1].fuera.includes(idx)) {
+				const existente = consecutivos.find((c) => c.idx === idx);
+				if (existente) {
+					existente.tramos.push([ti - 1, ti]);
+				} else {
+					consecutivos.push({
+						nombre: t.nombres[idx],
+						idx,
+						tramos: [[ti - 1, ti]],
+					});
+				}
+			}
+		});
+	}
+
+	// 4. Generar correcciones concretas
+	// Si un costalero tiene desbalance de saldo, sugerir intercambio
+	if (erroresSaldo.length >= 2) {
+		const conMenos = erroresSaldo
+			.filter((e) => e.tiene < e.necesita)
+			.sort((a, b) => a.tiene - b.tiene);
+		const conMas = erroresSaldo
+			.filter((e) => e.tiene > e.necesita)
+			.sort((a, b) => b.tiene - a.tiene);
+
+		if (conMenos.length > 0 && conMas.length > 0) {
+			const receptor = conMenos[0];
+			const donante = conMas[0];
+			// Encontrar tramo origen (donde donante está fuera y receptor dentro)
+			let tramoOrigen = -1;
+			let tramoDestino = -1;
+			if (t.plan) {
+				for (let ti = 0; ti < t.plan.length; ti++) {
+					if (
+						t.plan[ti].fuera.includes(donante.idx) &&
+						t.plan[ti].dentro.includes(receptor.idx)
+					) {
+						tramoOrigen = ti;
+						break;
+					}
+				}
+				// Encontrar otro tramo donde los roles están invertidos
+				for (let ti = 0; ti < t.plan.length; ti++) {
+					if (
+						t.plan[ti].fuera.includes(receptor.idx) &&
+						t.plan[ti].dentro.includes(donante.idx)
+					) {
+						tramoDestino = ti;
+						break;
+					}
+				}
+			}
+			correcciones.push({
+				tipo: "saldo",
+				costaleroA: {
+					nombre: receptor.nombre,
+					idx: receptor.idx,
+					problema: `Necesita ${receptor.necesita - receptor.tiene} salida(s) más`,
+				},
+				costaleroB: {
+					nombre: donante.nombre,
+					idx: donante.idx,
+					solucion: `Puede ceder ${donante.tiene - donante.necesita} salida(s)`,
+				},
+				tramoOrigen,
+				tramoDestino,
+				impacto:
+					tramoOrigen >= 0 && tramoDestino >= 0
+						? `Intercambiar en tramos ${tramoOrigen + 1} y ${tramoDestino + 1}`
+						: `Intercambiar en tramos con roles invertidos`,
+				prioridad: 2, // Alta prioridad
+			});
+		}
+	}
+
+	// Corrección de repeticiones
+	repetidos.forEach((r) => {
+		// Buscar un costalero que no esté en el último tramo para intercambiar
+		const candidatos = t.nombres
+			.map((nombre, idx) => ({ nombre, idx }))
+			.filter((c) => !t.analisis?.rep?.includes(c.idx))
+			.filter((c) => !t.bajas?.includes(c.idx))
+			.filter(
+				(c) => t.plan && t.plan[t.tramos.length - 1].dentro.includes(c.idx),
+			);
+
+		if (candidatos.length > 0) {
+			correcciones.push({
+				tipo: "repetido",
+				costaleroA: {
+					nombre: r.nombre,
+					idx: r.idx,
+					problema: `Repite en 1º y último tramo`,
+				},
+				costaleroB: {
+					nombre: candidatos[0].nombre,
+					idx: candidatos[0].idx,
+					solucion: `Intercambiar en último tramo (T${t.tramos.length})`,
+				},
+				tramoOrigen: 0,
+				tramoDestino: t.tramos.length - 1,
+				impacto: `Eliminar repetición 1º/último`,
+				prioridad: 1, // Crítica prioridad
+			});
+		}
+	});
+
+	// Corrección de consecutivos - buscar intercambio con costalero del tramo intermedio
+	consecutivos.forEach((c) => {
+		c.tramos.forEach(([ti1, ti2]) => {
+			// En ti2, buscar alguien que pueda intercambiar con quien está fuera en ti1
+			if (t.plan) {
+				const fueraEnT1 = t.plan[ti1].fuera;
+				const dentroEnT2 = t.plan[ti2].dentro;
+
+				// Encontrar un candidato que pueda intercambiar (que no esté de baja)
+				const cand = dentroEnT2.find(
+					(idx) => !fueraEnT1.includes(idx) && !t.bajas?.includes(idx),
+				);
+				if (cand !== undefined) {
+					// Validar que el intercambio no crea repetición nueva en 1º/último
+					const causariaRepeticion =
+						ti1 === 0 &&
+						t.plan[ti2].dentro.includes(c.idx) &&
+						t.plan[t.tramos.length - 1]?.dentro.includes(cand!);
+
+					correcciones.push({
+						tipo: "consecutivo",
+						costaleroA: {
+							nombre: c.nombre,
+							idx: c.idx,
+							problema: `Está fuera en tramos ${ti1 + 1} y ${ti2 + 1}`,
+						},
+						costaleroB: {
+							nombre: t.nombres[cand],
+							idx: cand,
+							solucion: `Intercambiar en tramo ${ti2 + 1}`,
+						},
+						tramoOrigen: ti1,
+						tramoDestino: ti2,
+						impacto: causariaRepeticion
+							? `Separar consecutividad (cuidado: podría crear repetición)`
+							: `Separar consecutividad`,
+						prioridad: causariaRepeticion ? 3 : 2, // Media si crea conflicto
+					});
+				}
+			}
+		});
+	});
+
+	// Ordenar por prioridad (crítica primero)
+	correcciones.sort((a, b) => (a.prioridad ?? 3) - (b.prioridad ?? 3));
+
+	// 5. Agrupar correcciones por tramos (mostrar resumen si hay múltiples)
+	const porTramos: Record<string, CorreccionSugerida[]> = {};
+	correcciones.forEach((corr) => {
+		const key = `T${corr.tramoOrigen + 1}\u2194T${corr.tramoDestino + 1}`;
+		if (!porTramos[key]) porTramos[key] = [];
+		porTramos[key].push(corr);
+	});
+
+	return {
+		correcciones,
+		erroresSaldo,
+		repetidos,
+		consecutivos,
+	};
+}
+
+/**
+ * Intercambia la posición de dos costaleros entre dos tramos.
+ * Útil para aplicar sugerencias de corrección.
+ *
+ * Para "saldo" y "consecutivo":
+ * - ciA está fuera en ti1 (el que necesita SALIR menos)
+ * - ciB está dentro en ti2 (el que necesita ENTRAR más)
+ * - El intercambio: en ti2, ciB pasa a fuera y ciA pasa a dentro
+ *
+ * Para "repetido" (ti1=0, ti2=último):
+ * - ciA está dentro en ambos tramos (el que repite)
+ * - ciB está dentro en ti2 (candidato para intercambiar)
+ * - El intercambio: ciA pasa a fuera en ambos tramos
+ *
+ * @param t - Trabajadera (se modifica in place)
+ * @param ti1 - Tramo origen
+ * @param ti2 - Tramo destino
+ * @param ciA - Índice del costalero con problema
+ * @param ciB - Índice del costalero candidato
+ */
+export function aplicarIntercambio(
+	t: Trabajadera,
+	ti1: number,
+	ti2: number,
+	ciA: number,
+	ciB: number,
+): boolean {
+	if (!t.plan || !t.obj) return false;
+
+	const todos = Array.from({ length: t.nombres.length }, (_, i) => i).filter(
+		(i) => !t.bajas?.includes(i),
+	);
+
+	// Caso "repetido": ti1=0 (primer tramo) y ti2 es el último tramo
+	// ADICIONALMENTE: ciA debe estar DENTRO en ti1 (no fuera)
+	const esRepetido =
+		ti1 === 0 &&
+		ti2 === t.tramos.length - 1 &&
+		t.plan[ti1]?.dentro.includes(ciA);
+
+	if (esRepetido) {
+		const r1 = t.plan[ti1];
+		const r2 = t.plan[ti2];
+
+		// Verificar que ciA está dentro en ambos tramos
+		if (!r1.dentro.includes(ciA) || !r2.dentro.includes(ciA)) {
+			return false;
+		}
+		// Verificar que ciB está dentro en ti2
+		if (!r2.dentro.includes(ciB)) {
+			return false;
+		}
+
+		// En ti1 (primer tramo): ciA pasa de dentro a fuera, intercambiamos con alguien
+		const idxCiAenT1 = r1.dentro.indexOf(ciA);
+		const alguienEnT1 = r1.dentro.find((idx) => idx !== ciA);
+		if (alguienEnT1 === undefined) return false;
+
+		r1.dentro[idxCiAenT1] = alguienEnT1;
+		r1.fuera = todos
+			.filter((i) => !r1.dentro.includes(i))
+			.sort((a, b) => a - b);
+
+		// En ti2 (último tramo): ciA pasa de dentro a fuera, ciB pasa de dentro a dentro
+		const idxCiAenT2 = r2.dentro.indexOf(ciA);
+		const idxCiBenT2 = r2.dentro.indexOf(ciB);
+		if (idxCiAenT2 === -1 || idxCiBenT2 === -1) return false;
+
+		r2.dentro[idxCiAenT2] = ciB;
+		r2.fuera = todos
+			.filter((i) => !r2.dentro.includes(i))
+			.sort((a, b) => a - b);
+
+		// Recalcular objetivo y análisis
+		const nuevoObj: Record<number, number> = {};
+		for (let i = 0; i < t.nombres.length; i++) nuevoObj[i] = 0;
+		t.plan.forEach((tramo) =>
+			tramo.fuera.forEach((ci) => {
+				nuevoObj[ci]++;
+			}),
+		);
+		t.obj = nuevoObj;
+		t.analisis = analizar(t.plan, t.nombres.length, nuevoObj, t);
+
+		return true;
+	}
+
+	// Caso "saldo" y "consecutivo": ciA está fuera en ti1
+	const r1 = t.plan[ti1];
+	const r2 = t.plan[ti2];
+
+	if (!r1.fuera.includes(ciA)) {
+		return false;
+	}
+
+	// Validar que ciB está dentro en ti2
+	if (!r2.dentro.includes(ciB)) {
+		return false;
+	}
+
+	// Intercambio en ti2: ciB pasa de dentro a fuera, ciA pasa de fuera a dentro
+	const idxCiBenT2 = r2.dentro.indexOf(ciB);
+	if (idxCiBenT2 === -1) return false;
+
+	r2.dentro[idxCiBenT2] = ciA;
+	r2.fuera = todos.filter((i) => !r2.dentro.includes(i)).sort((a, b) => a - b);
+
+	// Recalcular objetivo y análisis
+	const nuevoObj: Record<number, number> = {};
+	for (let i = 0; i < t.nombres.length; i++) nuevoObj[i] = 0;
+	t.plan.forEach((tramo) =>
+		tramo.fuera.forEach((ci) => {
+			nuevoObj[ci]++;
+		}),
+	);
+	t.obj = nuevoObj;
+	t.analisis = analizar(t.plan, t.nombres.length, nuevoObj, t);
+
+	return true;
+}
+
+/**
+ * Aplica todas las sugerencias de corrección disponibles en orden de prioridad.
+ * Modifica la Trabajadera in-place.
+ * @returns true si al menos una corrección fue aplicada
+ */
+export function aplicarTodasLasCorrecciones(t: Trabajadera): boolean {
+	if (!t.plan || !t.analisis) return false;
+
+	const sugerencias = generarSugerenciasCorreccion(t);
+	if (sugerencias.correcciones.length === 0) return false;
+
+	// Sort by priority (1 = crítica first)
+	const ordenadas = [...sugerencias.correcciones].sort(
+		(a, b) => (a.prioridad ?? 3) - (b.prioridad ?? 3),
+	);
+
+	let aplicadas = 0;
+	for (const corr of ordenadas) {
+		const ok = aplicarIntercambio(
+			t,
+			corr.tramoOrigen,
+			corr.tramoDestino,
+			corr.costaleroA.idx,
+			corr.costaleroB.idx,
+		);
+		if (ok) aplicadas++;
+	}
+
+	return aplicadas > 0;
+}
