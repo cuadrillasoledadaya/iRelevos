@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { datosVacios, migrarDatos, BANCO_DEFAULT } from "./datos";
+import type { DatosPerfil } from "../types";
 
 describe("datos", () => {
 	describe("BANCO_DEFAULT", () => {
@@ -57,10 +58,10 @@ describe("datos", () => {
 						nombres: ["Juan", "Pedro", "Luis", "Ana", "María", "Sofía"],
 						salidas: 2,
 						roles: [
-							{ pri: "COS" as const, sec: "FIJ_I" as const },
-							{ pri: "COS" as const, sec: "FIJ_I" as const },
-							{ pri: "FIJ_I" as const, sec: "COS" as const },
-							{ pri: "FIJ_D" as const, sec: "COS" as const },
+							{ pri: "COS_D" as const, sec: "FIJ_I" as const },
+							{ pri: "COS_D" as const, sec: "FIJ_I" as const },
+							{ pri: "FIJ_I" as const, sec: "COS_D" as const },
+							{ pri: "FIJ_D" as const, sec: "COS_D" as const },
 							{ pri: "COR" as const, sec: "FIJ_I" as const },
 							{ pri: "COR" as const, sec: "FIJ_I" as const },
 						],
@@ -104,7 +105,7 @@ describe("datos", () => {
 					},
 				],
 			};
-			const resultado = migrarDatos(datosIncompletos);
+			const resultado = migrarDatos(datosIncompletos as unknown as DatosPerfil);
 			const t = resultado.trabajaderas[0];
 			expect(t.nombres).toHaveLength(6);
 			expect(t.salidas).toBe(2);
@@ -126,12 +127,12 @@ describe("datos", () => {
 						nombres: ["Juan", "Pedro", "Luis", "Ana", "María", "Sofía"],
 						salidas: 2,
 						roles: [
-							{ pri: "PAT" as const, sec: "FIJ_I" as const },
-							{ pri: "COS" as const, sec: "FIJ_I" as const },
-							{ pri: "PAT" as const, sec: "FIJ_I" as const },
-							{ pri: "COS" as const, sec: "FIJ_I" as const },
-							{ pri: "PAT" as const, sec: "FIJ_I" as const },
-							{ pri: "COS" as const, sec: "FIJ_I" as const },
+							{ pri: "PAT_D" as const, sec: "FIJ_I" as const },
+							{ pri: "COS_D" as const, sec: "FIJ_I" as const },
+							{ pri: "PAT_D" as const, sec: "FIJ_I" as const },
+							{ pri: "COS_D" as const, sec: "FIJ_I" as const },
+							{ pri: "PAT_D" as const, sec: "FIJ_I" as const },
+							{ pri: "COS_D" as const, sec: "FIJ_I" as const },
 						],
 						pinned: null,
 						bajas: [],
@@ -145,7 +146,7 @@ describe("datos", () => {
 					},
 				],
 			};
-			const resultado = migrarDatos(datosConPlanInvalido);
+			const resultado = migrarDatos(datosConPlanInvalido as unknown as DatosPerfil);
 			expect(resultado.trabajaderas[0].plan).toBeNull();
 			expect(resultado.trabajaderas[0].obj).toBeNull();
 			expect(resultado.trabajaderas[0].analisis).toBeNull();
@@ -161,8 +162,12 @@ describe("datos", () => {
 						nombres: ["Juan", "Pedro", "Luis", "Ana", "María", "Sofía"],
 						salidas: 2,
 						roles: [
-							{ pri: "PAT" as const, sec: "FIJ_I" as const },
-							{ pri: "COS" as const, sec: "FIJ_I" as const },
+							{ pri: "PAT_D" as const, sec: "FIJ_I" as const },
+							{ pri: "COS_D" as const, sec: "FIJ_I" as const },
+							{ pri: "PAT_D" as const, sec: "FIJ_I" as const },
+							{ pri: "COS_D" as const, sec: "FIJ_I" as const },
+							{ pri: "PAT_D" as const, sec: "FIJ_I" as const },
+							{ pri: "COS_D" as const, sec: "FIJ_I" as const },
 						],
 						pinned: null,
 						bajas: [],
@@ -207,7 +212,7 @@ describe("datos", () => {
 					},
 				],
 			};
-			const resultado = migrarDatos(datos);
+			const resultado = migrarDatos(datos as unknown as DatosPerfil);
 			expect(resultado.trabajaderas[0].roles).toHaveLength(2);
 		});
 
@@ -221,7 +226,7 @@ describe("datos", () => {
 						nombres: ["Juan", "Pedro", "Luis"],
 						salidas: 2,
 						roles: [
-							{ pri: "PAT" as const, sec: "FIJ_I" as const },
+							{ pri: "PAT_D" as const, sec: "FIJ_I" as const },
 							undefined as unknown as { pri: string; sec: string },
 							{ pri: "COR" as const, sec: "FIJ_I" as const },
 						],
@@ -237,7 +242,7 @@ describe("datos", () => {
 					},
 				],
 			};
-			const resultado = migrarDatos(datos);
+			const resultado = migrarDatos(datos as unknown as DatosPerfil);
 			expect(resultado.trabajaderas[0].roles[1]).toEqual({
 				pri: "COR",
 				sec: "FIJ_I",

@@ -10,12 +10,12 @@ import {
 	completarAuto,
 	getFueraPorTramo,
 } from "./pinned";
-import type { Trabajadera } from "../types";
+import type { Trabajadera, PinState } from "../types";
 
 function makeTrabajadera(
 	nombres: string[],
 	tramos: string[],
-	pinned: string[][] | null = null,
+	pinned: PinState[][] | null = null,
 	salidas = 2,
 	regla5costaleros = false,
 ): Trabajadera {

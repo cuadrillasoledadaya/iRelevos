@@ -4,14 +4,14 @@
 
 import { describe, it, expect } from "vitest";
 import { generarSugerencias, aplicarSugerencias } from "./sugerencias";
-import type { Trabajadera } from "../types";
+import type { Trabajadera, PinState } from "../types";
 
 function makeTrabajadera(
 	nombres: string[],
 	puntuaciones: Record<string, number> = {},
 	tramosClaves: number[] = [],
 	tramos: string[] = ["T1", "T2"],
-	pinned: string[][] | null = null,
+	pinned: PinState[][] | null = null,
 ): Trabajadera {
 	return {
 		id: 1,

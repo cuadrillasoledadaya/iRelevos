@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { supabase } from '@/lib/supabase'
+import type { User, Session, AuthError } from '@supabase/supabase-js'
 
 describe('supabase auth', () => {
   beforeEach(() => {
@@ -12,9 +13,8 @@ describe('supabase auth', () => {
 
   describe('signInWithPassword', () => {
     it('debe retornar usuario y sesión con credenciales válidas', async () => {
-      // RED: El mock actual no tiene auth, este test debe fallar
-      const mockUser = { id: 'user-123', email: 'test@example.com' }
-      const mockSession = { access_token: 'token-abc', refresh_token: 'token-ref' }
+      const mockUser = { id: 'user-123', email: 'test@example.com' } as unknown as User
+      const mockSession = { access_token: 'token-abc', refresh_token: 'token-ref' } as unknown as Session
 
       vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
         data: { user: mockUser, session: mockSession },
@@ -33,10 +33,9 @@ describe('supabase auth', () => {
     })
 
     it('debe retornar error con credenciales inválidas', async () => {
-      // TRIANGULATE: camino diferente — error en lugar de éxito
       vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
         data: { user: null, session: null },
-        error: new Error('Invalid login credentials'),
+        error: { message: 'Invalid login credentials' } as AuthError,
       })
 
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -52,7 +51,7 @@ describe('supabase auth', () => {
 
     it('debe llamar al método auth con los parámetros correctos', async () => {
       vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-        data: { user: { id: 'u1' }, session: { access_token: 't1' } },
+        data: { user: { id: 'u1' } as unknown as User, session: { access_token: 't1' } as unknown as Session },
         error: null,
       })
 
@@ -70,7 +69,7 @@ describe('supabase auth', () => {
 
   describe('signUp', () => {
     it('debe registrar un nuevo usuario correctamente', async () => {
-      const mockUser = { id: 'new-user', email: 'new@example.com' }
+      const mockUser = { id: 'new-user', email: 'new@example.com' } as unknown as User
 
       vi.mocked(supabase.auth.signUp).mockResolvedValue({
         data: { user: mockUser, session: null },
@@ -94,7 +93,7 @@ describe('supabase auth', () => {
     it('debe retornar error si el email ya está registrado', async () => {
       vi.mocked(supabase.auth.signUp).mockResolvedValue({
         data: { user: null, session: null },
-        error: new Error('User already registered'),
+        error: { message: 'User already registered' } as AuthError,
       })
 
       const { data, error } = await supabase.auth.signUp({
@@ -121,7 +120,7 @@ describe('supabase auth', () => {
 
   describe('getSession', () => {
     it('debe retornar sesión activa cuando existe', async () => {
-      const mockSession = { access_token: 'active-token', user: { id: 'u1' } }
+      const mockSession = { access_token: 'active-token', user: { id: 'u1' } } as unknown as Session
 
       vi.mocked(supabase.auth.getSession).mockResolvedValue({
         data: { session: mockSession },
@@ -175,7 +174,7 @@ describe('supabase auth', () => {
     it('debe manejar error de servidor 500 en signUp', async () => {
       vi.mocked(supabase.auth.signUp).mockResolvedValue({
         data: { user: null, session: null },
-        error: new Error('Internal server error'),
+        error: { message: 'Internal server error' } as AuthError,
       })
 
       const { data, error } = await supabase.auth.signUp({
@@ -194,8 +193,8 @@ describe('supabase auth', () => {
       const mockUnsubscribe = vi.fn()
 
       vi.mocked(supabase.auth.onAuthStateChange).mockReturnValue({
-        data: { subscription: { unsubscribe: mockUnsubscribe } },
-      })
+        data: { subscription: { unsubscribe: mockUnsubscribe } as any },
+      } as any)
 
       const { data } = supabase.auth.onAuthStateChange(() => {})
 
