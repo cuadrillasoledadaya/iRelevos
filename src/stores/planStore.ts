@@ -161,34 +161,12 @@ export function createPlanStore(
 				const t = getTrabFn(d, tid);
 				if (!t.plan) return;
 
-				// 1. Aplicar todas las correcciones sugeridas
+				// Aplicar todas las correcciones sugeridas
+				// (cada aplicarIntercambio ya recalcula obj + analisis internamente)
 				aplicarTodasLasCorrecciones(t);
 
-				// 2. Obtener pinned actual
-				const p = getPinned(t);
-
-				// 3. Fijar (pinned) el estado actual del plan, respetando pins manuales existentes
-				t.plan.forEach((tramo, ti) => {
-					tramo.dentro.forEach((ci) => {
-						if (p[ti] && p[ti][ci] === "L") p[ti][ci] = "D";
-					});
-					tramo.fuera.forEach((ci) => {
-						if (p[ti] && p[ti][ci] === "L") p[ti][ci] = "F";
-					});
-				});
-
-				t.pinned = p;
-
-				// 4. Recalcular objetivo y análisis post-correcciones
-				const nuevoObj: Record<number, number> = {};
-				for (let i = 0; i < t.nombres.length; i++) nuevoObj[i] = 0;
-				t.plan.forEach((tramo) =>
-					tramo.fuera.forEach((ci) => {
-						nuevoObj[ci]++;
-					}),
-				);
-				t.obj = nuevoObj;
-				t.analisis = analizar(t.plan, t.nombres.length, nuevoObj, t);
+				// NO fijar pinned automáticamente — solo se respetan los que el
+				// usuario marcó a mano. El sistema debe poder re-asignar libremente.
 			});
 		},
 
