@@ -19,21 +19,22 @@ export interface TemporadaStoreActions {
 
 export type TemporadaStore = TemporadaStoreState & TemporadaStoreActions;
 
-export function createTemporadaStore(refetchPasos?: () => Promise<void>) {
-	return create<TemporadaStore>()((set) => ({
-		temporadas: [],
-		activeTemporadaId: "",
-
-		setActiveTemporadaId: (id) => {
-			set({ activeTemporadaId: id });
-			if (id) {
-				localStorage.setItem(LS_TID, id);
-				refetchPasos?.();
-			}
-		},
-
-		setTemporadas: (temporadas) => set({ temporadas }),
-	}));
+let _refetchPasos: (() => Promise<void>) | null = null;
+export function setTemporadaRefetch(fn: () => Promise<void>) {
+	_refetchPasos = fn;
 }
 
-export const temporadaStore = createTemporadaStore();
+export const temporadaStore = create<TemporadaStore>()((set) => ({
+	temporadas: [],
+	activeTemporadaId: "",
+
+	setActiveTemporadaId: (id) => {
+		set({ activeTemporadaId: id });
+		if (id) {
+			localStorage.setItem(LS_TID, id);
+			_refetchPasos?.();
+		}
+	},
+
+	setTemporadas: (temporadas) => set({ temporadas }),
+}));

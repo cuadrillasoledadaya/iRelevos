@@ -51,14 +51,19 @@ type MutarFn = (fn: (draft: DatosPerfil) => void) => void;
 type GetTrabFn = (d: DatosPerfil, tid: number) => Trabajadera;
 type GetSFn = () => DatosPerfil;
 
-export function createPlanStore(
-	mutar: MutarFn,
-	getTrabFn: GetTrabFn,
-	getS: GetSFn,
-) {
-	return create<PlanStore>()(() => ({
+let _mutar: MutarFn;
+let _getTrab: GetTrabFn;
+let _getS: GetSFn;
+
+export function setPlanDeps(m: MutarFn, gt: GetTrabFn, gs: GetSFn) {
+	_mutar = m;
+	_getTrab = gt;
+	_getS = gs;
+}
+
+export const planStore = create<PlanStore>()(() => ({
 		calcularTodo: () => {
-			mutar((d) => {
+			_mutar((d) => {
 				d.trabajaderas.forEach((t) => {
 					const { plan, objetivo } = calcularCiclo(t);
 					ordenarDentroFisico(t, plan);
@@ -71,8 +76,8 @@ export function createPlanStore(
 		},
 
 		calcularTrab: (tid) => {
-			mutar((d) => {
-				const t = getTrabFn(d, tid);
+			_mutar((d) => {
+				const t = _getTrab(d, tid);
 				const { plan, objetivo } = calcularCiclo(t);
 				ordenarDentroFisico(t, plan);
 				t.plan = plan;
@@ -83,8 +88,8 @@ export function createPlanStore(
 		},
 
 		completarPlan: (tid) => {
-			mutar((d) => {
-				const t = getTrabFn(d, tid);
+			_mutar((d) => {
+				const t = _getTrab(d, tid);
 				const res = completarAuto(t);
 				if ("error" in res) return;
 				ordenarDentroFisico(t, res.plan);
@@ -95,8 +100,8 @@ export function createPlanStore(
 		},
 
 		limpiarPlan: (tid) => {
-			mutar((d) => {
-				const t = getTrabFn(d, tid);
+			_mutar((d) => {
+				const t = _getTrab(d, tid);
 				t.plan = null;
 				t.obj = null;
 				t.analisis = null;
@@ -104,14 +109,14 @@ export function createPlanStore(
 		},
 
 		quitarBloqueos: (tid) => {
-			mutar((d) => {
-				getTrabFn(d, tid).pinned = null;
+			_mutar((d) => {
+				_getTrab(d, tid).pinned = null;
 			});
 		},
 
 		setPinned: (tid, ti, ci, v) => {
-			mutar((d) => {
-				const t = getTrabFn(d, tid);
+			_mutar((d) => {
+				const t = _getTrab(d, tid);
 				const p = getPinned(t);
 				p[ti][ci] = v;
 				t.pinned = p;
@@ -119,14 +124,14 @@ export function createPlanStore(
 		},
 
 		getErroresPinned: (tid): string[] => {
-			const t = getTrabFn(getS(), tid);
+			const t = _getTrab(_getS(), tid);
 			return validarPinned(t);
 		},
 
 		confirmarSwap: (ws) => {
-			mutar((d) => {
+			_mutar((d) => {
 				const { a, ambosD, nuevoDentroF, nuevoFuera } = ws;
-				const t = getTrabFn(d, a.tid);
+				const t = _getTrab(d, a.tid);
 				const r = t.plan![a.ti];
 				if (r) {
 					r.dentroFisico = [...nuevoDentroF];
@@ -149,16 +154,16 @@ export function createPlanStore(
 
 		aplicarSugerencia: (tid, ti1, ti2, ciA, ciB) => {
 			let result = false;
-			mutar((d) => {
-				const t = getTrabFn(d, tid);
+			_mutar((d) => {
+				const t = _getTrab(d, tid);
 				result = aplicarIntercambio(t, ti1, ti2, ciA, ciB);
 			});
 			return result;
 		},
 
 		confirmarAsignacion: (tid) => {
-			mutar((d) => {
-				const t = getTrabFn(d, tid);
+			_mutar((d) => {
+				const t = _getTrab(d, tid);
 				if (!t.plan) return;
 
 				// Aplicar todas las correcciones sugeridas
@@ -171,7 +176,7 @@ export function createPlanStore(
 		},
 
 		limpiarPlanificacion: () => {
-			mutar((d) => {
+			_mutar((d) => {
 				d.trabajaderas.forEach((t) => {
 					t.plan = null;
 					t.analisis = null;
@@ -181,7 +186,7 @@ export function createPlanStore(
 		},
 
 		limpiarTrabajaderas: () => {
-			mutar((d) => {
+			_mutar((d) => {
 				d.trabajaderas.forEach((t) => {
 					t.nombres = t.nombres.map((_, i) => `Costalero ${i + 1}`);
 					t.bajas = [];
@@ -194,7 +199,7 @@ export function createPlanStore(
 		},
 
 		resetTodo: () => {
-			mutar((d) => {
+			_mutar((d) => {
 				d.trabajaderas = [
 					{
 						id: 1,
@@ -231,7 +236,7 @@ export function createPlanStore(
 		},
 
 		addPlan: (nombre, tramos) => {
-			mutar((d) => {
+			_mutar((d) => {
 				if (!d.planes) d.planes = [];
 				d.planes.push({
 					id: `plan_${Date.now()}`,
@@ -242,7 +247,7 @@ export function createPlanStore(
 		},
 
 		updatePlan: (id, nombre) => {
-			mutar((d) => {
+			_mutar((d) => {
 				if (!d.planes) d.planes = [];
 				const plan = d.planes.find((p) => p.id === id);
 				if (plan) plan.nombre = nombre;
@@ -250,14 +255,14 @@ export function createPlanStore(
 		},
 
 		delPlan: (id) => {
-			mutar((d) => {
+			_mutar((d) => {
 				if (!d.planes) d.planes = [];
 				d.planes = d.planes.filter((p) => p.id !== id);
 			});
 		},
 
 		cargarPlanEnTrabajadera: (tid, planId) => {
-			mutar((d) => {
+			_mutar((d) => {
 				if (!d.planes) d.planes = [];
 				const plan = d.planes.find((p) => p.id === planId);
 				if (!plan) return;
@@ -271,4 +276,3 @@ export function createPlanStore(
 			});
 		},
 	}));
-}

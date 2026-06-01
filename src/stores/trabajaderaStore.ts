@@ -34,27 +34,30 @@ type MutarFn = (fn: (draft: DatosPerfil) => void) => void
 type GetTrabFn = (d: DatosPerfil, tid: number) => Trabajadera
 type CompletarPlanFn = (tid: number) => void
 
+let _mutar: MutarFn
+let _getTrab: GetTrabFn
+let _completarPlan: CompletarPlanFn
+
+export function setTrabajaderaDeps(m: MutarFn, gt: GetTrabFn, cp: CompletarPlanFn) {
+  _mutar = m; _getTrab = gt; _completarPlan = cp
+}
+
 /**
- * Crea el store de trabajadera. Recibe mutar(), getTrab() y
- * completarPlan() como dependencias inyectadas.
+ * Store de trabajadera — mutaciones de costaleros y tramos.
+ * Delega en mutar() que opera sobre el projectStore.
  */
-export function createTrabajaderaStore(
-  mutar: MutarFn,
-  getTrabFn: GetTrabFn,
-  completarPlan: CompletarPlanFn,
-) {
-  return create<TrabajaderaStore>()(() => ({
+export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
     // ── Costaleros ───────────────────────────────────────────────
 
     setNombre: (tid, i, nombre) => {
-      mutar(d => {
-        getTrabFn(d, tid).nombres[i] = nombre
+      _mutar(d => {
+        _getTrab(d, tid).nombres[i] = nombre
       })
     },
 
     addCost: (tid) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         t.nombres.push(`Costalero ${t.nombres.length + 1}`)
         if (!t.roles) t.roles = defaultRoles(t.nombres.length - 1, tid)
         t.roles.push({ pri: 'COR', sec: 'FIJ_I' })
@@ -66,8 +69,8 @@ export function createTrabajaderaStore(
     },
 
     delCost: (tid, i) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         const bajas = t.bajas ?? []
         t.nombres.splice(i, 1)
         t.roles?.splice(i, 1)
@@ -81,8 +84,8 @@ export function createTrabajaderaStore(
 
     toggleBaja: (tid, i): boolean => {
       let ok = true
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         if (!t.bajas) t.bajas = []
         const idx = t.bajas.indexOf(i)
         if (idx >= 0) {
@@ -104,8 +107,8 @@ export function createTrabajaderaStore(
     },
 
     setRolPri: (tid, i, rol) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         // Asegurar array roles: longitud correcta + sin nulls/undefineds
         if (!t.roles) t.roles = []
         while (t.roles.length < t.nombres.length) {
@@ -124,8 +127,8 @@ export function createTrabajaderaStore(
     },
 
     setRolSec: (tid, i, rol) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         // Asegurar array roles: longitud correcta + sin nulls/undefineds
         if (!t.roles) t.roles = []
         while (t.roles.length < t.nombres.length) {
@@ -143,8 +146,8 @@ export function createTrabajaderaStore(
     },
 
     toggleRegla5: (tid) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         t.regla5costaleros = !t.regla5costaleros
         t.plan = null
         t.obj = null
@@ -154,7 +157,7 @@ export function createTrabajaderaStore(
     },
 
     addTrab: () => {
-      mutar(d => {
+      _mutar(d => {
         const nextId = d.trabajaderas.length + 1
         d.trabajaderas.push({
           id: nextId,
@@ -182,16 +185,16 @@ export function createTrabajaderaStore(
     },
 
     setPuntuacion: (tid, nombre, pts) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         if (!t.puntuaciones) t.puntuaciones = {}
         t.puntuaciones[nombre] = pts
       })
     },
 
     addCostUltimo: (tid, nombre, roles) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         const nuevoIdx = t.nombres.length
         t.nombres.push(nombre)
         t.roles.push({
@@ -209,20 +212,20 @@ export function createTrabajaderaStore(
         t.obj = null
         t.analisis = null
       })
-      completarPlan(tid)
+      _completarPlan(tid)
     },
 
     // ── Tramos ───────────────────────────────────────────────────
 
     setNombreTramo: (tid, ti, nombre) => {
-      mutar(d => {
-        getTrabFn(d, tid).tramos[ti] = nombre
+      _mutar(d => {
+        _getTrab(d, tid).tramos[ti] = nombre
       })
     },
 
     addTramo: (tid) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         t.tramos.push(`Tramo ${t.tramos.length + 1} (T${tid})`)
         t.plan = null
         t.obj = null
@@ -232,8 +235,8 @@ export function createTrabajaderaStore(
     },
 
     delTramo: (tid, ti) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         t.tramos.splice(ti, 1)
         t.plan = null
         t.obj = null
@@ -243,8 +246,8 @@ export function createTrabajaderaStore(
     },
 
     setSalidas: (tid, salidas) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         t.salidas = salidas
         t.plan = null
         t.obj = null
@@ -254,14 +257,14 @@ export function createTrabajaderaStore(
     },
 
     usarBanco: (tid, ti, nombre) => {
-      mutar(d => {
-        getTrabFn(d, tid).tramos[ti] = nombre
+      _mutar(d => {
+        _getTrab(d, tid).tramos[ti] = nombre
       })
     },
 
     sugerirTramos: (tid, targetSalidas?) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         if (targetSalidas !== undefined) t.salidas = targetSalidas
         const nActivos = t.nombres.length - (t.bajas?.length ?? 0)
         const nOpt = tramosOptimos(nActivos, t.salidas ?? 2, t.regla5costaleros)
@@ -281,8 +284,8 @@ export function createTrabajaderaStore(
     },
 
     toggleTramoClave: (tid, ti) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         if (!t.tramosClaves) t.tramosClaves = []
         const idx = t.tramosClaves.indexOf(ti)
         if (idx >= 0) {
@@ -295,8 +298,8 @@ export function createTrabajaderaStore(
     },
 
     sugerirYCalcular: (tid) => {
-      mutar(d => {
-        const t = getTrabFn(d, tid)
+      _mutar(d => {
+        const t = _getTrab(d, tid)
         try {
           aplicarSugerencias(t)
         } catch (err: unknown) {
@@ -304,7 +307,6 @@ export function createTrabajaderaStore(
           if (typeof alert !== 'undefined') alert(msg)
         }
       })
-      completarPlan(tid)
+      _completarPlan(tid)
     },
   }))
-}

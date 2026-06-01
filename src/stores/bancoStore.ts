@@ -13,18 +13,19 @@ export interface BancoStore {
 
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void
 
-export function createBancoStore(mutar: MutarFn) {
-  return create<BancoStore>()(() => ({
-    addBanco: (nombre) => {
-      mutar(d => { d.banco.push(nombre) })
-    },
+let _mutar: MutarFn
+export function setBancoMutar(m: MutarFn) { _mutar = m }
 
-    delBanco: (i) => {
-      mutar(d => { d.banco.splice(i, 1) })
-    },
+export const bancoStore = create<BancoStore>()(() => ({
+  addBanco: (nombre) => {
+    _mutar(d => { d.banco.push(nombre) })
+  },
 
-    limpiarBanco: () => {
-      mutar(d => { d.banco = [] })
-    },
-  }))
-}
+  delBanco: (i) => {
+    _mutar(d => { d.banco.splice(i, 1) })
+  },
+
+  limpiarBanco: () => {
+    _mutar(d => { d.banco = [] })
+  },
+}))
