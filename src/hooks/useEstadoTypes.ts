@@ -4,8 +4,10 @@
 // ══════════════════════════════════════════════════════════════════
 
 import type { ActivePage, ActiveSheet, CellTarget, CensusTarget, DatosPerfil, PasoDB, PinState, RolCode, SwapState, Trabajadera, Temporada } from '@/lib/types'
+import type { SugerenciaRes } from '@/lib/algoritmos'
 
 export type { ActivePage, ActiveSheet, PasoDB, DatosPerfil, Trabajadera, RolCode, PinState, SwapState, CellTarget, CensusTarget, Temporada }
+export type { SugerenciaRes }
 
 export interface EstadoCtx {
   pasos: PasoDB[]; pid: string; setPid: (id: string) => void; S: DatosPerfil; nombrePaso: string; nombreCuadrilla: string
@@ -24,6 +26,8 @@ export interface EstadoCtx {
   setSalidas: (tid: number, salidas: number) => void; usarBanco: (tid: number, ti: number, nombre: string) => void
   tramosOptimosFor: (tid: number, salidas?: number) => number; sugerirTramos: (tid: number, targetSalidas?: number) => void
   toggleTramoClave: (tid: number, ti: number) => void; sugerirYCalcular: (tid: number) => void
+  previsualizarSugerencia: (tid: number) => SugerenciaRes | null
+  confirmarSugerencia: (tid: number) => boolean
   addBanco: (nombre: string) => void; delBanco: (i: number) => void
   calcularTodo: () => void; calcularTrab: (tid: number) => void; completarPlan: (tid: number) => void
   limpiarPlan: (tid: number) => void; quitarBloqueos: (tid: number) => void

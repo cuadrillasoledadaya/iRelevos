@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import { uiStore, projectStore, trabajaderaStore, planStore } from "@/stores";
 import {
 	getPinned,
@@ -273,9 +273,10 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 	const limpiarPlan = planStore.getState().limpiarPlan;
 	const getErroresPinned = planStore.getState().getErroresPinned;
 	const quitarBloqueos = planStore.getState().quitarBloqueos;
-	const sugerirYCalcular = trabajaderaStore.getState().sugerirYCalcular;
 	const aplicarSugerencia = planStore.getState().aplicarSugerencia;
 	const confirmarAsignacion = planStore.getState().confirmarAsignacion;
+	const setBancoTargetLocal = uiStore.getState().setBancoTarget;
+	const openSheetLocal = uiStore.getState().openSheet;
 	const { profile } = useAuth();
 	const esMando =
 		profile?.role === "superadmin" ||
@@ -298,6 +299,14 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 
 	const erroresPinned = getErroresPinned(t.id);
 	const pinned = getPinned(t);
+
+	// Memoizado: 1× por trabajadera, reusado en celdas y sección inferior
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	const sugerencias = useMemo(
+		() => generarSugerenciasCorreccion(t),
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+		[t.plan, t.analisis, t.nombres, t.tramos, t.bajas, t.obj, t.puntuaciones, t.tramosClaves],
+	);
 
 	function openBanco(ti: number) {
 		setBancoTarget({ tid: t.id, ti });
@@ -520,7 +529,6 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											let hasCons = false;
 
 											// Preview visual: resaltar celdas afectadas por sugerencia hover
-											const sugerencias = generarSugerenciasCorreccion(t);
 											const hoveredCorr =
 												hoverSugerencia !== null
 													? sugerencias.correcciones[hoverSugerencia]
@@ -611,7 +619,10 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						<button
 							className="btn btn-out f1"
 							style={{ borderColor: "var(--oro)", color: "var(--oro)" }}
-							onClick={() => sugerirYCalcular(t.id)}
+							onClick={() => {
+								setBancoTargetLocal({ tid: t.id, ti: -1 });
+								openSheetLocal("sugerencia-asig");
+							}}
 							title="Sugerir asignación basada en puntuaciones y tramos clave"
 						>
 							💡 Sugerir Asig.
@@ -652,7 +663,6 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 							Sugerencias de Corrección
 						</div>
 						{(() => {
-							const sugerencias = generarSugerenciasCorreccion(t);
 							if (sugerencias.correcciones.length === 0) {
 								return (
 									<div className="text-[0.75rem] text-[var(--cre-o)]">

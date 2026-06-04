@@ -46,6 +46,10 @@ const SugerenciaSheet = dynamic(
 	() => import("@/components/sheets/SugerenciaSheet"),
 	{ ssr: false },
 );
+const SugerenciaAsignacionSheet = dynamic(
+	() => import("@/components/sheets/SugerenciaAsignacionSheet"),
+	{ ssr: false },
+);
 const RelevosSheet = dynamic(() => import("@/components/sheets/RelevosSheet"), {
 	ssr: false,
 });
@@ -126,6 +130,7 @@ export default function Home() {
 			{activeSheet === "celda" && <CeldaSheet />}
 			{activeSheet === "swap" && <SwapSheet />}
 			{activeSheet === "sugerencia" && <SugerenciaSheet />}
+			{activeSheet === "sugerencia-asig" && <SugerenciaAsignacionSheet />}
 			{activeSheet === "relevos" && <RelevosSheet />}
 			{activeSheet === "censo" && <CensusSheet />}
 		</div>

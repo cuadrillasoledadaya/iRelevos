@@ -27,6 +27,7 @@ const mutar = createMutar(
 setPlanDeps(mutar, getTrab, () => projectStore.getState().S);
 setTrabajaderaDeps(mutar, getTrab, (tid) =>
 	planStore.getState().completarPlan(tid),
+	() => projectStore.getState().S,
 );
 setBancoMutar(mutar);
 setTemporadaRefetch(() => projectStore.getState().refetchPasos());

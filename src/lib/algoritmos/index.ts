@@ -20,7 +20,7 @@ export {
 
 // Sugerencias
 export { generarSugerencias, aplicarSugerencias } from "./sugerencias";
-export type { SugerenciaRes } from "./sugerencias";
+export type { SugerenciaRes, SugerenciaAsignacion } from "./sugerencias";
 
 // Correcciones
 export {

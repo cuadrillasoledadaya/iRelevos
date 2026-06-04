@@ -134,6 +134,8 @@ export function useEstado(): EstadoCtx {
 			sugerirTramos: trabajaderaStore.getState().sugerirTramos,
 			toggleTramoClave: trabajaderaStore.getState().toggleTramoClave,
 			sugerirYCalcular: trabajaderaStore.getState().sugerirYCalcular,
+			previsualizarSugerencia: trabajaderaStore.getState().previsualizarSugerencia,
+			confirmarSugerencia: trabajaderaStore.getState().confirmarSugerencia,
 			addBanco: bancoStore.getState().addBanco,
 			delBanco: bancoStore.getState().delBanco,
 			limpiarBanco: bancoStore.getState().limpiarBanco,

@@ -47,7 +47,7 @@ describe("sugerencias", () => {
 			expect(resultado.top3[1].puntuacion).toBe(8);
 			expect(resultado.top3[2].nombre).toBe("Luis");
 			expect(resultado.top3[2].puntuacion).toBe(5);
-			expect(resultado.tramosClaves).toEqual([0, 2]);
+			expect(resultado.tramosObjetivo).toEqual([0, 2]);
 			expect(resultado.ultimoIdx).toBe(2);
 		});
 
@@ -60,7 +60,7 @@ describe("sugerencias", () => {
 			);
 			const resultado = generarSugerencias(t);
 			expect(resultado.top3).toHaveLength(0);
-			expect(resultado.tramosClaves).toEqual([]);
+			expect(resultado.tramosObjetivo).toEqual([1]);
 			expect(resultado.ultimoIdx).toBe(1);
 		});
 
@@ -73,7 +73,7 @@ describe("sugerencias", () => {
 			);
 			const resultado = generarSugerencias(t);
 			expect(resultado.top3).toHaveLength(3);
-			expect(resultado.tramosClaves).toEqual([]);
+			expect(resultado.tramosObjetivo).toEqual([0]);
 			expect(resultado.ultimoIdx).toBe(0);
 		});
 
@@ -155,6 +155,206 @@ describe("sugerencias", () => {
 			expect(t.pinned![2][0]).toBe("D"); // A en T3
 			// T2 no debe tener pins aplicados
 			expect(t.pinned![1][0]).toBe("L");
+		});
+
+		it("debería respetar pin D manual preexistente del top3", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis", "Ana", "María"],
+				{ Juan: 20, Pedro: 15, Luis: 10 },
+				[0],
+				["T1", "T2"],
+				[
+					["D", "L", "L", "L", "L"],
+					["L", "L", "L", "L", "L"],
+				],
+			);
+			aplicarSugerencias(t);
+			// Juan ya tenía D manual en T1, debe mantenerse y no contar como "aplicado"
+			expect(t.pinned![0][0]).toBe("D"); // Juan (D manual respetado)
+			expect(t.pinned![0][1]).toBe("D"); // Pedro (top3 aplicado)
+			expect(t.pinned![0][2]).toBe("D"); // Luis (top3 aplicado)
+			// En T2 (último) no había pin manual, se aplica a los 3
+			expect(t.pinned![1][0]).toBe("D");
+			expect(t.pinned![1][1]).toBe("D");
+			expect(t.pinned![1][2]).toBe("D");
+		});
+
+		it("debería respetar pin F manual preexistente del top3 (no sobrescribir a D)", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis", "Ana", "María"],
+				{ Juan: 20, Pedro: 15, Luis: 10 },
+				[0],
+				["T1", "T2"],
+				[
+					["F", "L", "L", "L", "L"],
+					["L", "L", "L", "L", "L"],
+				],
+			);
+			aplicarSugerencias(t);
+			// Juan tenía F manual, NO se sobreescribe a D
+			expect(t.pinned![0][0]).toBe("F");
+			expect(t.pinned![0][1]).toBe("D"); // Pedro
+			expect(t.pinned![0][2]).toBe("D"); // Luis
+		});
+
+		it("debería limpiar pins D de costaleros fuera del top3 en tramos objetivo", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis", "Ana", "María"],
+				{ Juan: 20, Pedro: 15, Luis: 10 },
+				[0],
+				["T1", "T2"],
+				[
+					// Ana y María (no top3) tienen D preexistente
+					["L", "L", "L", "D", "D"],
+					["L", "L", "L", "L", "L"],
+				],
+			);
+			aplicarSugerencias(t);
+			// Ana y María deben limpiarse a L en T1
+			expect(t.pinned![0][3]).toBe("L");
+			expect(t.pinned![0][4]).toBe("L");
+			// Top3 ocupa los huecos
+			expect(t.pinned![0][0]).toBe("D");
+			expect(t.pinned![0][1]).toBe("D");
+			expect(t.pinned![0][2]).toBe("D");
+		});
+
+		it("NO debería limpiar pins F de costaleros fuera del top3", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis", "Ana", "María"],
+				{ Juan: 20, Pedro: 15, Luis: 10 },
+				[0],
+				["T1", "T2"],
+				[
+					["L", "L", "L", "F", "F"],
+					["L", "L", "L", "L", "L"],
+				],
+			);
+			aplicarSugerencias(t);
+			// Los F manuales se respetan siempre
+			expect(t.pinned![0][3]).toBe("F");
+			expect(t.pinned![0][4]).toBe("F");
+		});
+
+		it("debería funcionar con top3 incompleto (1 o 2 puntuados)", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis", "Ana", "María"],
+				{ Juan: 20 },
+				[0],
+				["T1", "T2"],
+				[
+					["L", "L", "L", "L", "L"],
+					["L", "L", "L", "L", "L"],
+				],
+			);
+			expect(() => aplicarSugerencias(t)).not.toThrow();
+			// Solo Juan entra
+			expect(t.pinned![0][0]).toBe("D");
+			expect(t.pinned![1][0]).toBe("D");
+		});
+	});
+
+	describe("generarSugerencias (preview / sin mutación)", () => {
+		it("debería NO mutar la trabajadera", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis", "Ana", "María"],
+				{ Juan: 20, Pedro: 15, Luis: 10 },
+				[0],
+				["T1", "T2"],
+				[
+					["L", "L", "L", "L", "L"],
+					["L", "L", "L", "L", "L"],
+				],
+			);
+			const snapshot = JSON.stringify(t.pinned);
+			generarSugerencias(t);
+			expect(JSON.stringify(t.pinned)).toBe(snapshot);
+		});
+
+		it("debería distinguir tramos donde aplicar vs respetar pin manual", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis", "Ana", "María"],
+				{ Juan: 20, Pedro: 15, Luis: 10 },
+				[0],
+				["T1", "T2"],
+				[
+					["D", "L", "L", "L", "L"], // Juan ya D en T1
+					["L", "L", "L", "L", "L"],
+				],
+			);
+			const res = generarSugerencias(t);
+			const juan = res.preview.find((a) => a.ci === 0)!;
+			expect(juan.tramosRespetados).toContain(0);
+			expect(juan.tramosAplicar).toContain(1);
+		});
+
+		it("debería reportar warning si no hay puntuaciones", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis"],
+				{ Juan: 0, Pedro: 0, Luis: 0 },
+				[],
+				["T1"],
+			);
+			const res = generarSugerencias(t);
+			expect(res.preview).toHaveLength(0);
+			expect(res.warnings.some((w) => w.includes("puntuación"))).toBe(true);
+		});
+
+		it("debería reportar warning si no hay tramos clave", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis"],
+				{ Juan: 10, Pedro: 5, Luis: 1 },
+				[],
+				["T1", "T2"],
+			);
+			const res = generarSugerencias(t);
+			expect(
+				res.warnings.some((w) => w.toLowerCase().includes("tramos clave")),
+			).toBe(true);
+		});
+
+		it("debería reportar warning si el top3 está incompleto", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis"],
+				{ Juan: 10 },
+				[],
+				["T1"],
+			);
+			const res = generarSugerencias(t);
+			expect(
+				res.warnings.some((w) => w.includes("Solo 1 costalero")),
+			).toBe(true);
+		});
+
+		it("debería listar tramos objetivo ordenados", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis"],
+				{ Juan: 10, Pedro: 5, Luis: 1 },
+				[2, 0],
+				["T1", "T2", "T3"],
+			);
+			const res = generarSugerencias(t);
+			expect(res.tramosObjetivo).toEqual([0, 2]);
+		});
+
+		it("NO debería reportar warning de regla 5 cuando los top3 ya son D manuales", () => {
+			// 8 costaleros, 3 D manuales preexistentes SON los top3 → respetados
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F", "G", "H"],
+				{ A: 10, B: 8, C: 5 },
+				[0],
+				["T1", "T2"],
+				[
+					// A, B, C son top3 y ya D manual; D, E no-top3 con D manual → se limpian
+					["D", "D", "D", "D", "D", "L", "L", "L"],
+					["L", "L", "L", "L", "L", "L", "L", "L"],
+				],
+			);
+			const res = generarSugerencias(t);
+			const rompe = res.warnings.some((w) =>
+				w.includes("fijados dentro (máx. 5)"),
+			);
+			expect(rompe).toBe(false);
 		});
 	});
 });

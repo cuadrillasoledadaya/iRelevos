@@ -7,8 +7,10 @@ import type {
   CellTarget, CensusTarget, DatosPerfil, PasoDB,
   PinState, RolCode, SwapState, Temporada,
 } from '@/lib/types'
+import type { SugerenciaRes } from '@/lib/algoritmos'
 
 export type { ActivePage, ActiveSheet, CellTarget, CensusTarget, DatosPerfil, PasoDB, PinState, RolCode, SwapState, Temporada }
+export type { SugerenciaRes }
 
 // ── UI Slice ───────────────────────────────────────────────────────
 
@@ -89,7 +91,10 @@ export interface TrabajaderaActions {
   usarBanco: (tid: number, ti: number, nombre: string) => void
   sugerirTramos: (tid: number, targetSalidas?: number) => void
   toggleTramoClave: (tid: number, ti: number) => void
+  /** @deprecated usar previsualizarSugerencia + confirmarSugerencia */
   sugerirYCalcular: (tid: number) => void
+  previsualizarSugerencia: (tid: number) => SugerenciaRes | null
+  confirmarSugerencia: (tid: number) => boolean
 }
 
 export type TrabajaderaSlice = TrabajaderaActions

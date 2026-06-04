@@ -106,7 +106,7 @@ export interface BsTarget {
 
 export type ActivePage = 'home' | 'config' | 'equipo' | 'plan' | 'capataz' | 'carga' | 'admin'
 export type ActiveSheet =
-  | 'banco' | 'perfiles' | 'celda' | 'swap' | 'sugerencia' | 'relevos' | 'censo' | null
+  | 'banco' | 'perfiles' | 'celda' | 'swap' | 'sugerencia' | 'sugerencia-asig' | 'relevos' | 'censo' | null
 
 export interface CensusTarget {
   tid: number

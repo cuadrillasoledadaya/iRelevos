@@ -6,8 +6,9 @@
 
 import { create } from 'zustand'
 import { defaultRoles } from '@/lib/roles'
-import { tramosOptimos, aplicarSugerencias } from '@/lib/algoritmos'
+import { tramosOptimos, aplicarSugerencias, generarSugerencias } from '@/lib/algoritmos'
 import type { DatosPerfil, RolCode, Trabajadera } from '@/lib/types'
+import type { SugerenciaRes } from '@/lib/algoritmos'
 
 export interface TrabajaderaStore {
   setNombre: (tid: number, i: number, nombre: string) => void
@@ -27,19 +28,24 @@ export interface TrabajaderaStore {
   usarBanco: (tid: number, ti: number, nombre: string) => void
   sugerirTramos: (tid: number, targetSalidas?: number) => void
   toggleTramoClave: (tid: number, ti: number) => void
+  /** @deprecated usar previsualizarSugerencia + confirmarSugerencia */
   sugerirYCalcular: (tid: number) => void
+  previsualizarSugerencia: (tid: number) => SugerenciaRes | null
+  confirmarSugerencia: (tid: number) => boolean
 }
 
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void
 type GetTrabFn = (d: DatosPerfil, tid: number) => Trabajadera
 type CompletarPlanFn = (tid: number) => void
+type GetSFn = () => DatosPerfil
 
 let _mutar: MutarFn
 let _getTrab: GetTrabFn
 let _completarPlan: CompletarPlanFn
+let _getS: GetSFn
 
-export function setTrabajaderaDeps(m: MutarFn, gt: GetTrabFn, cp: CompletarPlanFn) {
-  _mutar = m; _getTrab = gt; _completarPlan = cp
+export function setTrabajaderaDeps(m: MutarFn, gt: GetTrabFn, cp: CompletarPlanFn, gs: GetSFn) {
+  _mutar = m; _getTrab = gt; _completarPlan = cp; _getS = gs
 }
 
 /**
@@ -298,15 +304,44 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
     },
 
     sugerirYCalcular: (tid) => {
+      // Deprecated: usar previsualizarSugerencia + confirmarSugerencia.
+      // Conservado para AdminPage.test.tsx (smoke test de la API legacy).
+      let error: string | null = null
       _mutar(d => {
         const t = _getTrab(d, tid)
         try {
           aplicarSugerencias(t)
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err)
-          if (typeof alert !== 'undefined') alert(msg)
+          error = err instanceof Error ? err.message : String(err)
         }
       })
+      if (error) {
+        if (typeof alert !== 'undefined') alert(error)
+        return
+      }
       _completarPlan(tid)
+    },
+
+    previsualizarSugerencia: (tid) => {
+      const t = _getTrab(_getS(), tid)
+      return generarSugerencias(t)
+    },
+
+    confirmarSugerencia: (tid) => {
+      let error: string | null = null
+      _mutar(d => {
+        const t = _getTrab(d, tid)
+        try {
+          aplicarSugerencias(t)
+        } catch (err: unknown) {
+          error = err instanceof Error ? err.message : String(err)
+        }
+      })
+      if (error) {
+        if (typeof alert !== 'undefined') alert(error)
+        return false
+      }
+      _completarPlan(tid)
+      return true
     },
   }))
