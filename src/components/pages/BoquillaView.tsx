@@ -9,6 +9,7 @@ import type { Trabajadera, TramoSlot } from "@/lib/types";
 /**
  * BoquillaView — Muestra el plan de rotación real de cada boquillero,
  * agrupados para detectar coincidencias de "dentro" al mismo tiempo.
+ * Siempre visible (no colapsable).
  */
 const BoquillaView = memo(function BoquillaView({
 	trabajaderas,
@@ -52,7 +53,7 @@ const BoquillaView = memo(function BoquillaView({
 		isFuera: boolean;
 		planSlot: TramoSlot | null;
 		v: "L" | "D" | "F" | "LF";
-		cls: string; // pre-computed cell class
+		cls: string;
 	};
 
 	type BoqRow = {
@@ -117,7 +118,7 @@ const BoquillaView = memo(function BoquillaView({
 	if (boquilleros.length === 0) return null;
 
 	return (
-		<div className="card boquilla-view">
+		<div className="card boquilla-view open">
 			<div className="trab-hdr">
 				<div
 					className="t-badge"
@@ -150,7 +151,7 @@ const BoquillaView = memo(function BoquillaView({
 				</button>
 			</div>
 
-			<div className="trab-body">
+			<div className="trab-body" style={{ display: "block" }}>
 				{/* Tabla principal: cada fila es un boquillero, cada columna un tramo */}
 				<div className="plan-scroll">
 					<table className="plan-table">
@@ -225,7 +226,10 @@ const BoquillaView = memo(function BoquillaView({
 				{/* Detalle por tramo: quiénes están dentro/fuera */}
 				{hasAnyPlan && (
 					<div className="mt-4">
-						<div className="xs toro-o cinzel uppercase mb2" style={{ letterSpacing: ".06em" }}>
+						<div
+							className="xs toro-o cinzel uppercase mb2"
+							style={{ letterSpacing: ".06em" }}
+						>
 							Detalle por tramo
 						</div>
 						<div className="fc gap-2">
@@ -288,7 +292,7 @@ const BoquillaView = memo(function BoquillaView({
 				{maxCoincidentes > 1 && (
 					<div className="mt-3 p-3 bg-[rgba(139,26,26,0.15)] border border-red-800/30 rounded-xl">
 						<div className="text-[0.7rem] text-red-300">
-							<strong>⚠ Coincidencias detectadas:</strong> más de un boquillero está{" "}
+							<strong> Coincidencias detectadas:</strong> más de un boquillero está{" "}
 							<strong>dentro</strong> al mismo tiempo en estos tramos:
 						</div>
 						{coincidencias.map((coincs, ti) => {
