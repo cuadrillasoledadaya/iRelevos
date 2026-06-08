@@ -360,6 +360,18 @@ html.light .pcell.boq-F {
 	border-color: rgba(251, 146, 60, 0.5) !important;
 	color: rgba(217, 119, 6, 0.85) !important;
 }
+html.light .pcell.boq-coincidence {
+	background: rgba(220, 38, 38, 0.35) !important;
+	border-color: rgba(239, 68, 68, 0.6) !important;
+	color: rgba(185, 28, 28, 0.9) !important;
+	box-shadow: 0 0 10px rgba(220, 38, 38, 0.3) !important;
+	animation: boq-pulse 2s ease-in-out infinite;
+}
+html.light .pcell.empty {
+	opacity: 0.3;
+	background: transparent !important;
+	border-color: transparent !important;
+}
 html.light .leg-item {
 	color: var(--cre-o);
 }
@@ -1806,6 +1818,22 @@ body {
 	border-color: rgba(251, 146, 60, 0.7) !important;
 	color: rgba(253, 186, 116, 0.9) !important;
 	box-shadow: 0 0 7px rgba(234, 128, 0, 0.3) !important;
+}
+.pcell.boq-coincidence {
+	background: rgba(220, 38, 38, 0.5) !important;
+	border-color: rgba(239, 68, 68, 0.8) !important;
+	color: rgba(252, 165, 165, 1) !important;
+	box-shadow: 0 0 10px rgba(220, 38, 38, 0.4) !important;
+	animation: boq-pulse 2s ease-in-out infinite;
+}
+@keyframes boq-pulse {
+	0%, 100% { box-shadow: 0 0 10px rgba(220, 38, 38, 0.4); }
+	50% { box-shadow: 0 0 16px rgba(220, 38, 38, 0.6); }
+}
+.pcell.empty {
+	opacity: 0.3;
+	background: transparent !important;
+	border-color: transparent !important;
 }
 .plan-actions {
 	display: flex;

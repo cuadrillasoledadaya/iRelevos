@@ -11,6 +11,7 @@ import {
 import { nameAt, shortName } from "@/lib/nombres";
 import type { Trabajadera } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
+import BoquillaView from "./BoquillaView";
 
 export default function PlanPage() {
 	const S = projectStore((s) => s.S);
@@ -21,6 +22,18 @@ export default function PlanPage() {
 		profile?.role === "superadmin" ||
 		profile?.role === "capataz" ||
 		profile?.role === "auxiliar";
+	const [showBoquilla, setShowBoquilla] = useState(false);
+
+	// Count boquilleros
+	const boquillaCount = useMemo(() => {
+		let count = 0;
+		for (const t of S.trabajaderas) {
+			for (const name of t.nombres) {
+				if (censusBoquilla[name]) count++;
+			}
+		}
+		return count;
+	}, [S.trabajaderas, censusBoquilla]);
 
 	// Si es costalero, mostrar vista personal
 	if (!esMando) {
@@ -31,14 +44,32 @@ export default function PlanPage() {
 		<>
 			<div className="sec flex jb aic">
 				<span>Plan de Rotaciones</span>
-				<button className="btn btn-oro btn-sm" onClick={calcularTodo}>
-					⚙ Calcular Todos
-				</button>
+				<div className="flex gap-2">
+					{boquillaCount > 0 && (
+						<button
+							className={`btn btn-sm ${showBoquilla ? "btn-oro" : "btn-ghost"}`}
+							onClick={() => setShowBoquilla(!showBoquilla)}
+							title="Ver todos los boquilleros juntos"
+						>
+							🔶 Boquillas ({boquillaCount})
+						</button>
+					)}
+					<button className="btn btn-oro btn-sm" onClick={calcularTodo}>
+						⚙ Calcular Todos
+					</button>
+				</div>
 			</div>
 
 			{S.trabajaderas.map((t: Trabajadera) => (
 				<PlanTrabajadera key={t.id} t={t} censusBoquilla={censusBoquilla} />
 			))}
+
+			{showBoquilla && boquillaCount > 0 && (
+				<BoquillaView
+					trabajaderas={S.trabajaderas}
+					censusBoquilla={censusBoquilla}
+				/>
+			)}
 		</>
 	);
 }
