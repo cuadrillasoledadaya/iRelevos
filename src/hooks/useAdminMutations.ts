@@ -12,6 +12,7 @@ import type {
 } from "@/components/admin/types";
 import { useAdminForms } from "@/hooks/useAdminForms";
 import * as adminService from "@/services/adminService";
+import { projectStore } from "@/stores";
 
 export function useAdminMutations(
 	activeTemporadaId: string,
@@ -436,6 +437,7 @@ export function useAdminMutations(
 			}
 
 			await syncTodoCenso(forms.importPid);
+			await projectStore.getState().refetchPasos();
 			forms.setImportPreview(null);
 			alert(
 				`✅ Sincronización completa (full sync):\n` +
