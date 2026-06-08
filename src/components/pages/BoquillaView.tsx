@@ -8,7 +8,7 @@ import type { Trabajadera, TramoSlot } from "@/lib/types";
 
 /**
  * BoquillaView — Muestra el plan de rotación real de cada boquillero,
- * agrupados para detectar coincidencias de "dentro" al mismo tiempo.
+ * alineados por número de tramo para detectar coincidencias.
  * Siempre visible (no colapsable).
  */
 const BoquillaView = memo(function BoquillaView({
@@ -28,7 +28,7 @@ const BoquillaView = memo(function BoquillaView({
 		ci: number;
 	};
 
-	// Recopilar boquilleros de todas las trabajaderas
+	// 1. Recopilar boquilleros de todas las trabajaderas
 	const boquilleros = useMemo(() => {
 		const result: Boquillero[] = [];
 		for (const t of trabajaderas) {
@@ -43,11 +43,17 @@ const BoquillaView = memo(function BoquillaView({
 		return result;
 	}, [trabajaderas, censusBoquilla]);
 
-	// Máximo número de tramos
-	const maxTramos = Math.max(...trabajaderas.map((t) => t.tramos.length), 0);
+	if (boquilleros.length === 0) return null;
+
+	// 2. Solo considerar trabajaderas que tienen boquilleros
+	const boquillaTids = new Set(boquilleros.map((b) => b.tid));
+	const trabConBoquilla = trabajaderas.filter((t) => boquillaTids.has(t.id));
+
+	// 3. Máximo tramo entre las trabajaderas con boquilleros
+	const maxTramos = Math.max(...trabConBoquilla.map((t) => t.tramos.length), 0);
 	const tramosGlobales = Array.from({ length: maxTramos }, (_, i) => `T${i + 1}`);
 
-	// Para cada boquillero, extraer su estado real del plan
+	// 4. Para cada boquillero, extraer su estado REAL en cada tramo de su trabajadera
 	type BoqCell = {
 		isDentro: boolean;
 		isFuera: boolean;
@@ -69,13 +75,15 @@ const BoquillaView = memo(function BoquillaView({
 		const celdas: (BoqCell | null)[] = [];
 
 		for (let ti = 0; ti < maxTramos; ti++) {
-			const planSlot = t.plan?.[ti] ?? null;
-			const v = pinned[ti]?.[bq.ci] ?? "L";
-
+			// Si este tramo no existe en la trabajadera del boquilla, dejar vacío
 			if (ti >= t.tramos.length) {
 				celdas.push(null);
 				continue;
 			}
+
+			// Estado real del boquilla en este tramo de su trabajadera
+			const planSlot = t.plan?.[ti] ?? null;
+			const v = pinned[ti]?.[bq.ci] ?? "L";
 
 			let isAutoD = false;
 			let isAutoF = false;
@@ -100,7 +108,7 @@ const BoquillaView = memo(function BoquillaView({
 		return { name: bq.name, tid: bq.tid, ci: bq.ci, celdas };
 	});
 
-	// Detectar coincidencias: para cada tramo, qué boquilleros están dentro
+	// 5. Detectar coincidencias: para cada tramo, qué boquilleros están dentro
 	const coincidencias = useMemo(() => {
 		const result: number[][] = [];
 		for (let ti = 0; ti < maxTramos; ti++) {
@@ -113,9 +121,7 @@ const BoquillaView = memo(function BoquillaView({
 	}, [rows, maxTramos]);
 
 	const maxCoincidentes = Math.max(...coincidencias.map((c) => c.length), 0);
-	const hasAnyPlan = trabajaderas.some((t) => t.plan !== null);
-
-	if (boquilleros.length === 0) return null;
+	const hasAnyPlan = trabConBoquilla.some((t) => t.plan !== null);
 
 	return (
 		<div className="card boquilla-view open">
@@ -132,7 +138,7 @@ const BoquillaView = memo(function BoquillaView({
 						{boquilleros.length} boquilla(s) · {maxTramos} tramos
 						{maxCoincidentes > 1 && (
 							<span className="text-red-400 ml-2">
-								⚠ Hasta {maxCoincidentes} boquillas dentro al mismo tiempo
+								 Hasta {maxCoincidentes} boquillas dentro al mismo tiempo
 							</span>
 						)}
 						{!hasAnyPlan && (
@@ -147,12 +153,12 @@ const BoquillaView = memo(function BoquillaView({
 					onClick={calcularTodo}
 					title="Recalcular todas las trabajaderas"
 				>
-					⚙ Calcular Todo
+					 Calcular Todo
 				</button>
 			</div>
 
 			<div className="trab-body" style={{ display: "block" }}>
-				{/* Tabla principal: cada fila es un boquillero, cada columna un tramo */}
+				{/* Tabla: filas = boquilleros, columnas = tramos T1..Tn */}
 				<div className="plan-scroll">
 					<table className="plan-table">
 						<thead>
@@ -188,7 +194,6 @@ const BoquillaView = memo(function BoquillaView({
 										}
 
 										let cls = cell.cls;
-
 										if (cell.isDentro) cls += " boq-D";
 										if (cell.isFuera) cls += " boq-F";
 
@@ -223,7 +228,7 @@ const BoquillaView = memo(function BoquillaView({
 					</table>
 				</div>
 
-				{/* Detalle por tramo: quiénes están dentro/fuera */}
+				{/* Detalle por tramo: quiénes están dentro/fuera en cada tramo */}
 				{hasAnyPlan && (
 					<div className="mt-4">
 						<div
