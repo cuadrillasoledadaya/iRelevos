@@ -184,6 +184,7 @@ export function useEstado(): EstadoCtx {
 			censusHeights,
 			temporadas,
 			activeTemporadaId,
+			censusBoquilla,
 			addCost,
 			confirmarSwap,
 			tramosOptimosFor,

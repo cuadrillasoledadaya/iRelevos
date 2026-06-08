@@ -1,9 +1,9 @@
 "use client";
 
-import { memo, useMemo } from "react";
-import { uiStore, trabajaderaStore, planStore } from "@/stores";
-import { getPinned, getFueraPorTramo } from "@/lib/algoritmos";
-import { shortName, nameAt } from "@/lib/nombres";
+import { memo, useMemo, useState } from "react";
+import { uiStore, projectStore, planStore } from "@/stores";
+import { getPinned } from "@/lib/algoritmos";
+import { shortName } from "@/lib/nombres";
 import type { Trabajadera } from "@/lib/types";
 
 /**
@@ -18,25 +18,16 @@ const BoquillaView = memo(function BoquillaView({
 	trabajaderas: Trabajadera[];
 	censusBoquilla: Record<string, boolean>;
 }) {
+	const S = projectStore((s) => s.S);
 	const openSheet = uiStore.getState().openSheet;
 	const setCellTarget = uiStore.getState().setCellTarget;
-	const setBancoTarget = uiStore.getState().setBancoTarget;
-	const addTramo = trabajaderaStore.getState().addTramo;
-	const delTramo = trabajaderaStore.getState().delTramo;
-	const setSalidas = trabajaderaStore.getState().setSalidas;
-	const calcularTrab = planStore.getState().calcularTrab;
-	const completarPlan = planStore.getState().completarPlan;
-	const limpiarPlan = planStore.getState().limpiarPlan;
-	const getErroresPinned = planStore.getState().getErroresPinned;
-	const quitarBloqueos = planStore.getState().quitarBloqueos;
-	const aplicarSugerencia = planStore.getState().aplicarSugerencia;
-	const confirmarAsignacion = planStore.getState().confirmarAsignacion;
+	const calcularTodo = planStore.getState().calcularTodo;
 
 	// Recopilar todos los boquilleros de todas las trabajaderas
 	type Boquillero = {
 		name: string;
-		tid: number; // trabajadera de origen
-		ci: number; // índice en su trabajadera
+		tid: number;
+		ci: number;
 	};
 
 	const boquilleros = useMemo(() => {
@@ -58,23 +49,23 @@ const BoquillaView = memo(function BoquillaView({
 	// Máximo número de tramos entre todas las trabajaderas
 	const maxTramos = Math.max(...trabajaderas.map((t) => t.tramos.length));
 
-	// Generar nombres de tramos genéricos
+	// Generar nombres de tramos globales
 	const tramosGlobales = Array.from({ length: maxTramos }, (_, i) => `T${i + 1}`);
 
 	// Para cada boquillero, extraer su estado en cada tramo global
-	type BoqRow = {
-		name: string;
-		tid: number;
-		ci: number;
-		celdas: (BoqCell | null)[];
-	};
-
 	type BoqCell = {
 		v: "L" | "D" | "F" | "LF";
 		isAutoD: boolean;
 		isAutoF: boolean;
 		isDentro: boolean;
 		isFuera: boolean;
+	};
+
+	type BoqRow = {
+		name: string;
+		tid: number;
+		ci: number;
+		celdas: (BoqCell | null)[];
 	};
 
 	const rows: BoqRow[] = boquilleros.map((bq) => {
@@ -109,7 +100,7 @@ const BoquillaView = memo(function BoquillaView({
 
 	// Detectar coincidencias: para cada tramo, qué boquilleros están dentro
 	const coincidencias = useMemo(() => {
-		const result: number[][] = []; // por tramo, lista de índices de boquilleros dentro
+		const result: number[][] = [];
 		for (let ti = 0; ti < maxTramos; ti++) {
 			const dentro = rows
 				.map((r, ri) => (r.celdas[ti]?.isDentro ? ri : -1))
@@ -125,7 +116,10 @@ const BoquillaView = memo(function BoquillaView({
 	return (
 		<div className="card boquilla-view">
 			<div className="trab-hdr">
-				<div className="t-badge" style={{ backgroundColor: "var(--oro)", color: "#000" }}>
+				<div
+					className="t-badge"
+					style={{ backgroundColor: "var(--oro)", color: "#000" }}
+				>
 					B
 				</div>
 				<div className="t-info">
@@ -139,6 +133,13 @@ const BoquillaView = memo(function BoquillaView({
 						)}
 					</div>
 				</div>
+				<button
+					className="btn btn-oro btn-sm ml-auto"
+					onClick={calcularTodo}
+					title="Recalcular todas las trabajaderas"
+				>
+					⚙ Recalcular
+				</button>
 			</div>
 
 			<div className="trab-body">
@@ -147,23 +148,21 @@ const BoquillaView = memo(function BoquillaView({
 						<thead>
 							<tr>
 								<th className="col-name">Boquilla</th>
-								{tramosGlobales.map((_, ti) => (
+								{tramosGlobales.map((nombre, ti) => (
 									<th key={ti} className="col-tramo">
-										<span className="truncate max-w-[60px]" title={_}>
-											{_}
+										<span className="truncate max-w-[60px]" title={nombre}>
+											{nombre}
 										</span>
 									</th>
 								))}
 							</tr>
 						</thead>
 						<tbody>
-							{rows.map((row, ri) => (
+							{rows.map((row) => (
 								<tr key={`${row.tid}-${row.ci}`}>
 									<td className="td-name">
 										<div className="flex aic jb gap-1">
-											<span className="truncate">
-												{shortName(row.name)}
-											</span>
+											<span className="truncate">{shortName(row.name)}</span>
 											<span className="text-[0.55rem] text-[var(--cre-o)]">
 												T{row.tid}
 											</span>
@@ -178,7 +177,7 @@ const BoquillaView = memo(function BoquillaView({
 											);
 										}
 
-										const clsMap = {
+										const clsMap: Record<string, string> = {
 											L: cell.isAutoD ? "d" : cell.isAutoF ? "f" : "L",
 											D: "D",
 											F: "F",
@@ -206,7 +205,6 @@ const BoquillaView = memo(function BoquillaView({
 												<div
 													className={`pcell ${cls}`}
 													onClick={() => {
-														// Abrir el sheet de edición de la celda en la trabajadera original
 														setCellTarget({ tid: row.tid, ti, ci: row.ci });
 														openSheet("celda");
 													}}
