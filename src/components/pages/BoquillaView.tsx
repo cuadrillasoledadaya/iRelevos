@@ -43,8 +43,6 @@ const BoquillaView = memo(function BoquillaView({
 		return result;
 	}, [trabajaderas, censusBoquilla]);
 
-	if (boquilleros.length === 0) return null;
-
 	// 2. Solo considerar trabajaderas que tienen boquilleros
 	const boquillaTids = new Set(boquilleros.map((b) => b.tid));
 	const trabConBoquilla = trabajaderas.filter((t) => boquillaTids.has(t.id));
@@ -122,6 +120,8 @@ const BoquillaView = memo(function BoquillaView({
 
 	const maxCoincidentes = Math.max(...coincidencias.map((c) => c.length), 0);
 	const hasAnyPlan = trabConBoquilla.some((t) => t.plan !== null);
+
+	if (boquilleros.length === 0) return null;
 
 	return (
 		<div className="card boquilla-view open">
