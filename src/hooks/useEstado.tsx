@@ -53,11 +53,15 @@ export function useEstado(): EstadoCtx {
 	const nombrePaso = projectStore((s) => s.nombrePaso);
 	const nombreCuadrilla = projectStore((s) => s.nombreCuadrilla);
 	const censusHeights = projectStore((s) => s.censusHeights);
+	const censusBoquilla = projectStore((s) => s.censusBoquilla);
 	const temporadas = temporadaStore((s) => s.temporadas);
 	const activeTemporadaId = temporadaStore((s) => s.activeTemporadaId);
 
 	useEffect(() => {
-		if (activeTemporadaId) projectStore.getState().fetchCensusHeights();
+		if (activeTemporadaId) {
+			projectStore.getState().fetchCensusHeights();
+			projectStore.getState().fetchCensusBoquilla();
+		}
 	}, [pid, activeTemporadaId]);
 
 	const addCost = useCallback((tid: number) => {
@@ -110,6 +114,7 @@ export function useEstado(): EstadoCtx {
 			nombrePaso,
 			nombreCuadrilla,
 			censusHeights,
+			censusBoquilla,
 			refetchPasos,
 			vaciarCenso,
 			temporadas,

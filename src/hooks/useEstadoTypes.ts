@@ -36,5 +36,5 @@ export interface EstadoCtx {
   limpiarPlanificacion: () => void; limpiarTrabajaderas: () => void; limpiarBanco: () => void; vaciarCenso: () => Promise<void>; resetTodo: () => void
   addPlan: (nombre: string, tramos?: string[]) => void; updatePlan: (id: string, nombre: string) => void; delPlan: (id: string) => void
   cargarPlanEnTrabajadera: (tid: number, planId: string) => void
-  censusHeights: Record<string, number>; temporadas: Temporada[]; activeTemporadaId: string; setActiveTemporadaId: (id: string) => void; refetchPasos: () => Promise<void>
+  censusHeights: Record<string, number>; censusBoquilla: Record<string, boolean>; temporadas: Temporada[]; activeTemporadaId: string; setActiveTemporadaId: (id: string) => void; refetchPasos: () => Promise<void>
 }

@@ -26,6 +26,7 @@ export interface ProjectStoreState {
 	nombreCuadrilla: string;
 	S: DatosPerfil;
 	censusHeights: Record<string, number>;
+	censusBoquilla: Record<string, boolean>;
 }
 
 export interface ProjectStoreActions {
@@ -33,6 +34,7 @@ export interface ProjectStoreActions {
 	setPasos: (pasos: PasoDB[]) => void;
 	refetchPasos: () => Promise<void>;
 	fetchCensusHeights: () => Promise<void>;
+	fetchCensusBoquilla: () => Promise<void>;
 	vaciarCenso: () => Promise<void>;
 }
 
@@ -57,6 +59,7 @@ export const createProjectStore = () =>
 				nombreCuadrilla: "Sin Cuadrilla",
 				S: datosVacios(),
 				censusHeights: {},
+				censusBoquilla: {},
 
 				// ── Acciones ──
 
@@ -134,6 +137,35 @@ export const createProjectStore = () =>
 							},
 						);
 						set({ censusHeights: map });
+					}
+				},
+
+				fetchCensusBoquilla: async () => {
+					const activeTemporadaId = getActiveTemporadaId();
+					if (!activeTemporadaId) return;
+
+					const { data } = await supabase
+						.from("census")
+						.select("nombre, apellidos, apodo, boquilla")
+						.eq("temporada_id", activeTemporadaId);
+
+					if (data) {
+						const map: Record<string, boolean> = {};
+						data.forEach(
+							(c: {
+								nombre: string;
+								apellidos: string;
+								apodo?: string;
+								boquilla?: boolean;
+							}) => {
+								if (c.boquilla) {
+									const fullName = `${c.nombre} ${c.apellidos}`.trim();
+									map[fullName] = true;
+									if (c.apodo) map[c.apodo.trim()] = true;
+								}
+							},
+						);
+						set({ censusBoquilla: map });
 					}
 				},
 

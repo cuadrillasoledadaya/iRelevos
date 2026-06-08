@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function PlanPage() {
 	const S = projectStore((s) => s.S);
+	const censusBoquilla = projectStore((s) => s.censusBoquilla);
 	const calcularTodo = planStore.getState().calcularTodo;
 	const { profile } = useAuth();
 	const esMando =
@@ -36,7 +37,7 @@ export default function PlanPage() {
 			</div>
 
 			{S.trabajaderas.map((t: Trabajadera) => (
-				<PlanTrabajadera key={t.id} t={t} />
+				<PlanTrabajadera key={t.id} t={t} censusBoquilla={censusBoquilla} />
 			))}
 		</>
 	);
@@ -259,8 +260,10 @@ function MiPlanPersonal({
 
 const PlanTrabajadera = memo(function PlanTrabajadera({
 	t,
+	censusBoquilla,
 }: {
 	t: Trabajadera;
+	censusBoquilla: Record<string, boolean>;
 }) {
 	const openSheet = uiStore.getState().openSheet;
 	const setCellTarget = uiStore.getState().setCellTarget;
@@ -569,8 +572,8 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											if (hasCons && !hasWarn) cls += " cons-v";
 											if (isHighlighted) cls += " highlight-sug";
 
-											// Boquilla: costaleros marcados con boquilla=true
-											const esBoquilla = t.boquilla?.[name] ?? false;
+											// Boquilla: costaleros marcados con boquilla=true en el censo
+											const esBoquilla = censusBoquilla[name] ?? false;
 											if (esBoquilla) {
 												if (v === "D" || (v === "L" && isAutoD)) cls += " boq-D";
 												if (v === "F" || (v === "L" && isAutoF)) cls += " boq-F";
