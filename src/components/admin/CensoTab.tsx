@@ -28,6 +28,7 @@ interface CensoTabProps {
   onSaveEdit: (id: string) => void
   onCancelEdit: () => void
   onDeleteFromCensus: (id: string) => void
+  onToggleBoquilla: (id: string, v: boolean) => void
 
   // Sync
   onReconstruirCenso: () => void
@@ -48,7 +49,7 @@ export default function CensoTab({
   census, pasos, loading, saving, importLoading,
   filterPid, onFilterPidChange,
   newEntry, onNewEntryChange, onAddToCensus,
-  editingId, editForm, onEditFormChange, onStartEdit, onSaveEdit, onCancelEdit, onDeleteFromCensus,
+  editingId, editForm, onEditFormChange, onStartEdit, onSaveEdit, onCancelEdit, onDeleteFromCensus, onToggleBoquilla,
   onReconstruirCenso, onSincronizacionTotal, onFetchFromICuadrilla,
   importPreview, importPid, onImportPidChange, onToggleSelected, onToggleAllSelected,
   onCloseImport, onEjecutarImportacion,
@@ -160,6 +161,7 @@ export default function CensoTab({
             onSaveEdit={onSaveEdit}
             onCancelEdit={onCancelEdit}
             onDeleteFromCensus={onDeleteFromCensus}
+            onToggleBoquilla={onToggleBoquilla}
           />
         )}
       </div>
@@ -187,6 +189,7 @@ export default function CensoTab({
 function CensoList({
   census, pasos, editingId, editForm,
   onEditFormChange, onStartEdit, onSaveEdit, onCancelEdit, onDeleteFromCensus,
+  onToggleBoquilla,
 }: {
   census: CensusEntry[]
   pasos: PasoDB[]
@@ -197,6 +200,7 @@ function CensoList({
   onSaveEdit: (id: string) => void
   onCancelEdit: () => void
   onDeleteFromCensus: (id: string) => void
+  onToggleBoquilla: (id: string, v: boolean) => void
 }) {
   const groups: Record<string, CensusEntry[]> = {}
   census.forEach(c => {
@@ -231,6 +235,7 @@ function CensoList({
               pasos={pasos}
               onEdit={() => onStartEdit(c)}
               onDelete={() => onDeleteFromCensus(c.id)}
+              onToggleBoquilla={onToggleBoquilla}
             />
           )}
         </div>
@@ -275,11 +280,12 @@ function EditForm({ form, onChange, onSave, onCancel }: {
   )
 }
 
-function ViewEntry({ entry, pasos, onEdit, onDelete }: {
+function ViewEntry({ entry, pasos, onEdit, onDelete, onToggleBoquilla }: {
   entry: CensusEntry
   pasos: PasoDB[]
   onEdit: () => void
   onDelete: () => void
+  onToggleBoquilla: (id: string, v: boolean) => void
 }) {
   return (
     <>
@@ -294,7 +300,16 @@ function ViewEntry({ entry, pasos, onEdit, onDelete }: {
         </div>
       </div>
       <div className="flex justify-between items-center text-[10px] text-[var(--cre-o)] opacity-70">
-        <div className="flex gap-3">
+        <div className="flex gap-3 items-center">
+          <label className="flex items-center gap-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={entry.boquilla ?? false}
+              onChange={(e) => onToggleBoquilla(entry.id, e.target.checked)}
+              className="w-3.5 h-3.5 accent-[var(--oro)] cursor-pointer"
+            />
+            <span className="font-bold uppercase tracking-wide">Boquilla</span>
+          </label>
           {entry.telefono && <span>📞 {entry.telefono}</span>}
           {entry.trabajadera && <span>🪜 Trab: {entry.trabajadera}</span>}
           {entry.altura && <span className="text-[var(--oro)] font-bold">📏 {entry.altura} cm</span>}

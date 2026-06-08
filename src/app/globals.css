@@ -350,6 +350,16 @@ html.light .pcell.d {
 html.light .pcell.f {
 	color: rgba(139, 26, 26, 0.6);
 }
+html.light .pcell.boq-D {
+	background: rgba(59, 130, 246, 0.25) !important;
+	border-color: rgba(96, 165, 250, 0.5) !important;
+	color: rgba(37, 99, 235, 0.85) !important;
+}
+html.light .pcell.boq-F {
+	background: rgba(234, 128, 0, 0.2) !important;
+	border-color: rgba(251, 146, 60, 0.5) !important;
+	color: rgba(217, 119, 6, 0.85) !important;
+}
 html.light .leg-item {
 	color: var(--cre-o);
 }
@@ -1783,6 +1793,19 @@ body {
 }
 .pcell.f:active {
 	background: rgba(139, 26, 26, 0.55);
+}
+/* Boquilla: override visual para costaleros con boquilla=true */
+.pcell.boq-D {
+	background: rgba(59, 130, 246, 0.35) !important;
+	border-color: rgba(96, 165, 250, 0.7) !important;
+	color: rgba(147, 197, 253, 0.9) !important;
+	box-shadow: 0 0 7px rgba(59, 130, 246, 0.3) !important;
+}
+.pcell.boq-F {
+	background: rgba(234, 128, 0, 0.35) !important;
+	border-color: rgba(251, 146, 60, 0.7) !important;
+	color: rgba(253, 186, 116, 0.9) !important;
+	box-shadow: 0 0 7px rgba(234, 128, 0, 0.3) !important;
 }
 .plan-actions {
 	display: flex;

@@ -44,6 +44,7 @@ export function datosVacios(): DatosPerfil {
 			bajas: [],
 			regla5costaleros: false,
 			puntuaciones: {},
+			boquilla: {},
 			tramosClaves: [],
 		})),
 	};
@@ -79,6 +80,7 @@ export function migrarDatos(datos: DatosPerfil): DatosPerfil {
 			}
 		}
 		if (!t.puntuaciones) t.puntuaciones = {};
+		if (!t.boquilla) t.boquilla = {};
 		if (!t.tramosClaves) t.tramosClaves = [];
 
 		if (t.plan && t.plan[0]?.dentro?.length) {

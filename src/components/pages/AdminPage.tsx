@@ -245,8 +245,9 @@ export default function AdminPage() {
 					onCancelEdit={() => {
 						m.setEditingId(null);
 					}}
-					onDeleteFromCensus={m.deleteFromCensus}
-					onReconstruirCenso={m.reconstruirCensoCompleto}
+				onDeleteFromCensus={m.deleteFromCensus}
+				onToggleBoquilla={m.toggleBoquilla}
+				onReconstruirCenso={m.reconstruirCensoCompleto}
 					onSincronizacionTotal={m.sincronizacionTotal}
 					onFetchFromICuadrilla={handleFetchFromICuadrilla}
 					importPreview={m.importPreview}

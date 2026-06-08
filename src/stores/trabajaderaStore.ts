@@ -20,6 +20,7 @@ export interface TrabajaderaStore {
   toggleRegla5: (tid: number) => void
   addTrab: () => void
   setPuntuacion: (tid: number, nombre: string, pts: number) => void
+  setBoquilla: (tid: number, nombre: string, v: boolean) => void
   addCostUltimo: (tid: number, nombre: string, roles: string[]) => void
   setNombreTramo: (tid: number, ti: number, nombre: string) => void
   addTramo: (tid: number) => void
@@ -185,6 +186,7 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
           bajas: [],
           regla5costaleros: false,
           puntuaciones: {},
+          boquilla: {},
           tramosClaves: [],
         })
       })
@@ -195,6 +197,14 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
         const t = _getTrab(d, tid)
         if (!t.puntuaciones) t.puntuaciones = {}
         t.puntuaciones[nombre] = pts
+      })
+    },
+
+    setBoquilla: (tid, nombre, v) => {
+      _mutar(d => {
+        const t = _getTrab(d, tid)
+        if (!t.boquilla) t.boquilla = {}
+        t.boquilla[nombre] = v
       })
     },
 

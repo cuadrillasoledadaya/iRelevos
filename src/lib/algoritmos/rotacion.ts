@@ -126,6 +126,7 @@ export function tramosOptimos(
 			analisis: null,
 			pinned: null,
 			puntuaciones: {},
+			boquilla: {},
 			tramosClaves: [],
 		};
 		const { plan } = calcularCiclo(t);

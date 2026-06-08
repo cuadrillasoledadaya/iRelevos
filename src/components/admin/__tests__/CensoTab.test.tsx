@@ -56,6 +56,7 @@ function defaultProps(overrides: Partial<React.ComponentProps<typeof CensoTab>> 
     onSaveEdit: vi.fn(),
     onCancelEdit: vi.fn(),
     onDeleteFromCensus: vi.fn(),
+    onToggleBoquilla: vi.fn(),
     onReconstruirCenso: vi.fn(),
     onSincronizacionTotal: vi.fn(),
     onFetchFromICuadrilla: vi.fn(),
@@ -293,9 +294,11 @@ describe('CensoTab', () => {
     it('debería llamar onToggleSelected al hacer clic en checkbox', () => {
       const onToggleSelected = vi.fn()
       render(<CensoTab {...defaultProps({ importPreview: mockImportPreview, onToggleSelected })} />)
+      // El modal de import tiene checkboxes al final; los de boquilla están en la lista del censo
       const checkboxes = screen.getAllByRole('checkbox')
-      fireEvent.click(checkboxes[0])
-      expect(onToggleSelected).toHaveBeenCalledWith(0)
+      // El último checkbox es el del import modal (dentro de la preview)
+      fireEvent.click(checkboxes[checkboxes.length - 1])
+      expect(onToggleSelected).toHaveBeenCalledWith(mockImportPreview.length - 1)
     })
 
     it('debería llamar onToggleAllSelected al hacer clic en seleccionar todos', () => {

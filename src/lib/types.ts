@@ -47,6 +47,7 @@ export interface Trabajadera {
   analisis: Analisis | null
   pinned: PinState[][] | null
   puntuaciones: Record<string, number>
+  boquilla?: Record<string, boolean>
   tramosClaves: number[]
 }
 

@@ -261,6 +261,18 @@ export function useAdminMutations(
 		[setCensus],
 	);
 
+	const toggleBoquilla = useCallback(
+		async (id: string, value: boolean) => {
+			const result = await adminService.toggleCensusBoquilla(id, value);
+			if (!result.error) {
+				setCensus((prev) =>
+					prev.map((c) => (c.id === id ? { ...c, boquilla: value } : c)),
+				);
+			}
+		},
+		[setCensus],
+	);
+
 	const saveEdit = useCallback(
 		async (id: string) => {
 			forms.setSaving(true);
@@ -600,6 +612,7 @@ export function useAdminMutations(
 		eliminarPaso,
 		addToCensus,
 		deleteFromCensus,
+		toggleBoquilla,
 		saveEdit,
 		syncCostaleroToProject,
 		syncTodoCenso,

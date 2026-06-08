@@ -228,6 +228,7 @@ export const planStore = create<PlanStore>()(() => ({
 						bajas: [],
 						regla5costaleros: false,
 						puntuaciones: {},
+						boquilla: {},
 						tramosClaves: [],
 					},
 				];

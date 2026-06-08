@@ -569,6 +569,13 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											if (hasCons && !hasWarn) cls += " cons-v";
 											if (isHighlighted) cls += " highlight-sug";
 
+											// Boquilla: costaleros marcados con boquilla=true
+											const esBoquilla = t.boquilla?.[name] ?? false;
+											if (esBoquilla) {
+												if (v === "D" || (v === "L" && isAutoD)) cls += " boq-D";
+												if (v === "F" || (v === "L" && isAutoF)) cls += " boq-F";
+											}
+
 											const lbl =
 												v === "L"
 													? isAutoD

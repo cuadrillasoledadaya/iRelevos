@@ -314,7 +314,7 @@ export async function syncTodoCenso(
 ): Promise<ServiceResult<{ content: unknown }>> {
 	const { data: censusData } = await supabase
 		.from("census")
-		.select("nombre, apellidos, apodo, trabajadera, rol, rol_sec, puntuacion")
+		.select("nombre, apellidos, apodo, trabajadera, rol, rol_sec, puntuacion, boquilla")
 		.eq("proyecto_id", proyectoId)
 		.not("trabajadera", "is", null)
 		.order("trabajadera", { ascending: true });
@@ -339,6 +339,7 @@ export async function syncTodoCenso(
 			nombres: string[];
 			roles?: { pri: string; sec: string }[];
 			puntuaciones?: Record<string, number>;
+			boquilla?: Record<string, boolean>;
 		}[];
 	};
 
@@ -352,13 +353,13 @@ export async function syncTodoCenso(
 	// Group by trabajadera
 	const byTrab: Record<
 		number,
-		{ name: string; rol?: string | null; rol_sec?: string | null; puntuacion?: number }[]
+		{ name: string; rol?: string | null; rol_sec?: string | null; puntuacion?: number; boquilla?: boolean }[]
 	> = {};
 	censusData.forEach((c) => {
 		const tid = c.trabajadera as number;
 		const name = c.apodo?.trim() || `${c.nombre} ${c.apellidos}`.trim();
 		if (!byTrab[tid]) byTrab[tid] = [];
-		byTrab[tid].push({ name, rol: c.rol, rol_sec: c.rol_sec, puntuacion: c.puntuacion ?? 0 });
+		byTrab[tid].push({ name, rol: c.rol, rol_sec: c.rol_sec, puntuacion: c.puntuacion ?? 0, boquilla: c.boquilla ?? false });
 	});
 
 	Object.entries(byTrab).forEach(([tidStr, entries]) => {
@@ -371,8 +372,9 @@ export async function syncTodoCenso(
 			trab.roles.push({ pri: "COR", sec: "FIJ_I" });
 		}
 
-		// Initialize puntuaciones for this trabajadera
+		// Initialize puntuaciones and boquilla for this trabajadera
 		if (!trab.puntuaciones) trab.puntuaciones = {};
+		if (!trab.boquilla) trab.boquilla = {};
 
 		const esPrimero = tid === 1 || tid === 7;
 
@@ -391,6 +393,11 @@ export async function syncTodoCenso(
 			// Store puntuacion keyed by name
 			if (entry.puntuacion && entry.puntuacion > 0) {
 				trab.puntuaciones![entry.name] = entry.puntuacion;
+			}
+
+			// Store boquilla keyed by name
+			if (entry.boquilla) {
+				trab.boquilla![entry.name] = true;
 			}
 		});
 	});
@@ -554,6 +561,17 @@ export async function fullSyncCheck(
 
 export async function deleteCensusEntry(id: string): Promise<ServiceResult> {
 	const { error } = await supabase.from("census").delete().eq("id", id);
+	return error ? { error: error.message } : {};
+}
+
+export async function toggleCensusBoquilla(
+	id: string,
+	value: boolean,
+): Promise<ServiceResult> {
+	const { error } = await supabase
+		.from("census")
+		.update({ boquilla: value })
+		.eq("id", id);
 	return error ? { error: error.message } : {};
 }
 
