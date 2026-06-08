@@ -156,6 +156,10 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 				`  ${key} = "${firstRecord[key as keyof typeof firstRecord]}"`,
 			);
 		});
+		// Log explícito de puntuacion_total
+		console.log(
+			`[Import API] puntuacion_total explícito: "${firstRecord.puntuacion_total}" (tipo: ${typeof firstRecord.puntuacion_total})`,
+		);
 	}
 
 	return activos.map((u: ICuadrillaRaw) => {
@@ -183,11 +187,15 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 		const rolSecCostalero = mapPuestoToRolCode(puestoSec);
 
 		// Extraer puntuación total (probar múltiples nombres de campo posibles)
-		const puntuacion =
+		const rawPuntuacion =
 			u.puntuacion_total ?? u.puntuacion ?? u.score ?? 0;
+		const puntuacion =
+			typeof rawPuntuacion === "string"
+				? parseFloat(rawPuntuacion) || 0
+				: Number(rawPuntuacion);
 
 		console.log(
-			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: puesto="${puesto}" → rol="${rolCostalero}", puesto_sec="${puestoSec}" → rol_sec="${rolSecCostalero}", puntuacion=${puntuacion}`,
+			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: puesto="${puesto}" → rol="${rolCostalero}", puesto_sec="${puestoSec}" → rol_sec="${rolSecCostalero}", puntuacion_raw="${rawPuntuacion}" → puntuacion=${puntuacion}`,
 		);
 		console.log(
 			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}", puesto_secundario="${u.puesto_secundario}", puntuacion_total="${u.puntuacion_total}"`,
