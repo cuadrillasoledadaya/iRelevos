@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 import { uiStore, projectStore, planStore } from "@/stores";
 import { getPinned } from "@/lib/algoritmos";
 import { shortName } from "@/lib/nombres";
@@ -18,7 +18,6 @@ const BoquillaView = memo(function BoquillaView({
 	trabajaderas: Trabajadera[];
 	censusBoquilla: Record<string, boolean>;
 }) {
-	const S = projectStore((s) => s.S);
 	const openSheet = uiStore.getState().openSheet;
 	const setCellTarget = uiStore.getState().setCellTarget;
 	const calcularTodo = planStore.getState().calcularTodo;
@@ -43,8 +42,6 @@ const BoquillaView = memo(function BoquillaView({
 		}
 		return result;
 	}, [trabajaderas, censusBoquilla]);
-
-	if (boquilleros.length === 0) return null;
 
 	// Máximo número de tramos entre todas las trabajaderas
 	const maxTramos = Math.max(...trabajaderas.map((t) => t.tramos.length));
@@ -112,6 +109,8 @@ const BoquillaView = memo(function BoquillaView({
 
 	// Contar coincidencias por tramo
 	const maxCoincidentes = Math.max(...coincidencias.map((c) => c.length), 0);
+
+	if (boquilleros.length === 0) return null;
 
 	return (
 		<div className="card boquilla-view">
