@@ -1875,15 +1875,20 @@ body {
 	border-color: rgba(239, 68, 68, 0.8) !important;
 	opacity: 0.85;
 }
-/* BoquillaView: círculos SOLO para celdas inferidas */
-.boquilla-view .pcell.inferred {
-	border-radius: 50% !important;
-	width: 32px !important;
-	height: 32px !important;
+/* BoquillaView: todas las celdas centradas y del mismo tamaño */
+.boquilla-view .pcell {
+	width: 36px !important;
+	height: 36px !important;
 	margin: 0 auto !important;
 	display: flex !important;
 	align-items: center !important;
 	justify-content: center !important;
+}
+/* Celdas inferidas en BoquillaView: círculos normales (no punteados) */
+.boquilla-view .pcell.inferred {
+	border-radius: 50% !important;
+	border-style: solid !important;
+	opacity: 0.75 !important;
 }
 .boquilla-view .pcell.boq-D {
 	background: rgba(34, 197, 94, 0.25) !important;
