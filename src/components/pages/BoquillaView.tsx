@@ -4,12 +4,11 @@ import { memo, useMemo } from "react";
 import { uiStore, planStore } from "@/stores";
 import { getPinned } from "@/lib/algoritmos";
 import { shortName } from "@/lib/nombres";
-import type { Trabajadera } from "@/lib/types";
+import type { Trabajadera, TramoSlot } from "@/lib/types";
 
 /**
- * BoquillaView — "trabajadera virtual" que muestra solo los costaleros
- * marcados como boquilla en el censo, agrupados para detectar
- * coincidencias de "dentro" entre ellos.
+ * BoquillaView — Muestra el plan de rotación real de cada boquillero,
+ * agrupados para detectar coincidencias de "dentro" al mismo tiempo.
  */
 const BoquillaView = memo(function BoquillaView({
 	trabajaderas,
@@ -22,13 +21,13 @@ const BoquillaView = memo(function BoquillaView({
 	const setCellTarget = uiStore.getState().setCellTarget;
 	const calcularTodo = planStore.getState().calcularTodo;
 
-	// Recopilar todos los boquilleros de todas las trabajaderas
 	type Boquillero = {
 		name: string;
 		tid: number;
 		ci: number;
 	};
 
+	// Recopilar boquilleros de todas las trabajaderas
 	const boquilleros = useMemo(() => {
 		const result: Boquillero[] = [];
 		for (const t of trabajaderas) {
@@ -43,19 +42,17 @@ const BoquillaView = memo(function BoquillaView({
 		return result;
 	}, [trabajaderas, censusBoquilla]);
 
-	// Máximo número de tramos entre todas las trabajaderas
-	const maxTramos = Math.max(...trabajaderas.map((t) => t.tramos.length));
-
-	// Generar nombres de tramos globales
+	// Máximo número de tramos
+	const maxTramos = Math.max(...trabajaderas.map((t) => t.tramos.length), 0);
 	const tramosGlobales = Array.from({ length: maxTramos }, (_, i) => `T${i + 1}`);
 
-	// Para cada boquillero, extraer su estado en cada tramo global
+	// Para cada boquillero, extraer su estado real del plan
 	type BoqCell = {
-		v: "L" | "D" | "F" | "LF";
-		isAutoD: boolean;
-		isAutoF: boolean;
 		isDentro: boolean;
 		isFuera: boolean;
+		planSlot: TramoSlot | null;
+		v: "L" | "D" | "F" | "LF";
+		cls: string; // pre-computed cell class
 	};
 
 	type BoqRow = {
@@ -71,7 +68,7 @@ const BoquillaView = memo(function BoquillaView({
 		const celdas: (BoqCell | null)[] = [];
 
 		for (let ti = 0; ti < maxTramos; ti++) {
-			const r = t.plan?.[ti];
+			const planSlot = t.plan?.[ti] ?? null;
 			const v = pinned[ti]?.[bq.ci] ?? "L";
 
 			if (ti >= t.tramos.length) {
@@ -81,15 +78,22 @@ const BoquillaView = memo(function BoquillaView({
 
 			let isAutoD = false;
 			let isAutoF = false;
-			if (r) {
-				isAutoD = v === "L" && r.dentro.includes(bq.ci);
-				isAutoF = (v === "L" || v === "LF") && r.fuera.includes(bq.ci);
+			if (planSlot) {
+				isAutoD = v === "L" && planSlot.dentro.includes(bq.ci);
+				isAutoF = (v === "L" || v === "LF") && planSlot.fuera.includes(bq.ci);
 			}
 
 			const isDentro = v === "D" || (v === "L" && isAutoD);
 			const isFuera = v === "F" || (v === "L" && isAutoF);
 
-			celdas.push({ v, isAutoD, isAutoF, isDentro, isFuera });
+			const clsMap: Record<string, string> = {
+				L: isAutoD ? "d" : isAutoF ? "f" : "L",
+				D: "D",
+				F: "F",
+				LF: isAutoF ? "f" : "LF",
+			};
+
+			celdas.push({ isDentro, isFuera, planSlot, v, cls: clsMap[v] });
 		}
 
 		return { name: bq.name, tid: bq.tid, ci: bq.ci, celdas };
@@ -107,8 +111,8 @@ const BoquillaView = memo(function BoquillaView({
 		return result;
 	}, [rows, maxTramos]);
 
-	// Contar coincidencias por tramo
 	const maxCoincidentes = Math.max(...coincidencias.map((c) => c.length), 0);
+	const hasAnyPlan = trabajaderas.some((t) => t.plan !== null);
 
 	if (boquilleros.length === 0) return null;
 
@@ -130,6 +134,11 @@ const BoquillaView = memo(function BoquillaView({
 								⚠ Hasta {maxCoincidentes} boquillas dentro al mismo tiempo
 							</span>
 						)}
+						{!hasAnyPlan && (
+							<span className="text-yellow-400 ml-2">
+								· Calculá el plan para ver los datos
+							</span>
+						)}
 					</div>
 				</div>
 				<button
@@ -137,11 +146,12 @@ const BoquillaView = memo(function BoquillaView({
 					onClick={calcularTodo}
 					title="Recalcular todas las trabajaderas"
 				>
-					⚙ Recalcular
+					⚙ Calcular Todo
 				</button>
 			</div>
 
 			<div className="trab-body">
+				{/* Tabla principal: cada fila es un boquillero, cada columna un tramo */}
 				<div className="plan-scroll">
 					<table className="plan-table">
 						<thead>
@@ -176,19 +186,12 @@ const BoquillaView = memo(function BoquillaView({
 											);
 										}
 
-										const clsMap: Record<string, string> = {
-											L: cell.isAutoD ? "d" : cell.isAutoF ? "f" : "L",
-											D: "D",
-											F: "F",
-											LF: cell.isAutoF ? "f" : "LF",
-										};
-										let cls = clsMap[cell.v];
+										let cls = cell.cls;
 
-										// Boquilla colors
 										if (cell.isDentro) cls += " boq-D";
 										if (cell.isFuera) cls += " boq-F";
 
-										// Coincidencia highlight
+										// Coincidencia: más de un boquillero dentro en el mismo tramo
 										if (coincidencias[ti].length > 1 && cell.isDentro) {
 											cls += " boq-coincidence";
 										}
@@ -219,13 +222,74 @@ const BoquillaView = memo(function BoquillaView({
 					</table>
 				</div>
 
-				{/* Leyenda de coincidencias */}
+				{/* Detalle por tramo: quiénes están dentro/fuera */}
+				{hasAnyPlan && (
+					<div className="mt-4">
+						<div className="xs toro-o cinzel uppercase mb2" style={{ letterSpacing: ".06em" }}>
+							Detalle por tramo
+						</div>
+						<div className="fc gap-2">
+							{tramosGlobales.map((nombre, ti) => {
+								const boqsEnTramo = rows
+									.map((r, ri) => ({ row: r, ri, cell: r.celdas[ti] }))
+									.filter((x) => x.cell !== null);
+
+								const dentro = boqsEnTramo.filter((x) => x.cell!.isDentro);
+								const fuera = boqsEnTramo.filter((x) => x.cell!.isFuera);
+
+								return (
+									<div
+										key={ti}
+										className="flex items-start gap-3 px-3 py-2 rounded border border-white/5 bg-black/10"
+									>
+										<span className="text-[0.65rem] font-bold text-oro min-w-[30px]">
+											{nombre}
+										</span>
+										<div className="flex flex-col gap-1 f1">
+											{dentro.length > 0 && (
+												<div className="text-[0.65rem]">
+													<span className="text-blue-400 font-bold">DENTRO:</span>{" "}
+													{dentro.map((x) => (
+														<span key={x.ri} className="text-blue-300 ml-1">
+															{x.row.name}
+														</span>
+													))}
+												</div>
+											)}
+											{fuera.length > 0 && (
+												<div className="text-[0.65rem]">
+													<span className="text-orange-400 font-bold">FUERA:</span>{" "}
+													{fuera.map((x) => (
+														<span key={x.ri} className="text-orange-300 ml-1">
+															{x.row.name}
+														</span>
+													))}
+												</div>
+											)}
+											{dentro.length === 0 && fuera.length === 0 && (
+												<div className="text-[0.65rem] text-[var(--border)]">
+													Sin boquilleros en este tramo
+												</div>
+											)}
+											{dentro.length > 1 && (
+												<div className="text-[0.65rem] text-red-400 font-bold">
+													⚠ COINCIDENCIA: {dentro.length} boquillas dentro
+												</div>
+											)}
+										</div>
+									</div>
+								);
+							})}
+						</div>
+					</div>
+				)}
+
+				{/* Alerta de coincidencias */}
 				{maxCoincidentes > 1 && (
 					<div className="mt-3 p-3 bg-[rgba(139,26,26,0.15)] border border-red-800/30 rounded-xl">
 						<div className="text-[0.7rem] text-red-300">
-							<strong>⚠ Coincidencias detectadas:</strong> las celdas resaltadas en
-							rojo indican tramos donde más de un boquillero está{" "}
-							<strong>dentro</strong> al mismo tiempo.
+							<strong>⚠ Coincidencias detectadas:</strong> más de un boquillero está{" "}
+							<strong>dentro</strong> al mismo tiempo en estos tramos:
 						</div>
 						{coincidencias.map((coincs, ti) => {
 							if (coincs.length < 2) return null;
