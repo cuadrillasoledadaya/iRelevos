@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import { uiStore, planStore } from "@/stores";
 import { getPinned } from "@/lib/algoritmos";
 import { shortName } from "@/lib/nombres";
@@ -29,6 +29,8 @@ const BoquillaView = memo(function BoquillaView({
 	const openSheet = uiStore.getState().openSheet;
 	const setCellTarget = uiStore.getState().setCellTarget;
 	const calcularTodo = planStore.getState().calcularTodo;
+
+	const [isOpen, setIsOpen] = useState(false);
 
 	type Boquillero = {
 		name: string;
@@ -183,8 +185,8 @@ const BoquillaView = memo(function BoquillaView({
 	if (boquilleros.length === 0) return null;
 
 	return (
-		<div className="card boquilla-view open">
-			<div className="trab-hdr">
+		<div className={`card boquilla-view ${isOpen ? "open" : ""}`}>
+			<div className="trab-hdr" onClick={() => setIsOpen(!isOpen)}>
 				<div
 					className="t-badge"
 					style={{ backgroundColor: "var(--oro)", color: "#000" }}
@@ -214,14 +216,18 @@ const BoquillaView = memo(function BoquillaView({
 				</div>
 				<button
 					className="btn btn-oro btn-sm ml-auto"
-					onClick={calcularTodo}
+					onClick={(e) => {
+						e.stopPropagation();
+						calcularTodo();
+					}}
 					title="Recalcular todas las trabajaderas"
 				>
 					 Calcular Todo
 				</button>
+				<div className="t-chev">▼</div>
 			</div>
 
-			<div className="trab-body" style={{ display: "block" }}>
+			<div className="trab-body" style={{ display: isOpen ? "block" : "none" }}>
 				{/* Tabla: filas = boquilleros, columnas = tramos ordenados por número */}
 				<div className="plan-scroll">
 					<table className="plan-table">
