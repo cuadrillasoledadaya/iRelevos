@@ -314,7 +314,7 @@ export async function syncTodoCenso(
 ): Promise<ServiceResult<{ content: unknown }>> {
 	const { data: censusData } = await supabase
 		.from("census")
-		.select("nombre, apellidos, apodo, trabajadera, rol, rol_sec")
+		.select("nombre, apellidos, apodo, trabajadera, rol, rol_sec, puntuacion")
 		.eq("proyecto_id", proyectoId)
 		.not("trabajadera", "is", null)
 		.order("trabajadera", { ascending: true });
@@ -338,6 +338,7 @@ export async function syncTodoCenso(
 			id: number;
 			nombres: string[];
 			roles?: { pri: string; sec: string }[];
+			puntuaciones?: Record<string, number>;
 		}[];
 	};
 
@@ -351,13 +352,13 @@ export async function syncTodoCenso(
 	// Group by trabajadera
 	const byTrab: Record<
 		number,
-		{ name: string; rol?: string | null; rol_sec?: string | null }[]
+		{ name: string; rol?: string | null; rol_sec?: string | null; puntuacion?: number }[]
 	> = {};
 	censusData.forEach((c) => {
 		const tid = c.trabajadera as number;
 		const name = c.apodo?.trim() || `${c.nombre} ${c.apellidos}`.trim();
 		if (!byTrab[tid]) byTrab[tid] = [];
-		byTrab[tid].push({ name, rol: c.rol, rol_sec: c.rol_sec });
+		byTrab[tid].push({ name, rol: c.rol, rol_sec: c.rol_sec, puntuacion: c.puntuacion ?? 0 });
 	});
 
 	Object.entries(byTrab).forEach(([tidStr, entries]) => {
@@ -369,6 +370,9 @@ export async function syncTodoCenso(
 		while (trab.roles.length < trab.nombres.length) {
 			trab.roles.push({ pri: "COR", sec: "FIJ_I" });
 		}
+
+		// Initialize puntuaciones for this trabajadera
+		if (!trab.puntuaciones) trab.puntuaciones = {};
 
 		const esPrimero = tid === 1 || tid === 7;
 
@@ -382,6 +386,11 @@ export async function syncTodoCenso(
 			} else {
 				trab.nombres.push(entry.name);
 				trab.roles!.push({ pri: rolCompatible, sec: secCompatible });
+			}
+
+			// Store puntuacion keyed by name
+			if (entry.puntuacion && entry.puntuacion > 0) {
+				trab.puntuaciones![entry.name] = entry.puntuacion;
 			}
 		});
 	});

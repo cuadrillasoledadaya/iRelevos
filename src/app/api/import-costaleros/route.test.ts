@@ -282,6 +282,7 @@ describe("POST /api/import-costaleros", () => {
 					trabajadera: 3,
 					rol: "PAT_D",
 					rol_sec: "COR",
+					puntuacion: 0,
 					source: "icuadrilla",
 				},
 				{
@@ -293,6 +294,7 @@ describe("POST /api/import-costaleros", () => {
 					trabajadera: 5,
 					rol: "FIJ_I",
 					rol_sec: "COR",
+					puntuacion: 0,
 					source: "icuadrilla",
 				},
 			],

@@ -29,6 +29,8 @@ export interface ImportEntry {
 	email: string | null;
 	trabajadera: number | null;
 	rol: RolCode;
+	rol_sec: RolCode;
+	puntuacion: number;
 	external_id: string;
 	selected: boolean;
 	_status?: "new" | "exists";

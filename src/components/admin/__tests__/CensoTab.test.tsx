@@ -31,8 +31,8 @@ const mockEditForm: CensusEditForm = {
 }
 
 const mockImportPreview: ImportEntry[] = [
-  { nombre: 'Pedro', apellidos: 'Sánchez', apodo: 'P', email: 'pedro@test.com', trabajadera: 1, rol: 'COR', external_id: 'ext-1', selected: true, _status: 'new' },
-  { nombre: 'Ana', apellidos: 'Martínez', apodo: 'A', email: 'ana@test.com', trabajadera: 2, rol: 'COR', external_id: 'ext-2', selected: false, _status: 'exists' },
+  { nombre: 'Pedro', apellidos: 'Sánchez', apodo: 'P', email: 'pedro@test.com', trabajadera: 1, rol: 'COR', rol_sec: 'FIJ_I', puntuacion: 0, external_id: 'ext-1', selected: true, _status: 'new' },
+  { nombre: 'Ana', apellidos: 'Martínez', apodo: 'A', email: 'ana@test.com', trabajadera: 2, rol: 'COR', rol_sec: 'FIJ_I', puntuacion: 5, external_id: 'ext-2', selected: false, _status: 'exists' },
 ]
 
 // ── Default props builder ────────────────────────────────────────

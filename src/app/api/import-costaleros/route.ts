@@ -29,6 +29,10 @@ interface ICuadrillaRaw {
 	posicion?: string;
 	// Puesto secundario - el campo exacto en iCuadrilla
 	puesto_secundario?: string;
+	// Puntuación total del costalero
+	puntuacion_total?: number;
+	puntuacion?: number;
+	score?: number;
 }
 
 interface NormalizedCostalero {
@@ -40,6 +44,7 @@ interface NormalizedCostalero {
 	trabajadera: number | null;
 	rol: RolCode;
 	rol_sec: RolCode;
+	puntuacion: number;
 	source: string;
 }
 
@@ -177,11 +182,15 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 		const puestoSec = u.puesto_secundario || null;
 		const rolSecCostalero = mapPuestoToRolCode(puestoSec);
 
+		// Extraer puntuación total (probar múltiples nombres de campo posibles)
+		const puntuacion =
+			u.puntuacion_total ?? u.puntuacion ?? u.score ?? 0;
+
 		console.log(
-			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: puesto="${puesto}" → rol="${rolCostalero}", puesto_sec="${puestoSec}" → rol_sec="${rolSecCostalero}"`,
+			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: puesto="${puesto}" → rol="${rolCostalero}", puesto_sec="${puestoSec}" → rol_sec="${rolSecCostalero}", puntuacion=${puntuacion}`,
 		);
 		console.log(
-			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}", puesto_secundario="${u.puesto_secundario}"`,
+			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}", puesto_secundario="${u.puesto_secundario}", puntuacion_total="${u.puntuacion_total}"`,
 		);
 
 		return {
@@ -193,6 +202,7 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 			trabajadera: u.trabajadera || u.fila || u.altura || null,
 			rol: rolCostalero,
 			rol_sec: rolSecCostalero,
+			puntuacion: Number(puntuacion),
 			source: "icuadrilla",
 		};
 	});
