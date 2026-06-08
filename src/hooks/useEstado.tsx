@@ -60,9 +60,14 @@ export function useEstado(): EstadoCtx {
 	useEffect(() => {
 		if (activeTemporadaId) {
 			projectStore.getState().fetchCensusHeights();
-			projectStore.getState().fetchCensusBoquilla();
 		}
 	}, [pid, activeTemporadaId]);
+
+	useEffect(() => {
+		if (pid) {
+			projectStore.getState().fetchCensusBoquilla();
+		}
+	}, [pid]);
 
 	const addCost = useCallback((tid: number) => {
 		trabajaderaStore.getState().addCost(tid);

@@ -141,13 +141,13 @@ export const createProjectStore = () =>
 				},
 
 				fetchCensusBoquilla: async () => {
-					const activeTemporadaId = getActiveTemporadaId();
-					if (!activeTemporadaId) return;
+					const { pid } = get();
+					if (!pid) return;
 
 					const { data } = await supabase
 						.from("census")
 						.select("nombre, apellidos, apodo, boquilla")
-						.eq("temporada_id", activeTemporadaId);
+						.eq("proyecto_id", pid);
 
 					if (data) {
 						const map: Record<string, boolean> = {};
