@@ -149,25 +149,35 @@ const BoquillaView = memo(function BoquillaView({
 		return { name: bq.name, tid: bq.tid, ci: bq.ci, celdas };
 	});
 
-	// 6. Detectar coincidencias: para cada tramo, qué boquilleros están dentro
+	// 6. Detectar coincidencias: para cada tramo, qué boquilleros están dentro/fuera
 	const coincidencias = useMemo(() => {
-		const result: { tramoNombre: string; tramoNum: number; indices: number[] }[] = [];
+		const result: {
+			tramoNombre: string;
+			tramoNum: number;
+			dentro: number[];
+			fuera: number[];
+		}[] = [];
 		for (let ti = 0; ti < tramosOrdenados.length; ti++) {
 			const dentro = rows
 				.map((r, ri) => (r.celdas[ti]?.exists && r.celdas[ti]?.isDentro ? ri : -1))
 				.filter((ri) => ri !== -1);
-			if (dentro.length > 0) {
+			const fuera = rows
+				.map((r, ri) => (r.celdas[ti]?.exists && r.celdas[ti]?.isFuera ? ri : -1))
+				.filter((ri) => ri !== -1);
+			if (dentro.length > 0 || fuera.length > 0) {
 				result.push({
 					tramoNombre: tramosOrdenados[ti],
 					tramoNum: extractTramoNum(tramosOrdenados[ti]),
-					indices: dentro,
+					dentro,
+					fuera,
 				});
 			}
 		}
 		return result;
 	}, [rows, tramosOrdenados]);
 
-	const maxCoincidentes = Math.max(...coincidencias.map((c) => c.indices.length), 0);
+	const maxDentro = Math.max(...coincidencias.map((c) => c.dentro.length), 0);
+	const maxFuera = Math.max(...coincidencias.map((c) => c.fuera.length), 0);
 	const hasAnyPlan = trabConBoquilla.some((t) => t.plan !== null);
 
 	if (boquilleros.length === 0) return null;
@@ -185,9 +195,14 @@ const BoquillaView = memo(function BoquillaView({
 					<div className="t-name">Vista Boquilla</div>
 					<div className="t-meta">
 						{boquilleros.length} boquilla(s) · {tramosOrdenados.length} tramos
-						{maxCoincidentes > 1 && (
+						{maxDentro > 1 && (
 							<span className="text-red-400 ml-2">
-								 Hasta {maxCoincidentes} boquillas dentro al mismo tiempo
+								 {maxDentro} boquillas dentro al mismo tiempo
+							</span>
+						)}
+						{maxFuera > 1 && (
+							<span className="text-red-500 ml-2 font-bold">
+								 {maxFuera} boquillas FUERA al mismo tiempo
 							</span>
 						)}
 						{!hasAnyPlan && (
@@ -249,10 +264,14 @@ const BoquillaView = memo(function BoquillaView({
 										if (cell.isDentro) cls += " boq-D";
 										if (cell.isFuera) cls += " boq-F";
 
-										// Coincidencia: más de un boquillero dentro en el mismo tramo
+										// Coincidencia DENTRO: más de un boquillero dentro en el mismo tramo
 										const coinc = coincidencias.find((c) => c.tramoNum === cell.tramoNum);
-										if (coinc && coinc.indices.length > 1 && cell.isDentro) {
+										if (coinc && coinc.dentro.length > 1 && cell.isDentro) {
 											cls += " boq-coincidence";
+										}
+										// Coincidencia FUERA: más de un boquillero fuera en el mismo tramo
+										if (coinc && coinc.fuera.length > 1 && cell.isFuera) {
+											cls += " boq-coincidence-fuera";
 										}
 
 										const lbl = cell.isDentro
@@ -340,7 +359,12 @@ const BoquillaView = memo(function BoquillaView({
 											)}
 											{dentro.length > 1 && (
 												<div className="text-[0.65rem] text-red-400 font-bold">
-													⚠ COINCIDENCIA: {dentro.length} boquillas dentro
+													⚠ COINCIDENCIA DENTRO: {dentro.length} boquillas
+												</div>
+											)}
+											{fuera.length > 1 && (
+												<div className="text-[0.65rem] text-red-500 font-bold">
+													⚠ COINCIDENCIA FUERA: {fuera.length} boquillas
 												</div>
 											)}
 										</div>
@@ -352,18 +376,27 @@ const BoquillaView = memo(function BoquillaView({
 				)}
 
 				{/* Alerta de coincidencias */}
-				{maxCoincidentes > 1 && (
+				{(maxDentro > 1 || maxFuera > 1) && (
 					<div className="mt-3 p-3 bg-[rgba(139,26,26,0.15)] border border-red-800/30 rounded-xl">
 						<div className="text-[0.7rem] text-red-300">
-							<strong> Coincidencias detectadas:</strong> más de un boquillero está{" "}
-							<strong>dentro</strong> al mismo tiempo en estos tramos:
+							<strong> Coincidencias detectadas:</strong>
 						</div>
 						{coincidencias
-							.filter((c) => c.indices.length > 1)
+							.filter((c) => c.dentro.length > 1 || c.fuera.length > 1)
 							.map((c) => (
 								<div key={c.tramoNum} className="text-[0.65rem] text-red-300 mt-1 ml-2">
 									<strong>{c.tramoNombre}:</strong>{" "}
-									{c.indices.map((ri) => rows[ri].name).join(", ")}
+									{c.dentro.length > 1 && (
+										<span>
+											DENTRO: {c.dentro.map((ri) => rows[ri].name).join(", ")}
+										</span>
+									)}
+									{c.dentro.length > 1 && c.fuera.length > 1 && <span> · </span>}
+									{c.fuera.length > 1 && (
+										<span className="text-red-400 font-bold">
+											FUERA: {c.fuera.map((ri) => rows[ri].name).join(", ")}
+										</span>
+									)}
 								</div>
 							))}
 					</div>

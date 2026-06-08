@@ -367,6 +367,13 @@ html.light .pcell.boq-coincidence {
 	box-shadow: 0 0 10px rgba(220, 38, 38, 0.3) !important;
 	animation: boq-pulse 2s ease-in-out infinite;
 }
+html.light .pcell.boq-coincidence-fuera {
+	background: rgba(185, 28, 28, 0.5) !important;
+	border-color: rgba(239, 68, 68, 0.8) !important;
+	color: rgba(153, 27, 27, 1) !important;
+	box-shadow: 0 0 14px rgba(185, 28, 28, 0.4) !important;
+	animation: boq-pulse-fuera 1.5s ease-in-out infinite;
+}
 html.light .pcell.empty {
 	opacity: 0.3;
 	background: transparent !important;
@@ -1826,9 +1833,20 @@ body {
 	box-shadow: 0 0 10px rgba(220, 38, 38, 0.4) !important;
 	animation: boq-pulse 2s ease-in-out infinite;
 }
+.pcell.boq-coincidence-fuera {
+	background: rgba(185, 28, 28, 0.7) !important;
+	border-color: rgba(239, 68, 68, 1) !important;
+	color: rgba(255, 200, 200, 1) !important;
+	box-shadow: 0 0 14px rgba(185, 28, 28, 0.6) !important;
+	animation: boq-pulse-fuera 1.5s ease-in-out infinite;
+}
 @keyframes boq-pulse {
 	0%, 100% { box-shadow: 0 0 10px rgba(220, 38, 38, 0.4); }
 	50% { box-shadow: 0 0 16px rgba(220, 38, 38, 0.6); }
+}
+@keyframes boq-pulse-fuera {
+	0%, 100% { box-shadow: 0 0 14px rgba(185, 28, 28, 0.6); }
+	50% { box-shadow: 0 0 22px rgba(185, 28, 28, 0.8); }
 }
 .pcell.empty {
 	opacity: 0.3;
