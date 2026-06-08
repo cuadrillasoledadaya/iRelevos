@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import { uiStore, projectStore, planStore } from "@/stores";
+import { uiStore, planStore } from "@/stores";
 import { getPinned } from "@/lib/algoritmos";
 import { shortName } from "@/lib/nombres";
 import type { Trabajadera } from "@/lib/types";
