@@ -195,7 +195,7 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 				: Number(rawPuntuacion);
 
 		console.log(
-			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: puesto="${puesto}" → rol="${rolCostalero}", puesto_sec="${puestoSec}" → rol_sec="${rolSecCostalero}", puntuacion_raw="${rawPuntuacion}" → puntuacion=${puntuacion}`,
+			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: rawPuntuacion="${rawPuntuacion}" (tipo: ${typeof rawPuntuacion}) → puntuacion=${puntuacion} (tipo: ${typeof puntuacion})`,
 		);
 		console.log(
 			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}", puesto_secundario="${u.puesto_secundario}", puntuacion_total="${u.puntuacion_total}"`,
