@@ -303,14 +303,26 @@ const BoquillaView = memo(function BoquillaView({
 
 										let cls = cell.cls;
 
-										// Coincidencia DENTRO
+										// Coincidencia DENTRO → gris
 										const coinc = coincidencias.find((c) => c.tramoNum === cell.tramoNum);
 										if (coinc && coinc.dentro.length > 1 && cell.isDentro) {
-											cls += " boq-coincidence";
+											cls = "boq-coincidence";
+											if (cell.inferred) cls += " inferred";
 										}
-										// Coincidencia FUERA
-										if (coinc && coinc.fuera.length > 1 && cell.isFuera) {
-											cls += " boq-coincidence-fuera";
+										// Coincidencia FUERA → rojo intenso
+										else if (coinc && coinc.fuera.length > 1 && cell.isFuera) {
+											cls = "boq-coincidence-fuera";
+											if (cell.inferred) cls += " inferred";
+										}
+										// Normal: D=verde, F=rojo
+										else if (cell.isDentro) {
+											cls = "boq-D";
+											if (cell.inferred) cls += " inferred";
+										} else if (cell.isFuera) {
+											cls = "boq-F";
+											if (cell.inferred) cls += " inferred";
+										} else if (cell.inferred) {
+											cls = "empty inferred";
 										}
 
 										const lbl = cell.isDentro
@@ -370,11 +382,11 @@ const BoquillaView = memo(function BoquillaView({
 										<div className="flex flex-col gap-1 f1">
 											{dentro.length > 0 && (
 												<div className="text-[0.65rem]">
-													<span className="text-blue-400 font-bold">DENTRO:</span>{" "}
+													<span className="text-green-400 font-bold">DENTRO:</span>{" "}
 													{dentro.map((x) => (
 														<span
 															key={x.ri}
-															className={`ml-1 ${x.cell!.inferred ? "text-blue-300/60 italic" : "text-blue-300"}`}
+															className={`ml-1 ${x.cell!.inferred ? "text-green-300/60 italic" : "text-green-300"}`}
 														>
 															{x.row.name}
 															{x.cell!.inferred && " (inf)"}
@@ -384,11 +396,11 @@ const BoquillaView = memo(function BoquillaView({
 											)}
 											{fuera.length > 0 && (
 												<div className="text-[0.65rem]">
-													<span className="text-orange-400 font-bold">FUERA:</span>{" "}
+													<span className="text-red-400 font-bold">FUERA:</span>{" "}
 													{fuera.map((x) => (
 														<span
 															key={x.ri}
-															className={`ml-1 ${x.cell!.inferred ? "text-orange-300/60 italic" : "text-orange-300"}`}
+															className={`ml-1 ${x.cell!.inferred ? "text-red-300/60 italic" : "text-red-300"}`}
 														>
 															{x.row.name}
 															{x.cell!.inferred && " (inf)"}
