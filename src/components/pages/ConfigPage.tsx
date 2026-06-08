@@ -127,8 +127,6 @@ export default function ConfigPage() {
 					{S.banco.map((n: string, i: number) => (
 						<div
 							key={i}
-							draggable
-							onDragStart={() => handleDragStart(i)}
 							onDragOver={(e) => handleDragOver(e, i)}
 							onDragEnd={handleDragEnd}
 							className={`banco-tag-row flex items-center gap-2 px-2 py-1.5 rounded border ${
@@ -136,10 +134,14 @@ export default function ConfigPage() {
 									? "border-oro bg-oro/10"
 									: "border-white/5 bg-black/10"
 							}`}
-							style={{ cursor: "grab" }}
 						>
-							<span className="xs text-oro-o font-bold min-w-[28px]">
-								{i + 1}.-
+							<span
+								draggable
+								onDragStart={() => handleDragStart(i)}
+								className="xs text-oro-o font-bold min-w-[28px] cursor-grab select-none"
+								title="Arrastrar para reordenar"
+							>
+								⠿ {i + 1}.-
 							</span>
 							{editingBancoIdx === i ? (
 								<input
@@ -156,9 +158,9 @@ export default function ConfigPage() {
 								/>
 							) : (
 								<span
-									className="sm f1"
-									onDoubleClick={() => startEditBanco(i)}
-									title="Doble click para editar"
+									className="sm f1 cursor-text"
+									onClick={() => startEditBanco(i)}
+									title="Click para editar"
 								>
 									{n}
 								</span>
