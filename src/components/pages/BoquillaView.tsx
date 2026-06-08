@@ -216,7 +216,6 @@ const BoquillaView = memo(function BoquillaView({
 		return result;
 	}, [rows, tramosOrdenados]);
 
-	const maxDentro = Math.max(...coincidencias.map((c) => c.dentro.length), 0);
 	const maxFuera = Math.max(...coincidencias.map((c) => c.fuera.length), 0);
 	const hasAnyPlan = trabConBoquilla.some((t) => t.plan !== null);
 
@@ -235,11 +234,6 @@ const BoquillaView = memo(function BoquillaView({
 					<div className="t-name">Vista Boquilla</div>
 					<div className="t-meta">
 						{boquilleros.length} boquilla(s) · {tramosOrdenados.length} tramos
-						{maxDentro > 1 && (
-							<span className="text-red-400 ml-2">
-								 {maxDentro} boquillas dentro al mismo tiempo
-							</span>
-						)}
 						{maxFuera > 1 && (
 							<span className="text-red-500 ml-2 font-bold">
 								 {maxFuera} boquillas FUERA al mismo tiempo
@@ -301,29 +295,21 @@ const BoquillaView = memo(function BoquillaView({
 											);
 										}
 
-										let cls = cell.cls;
+										let cls = "";
 
-										// Coincidencia DENTRO → gris
+										// Coincidencia FUERA → rojo
 										const coinc = coincidencias.find((c) => c.tramoNum === cell.tramoNum);
-										if (coinc && coinc.dentro.length > 1 && cell.isDentro) {
-											cls = "boq-coincidence";
-											if (cell.inferred) cls += " inferred";
-										}
-										// Coincidencia FUERA → rojo intenso
-										else if (coinc && coinc.fuera.length > 1 && cell.isFuera) {
+										if (coinc && coinc.fuera.length > 1 && cell.isFuera) {
 											cls = "boq-coincidence-fuera";
-											if (cell.inferred) cls += " inferred";
 										}
-										// Normal: D=verde, F=rojo
+										// Normal: D=verde, F=amarillo
 										else if (cell.isDentro) {
 											cls = "boq-D";
-											if (cell.inferred) cls += " inferred";
 										} else if (cell.isFuera) {
 											cls = "boq-F";
-											if (cell.inferred) cls += " inferred";
-										} else if (cell.inferred) {
-											cls = "empty inferred";
 										}
+
+										if (cell.inferred) cls += " inferred";
 
 										const lbl = cell.isDentro
 											? "D"
@@ -396,11 +382,11 @@ const BoquillaView = memo(function BoquillaView({
 											)}
 											{fuera.length > 0 && (
 												<div className="text-[0.65rem]">
-													<span className="text-red-400 font-bold">FUERA:</span>{" "}
+													<span className="text-yellow-400 font-bold">FUERA:</span>{" "}
 													{fuera.map((x) => (
 														<span
 															key={x.ri}
-															className={`ml-1 ${x.cell!.inferred ? "text-red-300/60 italic" : "text-red-300"}`}
+															className={`ml-1 ${x.cell!.inferred ? "text-yellow-300/60 italic" : "text-yellow-300"}`}
 														>
 															{x.row.name}
 															{x.cell!.inferred && " (inf)"}
@@ -411,11 +397,6 @@ const BoquillaView = memo(function BoquillaView({
 											{dentro.length === 0 && fuera.length === 0 && (
 												<div className="text-[0.65rem] text-[var(--border)]">
 													Sin boquilleros en este tramo
-												</div>
-											)}
-											{dentro.length > 1 && (
-												<div className="text-[0.65rem] text-red-400 font-bold">
-													⚠ COINCIDENCIA DENTRO: {dentro.length} boquillas
 												</div>
 											)}
 											{fuera.length > 1 && (
@@ -431,28 +412,21 @@ const BoquillaView = memo(function BoquillaView({
 					</div>
 				)}
 
-				{/* Alerta de coincidencias */}
-				{(maxDentro > 1 || maxFuera > 1) && (
-					<div className="mt-3 p-3 bg-[rgba(139,26,26,0.15)] border border-red-800/30 rounded-xl">
+				{/* Alerta de coincidencias FUERA */}
+				{maxFuera > 1 && (
+					<div className="mt-3 p-3 bg-[rgba(239,68,68,0.15)] border border-red-800/30 rounded-xl">
 						<div className="text-[0.7rem] text-red-300">
-							<strong> Coincidencias detectadas:</strong>
+							<strong>⚠ Coincidencias FUERA detectadas:</strong> más de un boquillero está{" "}
+							<strong>fuera</strong> al mismo tiempo en estos tramos:
 						</div>
 						{coincidencias
-							.filter((c) => c.dentro.length > 1 || c.fuera.length > 1)
+							.filter((c) => c.fuera.length > 1)
 							.map((c) => (
 								<div key={c.tramoNum} className="text-[0.65rem] text-red-300 mt-1 ml-2">
 									<strong>{c.tramoNombre}:</strong>{" "}
-									{c.dentro.length > 1 && (
-										<span>
-											DENTRO: {c.dentro.map((ri) => rows[ri].name).join(", ")}
-										</span>
-									)}
-									{c.dentro.length > 1 && c.fuera.length > 1 && <span> · </span>}
-									{c.fuera.length > 1 && (
-										<span className="text-red-400 font-bold">
-											FUERA: {c.fuera.map((ri) => rows[ri].name).join(", ")}
-										</span>
-									)}
+									<span className="text-red-400 font-bold">
+										FUERA: {c.fuera.map((ri) => rows[ri].name).join(", ")}
+									</span>
 								</div>
 							))}
 					</div>

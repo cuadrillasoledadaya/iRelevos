@@ -379,12 +379,8 @@ html.light .pcell.inferred.boq-D {
 	border-color: rgba(34, 197, 94, 0.4) !important;
 }
 html.light .pcell.inferred.boq-F {
-	background: rgba(239, 68, 68, 0.15) !important;
-	border-color: rgba(239, 68, 68, 0.4) !important;
-}
-html.light .pcell.inferred.boq-coincidence {
-	background: rgba(100, 100, 100, 0.25) !important;
-	border-color: rgba(100, 100, 100, 0.5) !important;
+	background: rgba(234, 179, 8, 0.15) !important;
+	border-color: rgba(234, 179, 8, 0.4) !important;
 }
 html.light .pcell.empty {
 	opacity: 0.3;
@@ -1897,22 +1893,17 @@ body {
 	box-shadow: 0 0 6px rgba(34, 197, 94, 0.3) !important;
 }
 .boquilla-view .pcell.boq-F {
-	background: rgba(239, 68, 68, 0.25) !important;
-	border-color: rgba(239, 68, 68, 0.6) !important;
-	color: rgba(239, 68, 68, 0.9) !important;
-	box-shadow: 0 0 6px rgba(239, 68, 68, 0.3) !important;
+	background: rgba(234, 179, 8, 0.25) !important;
+	border-color: rgba(234, 179, 8, 0.6) !important;
+	color: rgba(234, 179, 8, 0.9) !important;
+	box-shadow: 0 0 6px rgba(234, 179, 8, 0.3) !important;
 }
-.boquilla-view .pcell.boq-coincidence {
-	background: rgba(100, 100, 100, 0.4) !important;
-	border-color: rgba(100, 100, 100, 0.7) !important;
-	color: rgba(200, 200, 200, 1) !important;
-	box-shadow: 0 0 8px rgba(100, 100, 100, 0.4) !important;
-}
+/* Solo advertencia cuando AMBOS están FUERA */
 .boquilla-view .pcell.boq-coincidence-fuera {
-	background: rgba(185, 28, 28, 0.6) !important;
+	background: rgba(239, 68, 68, 0.5) !important;
 	border-color: rgba(239, 68, 68, 0.9) !important;
 	color: rgba(255, 200, 200, 1) !important;
-	box-shadow: 0 0 12px rgba(185, 28, 28, 0.5) !important;
+	box-shadow: 0 0 12px rgba(239, 68, 68, 0.5) !important;
 	animation: boq-pulse-fuera 1.5s ease-in-out infinite;
 }
 .boquilla-view .pcell.inferred.boq-D {
@@ -1920,20 +1911,12 @@ body {
 	border-color: rgba(34, 197, 94, 0.4) !important;
 }
 .boquilla-view .pcell.inferred.boq-F {
-	background: rgba(239, 68, 68, 0.15) !important;
-	border-color: rgba(239, 68, 68, 0.4) !important;
-}
-.boquilla-view .pcell.inferred.boq-coincidence {
-	background: rgba(100, 100, 100, 0.25) !important;
-	border-color: rgba(100, 100, 100, 0.5) !important;
-}
-@keyframes boq-pulse {
-	0%, 100% { box-shadow: 0 0 10px rgba(220, 38, 38, 0.4); }
-	50% { box-shadow: 0 0 16px rgba(220, 38, 38, 0.6); }
+	background: rgba(234, 179, 8, 0.15) !important;
+	border-color: rgba(234, 179, 8, 0.4) !important;
 }
 @keyframes boq-pulse-fuera {
-	0%, 100% { box-shadow: 0 0 14px rgba(185, 28, 28, 0.6); }
-	50% { box-shadow: 0 0 22px rgba(185, 28, 28, 0.8); }
+	0%, 100% { box-shadow: 0 0 14px rgba(239, 68, 68, 0.5); }
+	50% { box-shadow: 0 0 22px rgba(239, 68, 68, 0.7); }
 }
 .pcell.empty {
 	opacity: 0.3;
