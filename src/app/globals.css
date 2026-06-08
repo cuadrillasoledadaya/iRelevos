@@ -1875,8 +1875,8 @@ body {
 	border-color: rgba(239, 68, 68, 0.8) !important;
 	opacity: 0.85;
 }
-/* BoquillaView: círculos en lugar de cuadrados */
-.boquilla-view .pcell {
+/* BoquillaView: círculos SOLO para celdas inferidas */
+.boquilla-view .pcell.inferred {
 	border-radius: 50% !important;
 	width: 32px !important;
 	height: 32px !important;
