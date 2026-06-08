@@ -1,8 +1,8 @@
 -- Script para añadir columna puntuacion al censo y actualizar el RPC
 -- Ejecutar en Supabase SQL Editor
 
--- 1. Añadir columna puntuacion a la tabla census
-ALTER TABLE census ADD COLUMN IF NOT EXISTS puntuacion INTEGER DEFAULT 0;
+-- 1. Añadir columna puntuacion a la tabla census (NUMERIC para soportar decimales como 3.5)
+ALTER TABLE census ADD COLUMN IF NOT EXISTS puntuacion NUMERIC DEFAULT 0;
 
 -- 2. Actualizar el RPC full_sync_icuadrilla_census para soportar puntuacion
 DROP FUNCTION IF EXISTS public.full_sync_icuadrilla_census(text, jsonb);
@@ -25,7 +25,7 @@ DECLARE
     trabajadera INTEGER;
     rol TEXT;
     rol_sec TEXT;
-    puntuacion INTEGER;
+    puntuacion NUMERIC;
 BEGIN
     -- Eliminar registros existentes del proyecto con source='icuadrilla'
     DELETE FROM census 
@@ -50,7 +50,7 @@ BEGIN
         rol_sec := r->>'rol_sec';
         puntuacion := CASE 
             WHEN r->>'puntuacion' IS NULL or r->>'puntuacion' = '' THEN 0 
-            ELSE (r->>'puntuacion')::INTEGER 
+            ELSE (r->>'puntuacion')::NUMERIC 
         END;
         
         INSERT INTO census (
