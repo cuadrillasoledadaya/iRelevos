@@ -17,7 +17,7 @@ function extractTramoNum(nombre: string): number {
 /**
  * BoquillaView — Muestra el plan de rotación real de cada boquillero,
  * alineados por NÚMERO de tramo para detectar coincidencias.
- * Siempre visible (no colapsable).
+ * Incluye inferencia de estado para tramos intermedios.
  */
 const BoquillaView = memo(function BoquillaView({
 	trabajaderas,
@@ -70,7 +70,7 @@ const BoquillaView = memo(function BoquillaView({
 		(a, b) => extractTramoNum(a) - extractTramoNum(b),
 	);
 
-	// 5. Para cada boquillero, extraer su estado REAL en cada tramo (por nombre)
+	// 5. Para cada boquillero, extraer su estado REAL + inferido
 	type BoqCell = {
 		tramoNombre: string;
 		tramoNum: number;
@@ -80,6 +80,7 @@ const BoquillaView = memo(function BoquillaView({
 		v: "L" | "D" | "F" | "LF";
 		cls: string;
 		exists: boolean; // true si este tramo existe en la trabajadera del boquilla
+		inferred: boolean; // true si el estado fue inferido por continuidad
 	};
 
 	type BoqRow = {
@@ -97,54 +98,91 @@ const BoquillaView = memo(function BoquillaView({
 		const nombreToIdx = new Map<string, number>();
 		t.tramos.forEach((nombre, idx) => nombreToIdx.set(nombre, idx));
 
+		// Estado inferido: se mantiene el último estado conocido (D o F)
+		let lastState: "D" | "F" | null = null;
+
 		const celdas: BoqCell[] = tramosOrdenados.map((tramoNombre) => {
 			const tramoNum = extractTramoNum(tramoNombre);
 			const ti = nombreToIdx.get(tramoNombre);
 
-			// Si este tramo no existe en la trabajadera del boquilla
-			if (ti === undefined) {
+			// Si este tramo existe en la trabajadera del boquilla
+			if (ti !== undefined) {
+				const planSlot = t.plan?.[ti] ?? null;
+				const v = pinned[ti]?.[bq.ci] ?? "L";
+
+				let isAutoD = false;
+				let isAutoF = false;
+				if (planSlot) {
+					isAutoD = v === "L" && planSlot.dentro.includes(bq.ci);
+					isAutoF = (v === "L" || v === "LF") && planSlot.fuera.includes(bq.ci);
+				}
+
+				const isDentro = v === "D" || (v === "L" && isAutoD);
+				const isFuera = v === "F" || (v === "L" && isAutoF);
+
+				const clsMap: Record<string, string> = {
+					L: isAutoD ? "d" : isAutoF ? "f" : "L",
+					D: "D",
+					F: "F",
+					LF: isAutoF ? "f" : "LF",
+				};
+
+				// Actualizar lastState con el estado real
+				lastState = isDentro ? "D" : "F";
+
+				return {
+					tramoNombre,
+					tramoNum,
+					isDentro,
+					isFuera,
+					planSlot,
+					v,
+					cls: clsMap[v],
+					exists: true,
+					inferred: false,
+				};
+			}
+
+			// Tramo no existe en esta trabajadera → inferir estado
+			if (lastState === "D") {
+				// Si estaba dentro, sigue dentro hasta que aparezca fuera
+				return {
+					tramoNombre,
+					tramoNum,
+					isDentro: true,
+					isFuera: false,
+					planSlot: null,
+					v: "L" as const,
+					cls: "d boq-D inferred",
+					exists: false,
+					inferred: true,
+				};
+			} else if (lastState === "F") {
+				// Si estaba fuera, sigue fuera hasta que aparezca dentro
 				return {
 					tramoNombre,
 					tramoNum,
 					isDentro: false,
-					isFuera: false,
+					isFuera: true,
 					planSlot: null,
 					v: "L" as const,
-					cls: "empty",
+					cls: "f boq-F inferred",
 					exists: false,
+					inferred: true,
 				};
 			}
 
-			// Estado real del boquilla en este tramo de su trabajadera
-			const planSlot = t.plan?.[ti] ?? null;
-			const v = pinned[ti]?.[bq.ci] ?? "L";
-
-			let isAutoD = false;
-			let isAutoF = false;
-			if (planSlot) {
-				isAutoD = v === "L" && planSlot.dentro.includes(bq.ci);
-				isAutoF = (v === "L" || v === "LF") && planSlot.fuera.includes(bq.ci);
-			}
-
-			const isDentro = v === "D" || (v === "L" && isAutoD);
-			const isFuera = v === "F" || (v === "L" && isAutoF);
-
-			const clsMap: Record<string, string> = {
-				L: isAutoD ? "d" : isAutoF ? "f" : "L",
-				D: "D",
-				F: "F",
-				LF: isAutoF ? "f" : "LF",
-			};
-
+			// Sin estado previo conocido
 			return {
 				tramoNombre,
 				tramoNum,
-				isDentro,
-				isFuera,
-				planSlot,
-				v,
-				cls: clsMap[v],
-				exists: true,
+				isDentro: false,
+				isFuera: false,
+				planSlot: null,
+				v: "L" as const,
+				cls: "empty",
+				exists: false,
+				inferred: false,
 			};
 		});
 
@@ -161,10 +199,10 @@ const BoquillaView = memo(function BoquillaView({
 		}[] = [];
 		for (let ti = 0; ti < tramosOrdenados.length; ti++) {
 			const dentro = rows
-				.map((r, ri) => (r.celdas[ti]?.exists && r.celdas[ti]?.isDentro ? ri : -1))
+				.map((r, ri) => (r.celdas[ti]?.isDentro ? ri : -1))
 				.filter((ri) => ri !== -1);
 			const fuera = rows
-				.map((r, ri) => (r.celdas[ti]?.exists && r.celdas[ti]?.isFuera ? ri : -1))
+				.map((r, ri) => (r.celdas[ti]?.isFuera ? ri : -1))
 				.filter((ri) => ri !== -1);
 			if (dentro.length > 0 || fuera.length > 0) {
 				result.push({
@@ -236,10 +274,7 @@ const BoquillaView = memo(function BoquillaView({
 								<th className="col-name">Boquilla</th>
 								{tramosOrdenados.map((nombre, ti) => (
 									<th key={ti} className="col-tramo">
-										<span
-											className="truncate max-w-[60px]"
-											title={nombre}
-										>
+										<span className="truncate max-w-[60px]" title={nombre}>
 											{nombre}
 										</span>
 									</th>
@@ -258,7 +293,7 @@ const BoquillaView = memo(function BoquillaView({
 										</div>
 									</td>
 									{row.celdas.map((cell, ti) => {
-										if (!cell.exists) {
+										if (!cell.exists && !cell.inferred) {
 											return (
 												<td key={ti}>
 													<div className="pcell empty">—</div>
@@ -267,15 +302,13 @@ const BoquillaView = memo(function BoquillaView({
 										}
 
 										let cls = cell.cls;
-										if (cell.isDentro) cls += " boq-D";
-										if (cell.isFuera) cls += " boq-F";
 
-										// Coincidencia DENTRO: más de un boquillero dentro en el mismo tramo
+										// Coincidencia DENTRO
 										const coinc = coincidencias.find((c) => c.tramoNum === cell.tramoNum);
 										if (coinc && coinc.dentro.length > 1 && cell.isDentro) {
 											cls += " boq-coincidence";
 										}
-										// Coincidencia FUERA: más de un boquillero fuera en el mismo tramo
+										// Coincidencia FUERA
 										if (coinc && coinc.fuera.length > 1 && cell.isFuera) {
 											cls += " boq-coincidence-fuera";
 										}
@@ -291,11 +324,8 @@ const BoquillaView = memo(function BoquillaView({
 												<div
 													className={`pcell ${cls}`}
 													onClick={() => {
-														// Encontrar el índice real en la trabajadera original
-														const t = trabajaderas.find((x) => x.id === row.tid)!;
-														const realTi = t.tramos.indexOf(cell.tramoNombre);
-														if (realTi >= 0) {
-															setCellTarget({ tid: row.tid, ti: realTi, ci: row.ci });
+														if (cell.exists) {
+															setCellTarget({ tid: row.tid, ti: ti, ci: row.ci });
 															openSheet("celda");
 														}
 													}}
@@ -311,7 +341,7 @@ const BoquillaView = memo(function BoquillaView({
 					</table>
 				</div>
 
-				{/* Detalle por tramo: quiénes están dentro/fuera en cada tramo */}
+				{/* Detalle por tramo */}
 				{hasAnyPlan && (
 					<div className="mt-4">
 						<div
@@ -324,7 +354,7 @@ const BoquillaView = memo(function BoquillaView({
 							{tramosOrdenados.map((nombre, ti) => {
 								const boqsEnTramo = rows
 									.map((r, ri) => ({ row: r, ri, cell: r.celdas[ti] }))
-									.filter((x) => x.cell?.exists);
+									.filter((x) => x.cell?.isDentro || x.cell?.isFuera);
 
 								const dentro = boqsEnTramo.filter((x) => x.cell!.isDentro);
 								const fuera = boqsEnTramo.filter((x) => x.cell!.isFuera);
@@ -342,8 +372,12 @@ const BoquillaView = memo(function BoquillaView({
 												<div className="text-[0.65rem]">
 													<span className="text-blue-400 font-bold">DENTRO:</span>{" "}
 													{dentro.map((x) => (
-														<span key={x.ri} className="text-blue-300 ml-1">
+														<span
+															key={x.ri}
+															className={`ml-1 ${x.cell!.inferred ? "text-blue-300/60 italic" : "text-blue-300"}`}
+														>
 															{x.row.name}
+															{x.cell!.inferred && " (inf)"}
 														</span>
 													))}
 												</div>
@@ -352,8 +386,12 @@ const BoquillaView = memo(function BoquillaView({
 												<div className="text-[0.65rem]">
 													<span className="text-orange-400 font-bold">FUERA:</span>{" "}
 													{fuera.map((x) => (
-														<span key={x.ri} className="text-orange-300 ml-1">
+														<span
+															key={x.ri}
+															className={`ml-1 ${x.cell!.inferred ? "text-orange-300/60 italic" : "text-orange-300"}`}
+														>
 															{x.row.name}
+															{x.cell!.inferred && " (inf)"}
 														</span>
 													))}
 												</div>
@@ -370,7 +408,7 @@ const BoquillaView = memo(function BoquillaView({
 											)}
 											{fuera.length > 1 && (
 												<div className="text-[0.65rem] text-red-500 font-bold">
-													⚠ COINCIDENCIA FUERA: {fuera.length} boquillas
+													 COINCIDENCIA FUERA: {fuera.length} boquillas
 												</div>
 											)}
 										</div>
