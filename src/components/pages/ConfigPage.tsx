@@ -16,6 +16,8 @@ export default function ConfigPage() {
 	const S = projectStore((s) => s.S);
 	const addBanco = bancoStore.getState().addBanco;
 	const delBanco = bancoStore.getState().delBanco;
+	const editBanco = bancoStore.getState().editBanco;
+	const reorderBanco = bancoStore.getState().reorderBanco;
 	const limpiarBanco = bancoStore.getState().limpiarBanco;
 	const calcularTodo = planStore.getState().calcularTodo;
 	const resetTodo = planStore.getState().resetTodo;
@@ -28,12 +30,50 @@ export default function ConfigPage() {
 	const [bancoInp, setBancoInp] = useState("");
 	const [newPlanName, setNewPlanName] = useState("");
 	const [selectedTramos, setSelectedTramos] = useState<string[]>([]);
+	const [editingBancoIdx, setEditingBancoIdx] = useState<number | null>(null);
+	const [editingBancoVal, setEditingBancoVal] = useState("");
+	const [dragIdx, setDragIdx] = useState<number | null>(null);
 
 	function handleAddBanco() {
 		const val = bancoInp.trim();
 		if (!val) return;
 		addBanco(val);
 		setBancoInp("");
+	}
+
+	function startEditBanco(idx: number) {
+		setEditingBancoIdx(idx);
+		setEditingBancoVal(S.banco[idx]);
+	}
+
+	function commitEditBanco() {
+		if (editingBancoIdx === null) return;
+		const val = editingBancoVal.trim();
+		if (val) {
+			editBanco(editingBancoIdx, val);
+		}
+		setEditingBancoIdx(null);
+		setEditingBancoVal("");
+	}
+
+	function cancelEditBanco() {
+		setEditingBancoIdx(null);
+		setEditingBancoVal("");
+	}
+
+	function handleDragStart(idx: number) {
+		setDragIdx(idx);
+	}
+
+	function handleDragOver(e: React.DragEvent, idx: number) {
+		e.preventDefault();
+		if (dragIdx === null || dragIdx === idx) return;
+		reorderBanco(dragIdx, idx);
+		setDragIdx(idx);
+	}
+
+	function handleDragEnd() {
+		setDragIdx(null);
 	}
 
 	function handleAddPlan() {
@@ -83,11 +123,47 @@ export default function ConfigPage() {
 			{/* Banco de Relevos */}
 			<div className="spanel mb4">
 				<div className="sec">✦ Banco de Relevos</div>
-				<div className="banco-tags mb3 flex flex-wrap gap-2">
+				<div className="banco-tags mb3 flex flex-col gap-1">
 					{S.banco.map((n: string, i: number) => (
-						<div key={i} className="banco-tag">
-							<span>{n}</span>
-							<span className="bdel" onClick={() => delBanco(i)}>
+						<div
+							key={i}
+							draggable
+							onDragStart={() => handleDragStart(i)}
+							onDragOver={(e) => handleDragOver(e, i)}
+							onDragEnd={handleDragEnd}
+							className={`banco-tag-row flex items-center gap-2 px-2 py-1.5 rounded border ${
+								dragIdx === i
+									? "border-oro bg-oro/10"
+									: "border-white/5 bg-black/10"
+							}`}
+							style={{ cursor: "grab" }}
+						>
+							<span className="xs text-oro-o font-bold min-w-[28px]">
+								{i + 1}.-
+							</span>
+							{editingBancoIdx === i ? (
+								<input
+									className="inp f1 sm"
+									value={editingBancoVal}
+									onChange={(e) => setEditingBancoVal(e.target.value)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter") commitEditBanco();
+										if (e.key === "Escape") cancelEditBanco();
+									}}
+									onBlur={commitEditBanco}
+									autoFocus
+									maxLength={50}
+								/>
+							) : (
+								<span
+									className="sm f1"
+									onDoubleClick={() => startEditBanco(i)}
+									title="Doble click para editar"
+								>
+									{n}
+								</span>
+							)}
+							<span className="bdel ml-auto" onClick={() => delBanco(i)}>
 								✕
 							</span>
 						</div>

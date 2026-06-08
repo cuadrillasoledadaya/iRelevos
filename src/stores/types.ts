@@ -126,6 +126,8 @@ export type PlanSlice = PlanActions
 export interface BancoActions {
   addBanco: (nombre: string) => void
   delBanco: (i: number) => void
+  editBanco: (i: number, nombre: string) => void
+  reorderBanco: (from: number, to: number) => void
   limpiarBanco: () => void
 }
 

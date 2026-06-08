@@ -148,6 +148,8 @@ export function useEstado(): EstadoCtx {
 			confirmarSugerencia: trabajaderaStore.getState().confirmarSugerencia,
 			addBanco: bancoStore.getState().addBanco,
 			delBanco: bancoStore.getState().delBanco,
+			editBanco: bancoStore.getState().editBanco,
+			reorderBanco: bancoStore.getState().reorderBanco,
 			limpiarBanco: bancoStore.getState().limpiarBanco,
 			calcularTodo: planStore.getState().calcularTodo,
 			calcularTrab: planStore.getState().calcularTrab,

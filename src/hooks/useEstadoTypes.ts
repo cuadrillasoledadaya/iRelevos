@@ -28,7 +28,7 @@ export interface EstadoCtx {
   toggleTramoClave: (tid: number, ti: number) => void; sugerirYCalcular: (tid: number) => void
   previsualizarSugerencia: (tid: number) => SugerenciaRes | null
   confirmarSugerencia: (tid: number) => boolean
-  addBanco: (nombre: string) => void; delBanco: (i: number) => void
+  addBanco: (nombre: string) => void; delBanco: (i: number) => void; editBanco: (i: number, nombre: string) => void; reorderBanco: (from: number, to: number) => void
   calcularTodo: () => void; calcularTrab: (tid: number) => void; completarPlan: (tid: number) => void
   limpiarPlan: (tid: number) => void; quitarBloqueos: (tid: number) => void
   setPinned: (tid: number, ti: number, ci: number, v: PinState) => void; getErroresPinned: (tid: number) => string[]
