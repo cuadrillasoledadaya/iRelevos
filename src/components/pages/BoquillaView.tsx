@@ -7,8 +7,16 @@ import { shortName } from "@/lib/nombres";
 import type { Trabajadera, TramoSlot } from "@/lib/types";
 
 /**
+ * Extrae el número de un nombre de tramo como "T14" → 14, "Tramo 3" → 3
+ */
+function extractTramoNum(nombre: string): number {
+	const match = nombre.match(/(\d+)/);
+	return match ? parseInt(match[1], 10) : 0;
+}
+
+/**
  * BoquillaView — Muestra el plan de rotación real de cada boquillero,
- * alineados por número de tramo para detectar coincidencias.
+ * alineados por NÚMERO de tramo para detectar coincidencias.
  * Siempre visible (no colapsable).
  */
 const BoquillaView = memo(function BoquillaView({
@@ -43,40 +51,68 @@ const BoquillaView = memo(function BoquillaView({
 		return result;
 	}, [trabajaderas, censusBoquilla]);
 
+	if (boquilleros.length === 0) return null;
+
 	// 2. Solo considerar trabajaderas que tienen boquilleros
 	const boquillaTids = new Set(boquilleros.map((b) => b.tid));
 	const trabConBoquilla = trabajaderas.filter((t) => boquillaTids.has(t.id));
 
-	// 3. Máximo tramo entre las trabajaderas con boquilleros
-	const maxTramos = Math.max(...trabConBoquilla.map((t) => t.tramos.length), 0);
-	const tramosGlobales = Array.from({ length: maxTramos }, (_, i) => `T${i + 1}`);
+	// 3. Recopilar TODOS los nombres de tramos únicos de las trabajaderas con boquilleros
+	const allTramoNames = new Set<string>();
+	for (const t of trabConBoquilla) {
+		for (const nombre of t.tramos) {
+			allTramoNames.add(nombre);
+		}
+	}
 
-	// 4. Para cada boquillero, extraer su estado REAL en cada tramo de su trabajadera
+	// 4. Ordenar por número extraído del nombre
+	const tramosOrdenados = Array.from(allTramoNames).sort(
+		(a, b) => extractTramoNum(a) - extractTramoNum(b),
+	);
+
+	// 5. Para cada boquillero, extraer su estado REAL en cada tramo (por nombre)
 	type BoqCell = {
+		tramoNombre: string;
+		tramoNum: number;
 		isDentro: boolean;
 		isFuera: boolean;
 		planSlot: TramoSlot | null;
 		v: "L" | "D" | "F" | "LF";
 		cls: string;
+		exists: boolean; // true si este tramo existe en la trabajadera del boquilla
 	};
 
 	type BoqRow = {
 		name: string;
 		tid: number;
 		ci: number;
-		celdas: (BoqCell | null)[];
+		celdas: BoqCell[];
 	};
 
 	const rows: BoqRow[] = boquilleros.map((bq) => {
 		const t = trabajaderas.find((x) => x.id === bq.tid)!;
 		const pinned = getPinned(t);
-		const celdas: (BoqCell | null)[] = [];
 
-		for (let ti = 0; ti < maxTramos; ti++) {
-			// Si este tramo no existe en la trabajadera del boquilla, dejar vacío
-			if (ti >= t.tramos.length) {
-				celdas.push(null);
-				continue;
+		// Crear mapa nombre → índice para búsqueda rápida
+		const nombreToIdx = new Map<string, number>();
+		t.tramos.forEach((nombre, idx) => nombreToIdx.set(nombre, idx));
+
+		const celdas: BoqCell[] = tramosOrdenados.map((tramoNombre) => {
+			const tramoNum = extractTramoNum(tramoNombre);
+			const ti = nombreToIdx.get(tramoNombre);
+
+			// Si este tramo no existe en la trabajadera del boquilla
+			if (ti === undefined) {
+				return {
+					tramoNombre,
+					tramoNum,
+					isDentro: false,
+					isFuera: false,
+					planSlot: null,
+					v: "L" as const,
+					cls: "empty",
+					exists: false,
+				};
 			}
 
 			// Estado real del boquilla en este tramo de su trabajadera
@@ -100,28 +136,41 @@ const BoquillaView = memo(function BoquillaView({
 				LF: isAutoF ? "f" : "LF",
 			};
 
-			celdas.push({ isDentro, isFuera, planSlot, v, cls: clsMap[v] });
-		}
+			return {
+				tramoNombre,
+				tramoNum,
+				isDentro,
+				isFuera,
+				planSlot,
+				v,
+				cls: clsMap[v],
+				exists: true,
+			};
+		});
 
 		return { name: bq.name, tid: bq.tid, ci: bq.ci, celdas };
 	});
 
-	// 5. Detectar coincidencias: para cada tramo, qué boquilleros están dentro
+	// 6. Detectar coincidencias: para cada tramo, qué boquilleros están dentro
 	const coincidencias = useMemo(() => {
-		const result: number[][] = [];
-		for (let ti = 0; ti < maxTramos; ti++) {
+		const result: { tramoNombre: string; tramoNum: number; indices: number[] }[] = [];
+		for (let ti = 0; ti < tramosOrdenados.length; ti++) {
 			const dentro = rows
-				.map((r, ri) => (r.celdas[ti]?.isDentro ? ri : -1))
+				.map((r, ri) => (r.celdas[ti]?.exists && r.celdas[ti]?.isDentro ? ri : -1))
 				.filter((ri) => ri !== -1);
-			result.push(dentro);
+			if (dentro.length > 0) {
+				result.push({
+					tramoNombre: tramosOrdenados[ti],
+					tramoNum: extractTramoNum(tramosOrdenados[ti]),
+					indices: dentro,
+				});
+			}
 		}
 		return result;
-	}, [rows, maxTramos]);
+	}, [rows, tramosOrdenados]);
 
-	const maxCoincidentes = Math.max(...coincidencias.map((c) => c.length), 0);
+	const maxCoincidentes = Math.max(...coincidencias.map((c) => c.indices.length), 0);
 	const hasAnyPlan = trabConBoquilla.some((t) => t.plan !== null);
-
-	if (boquilleros.length === 0) return null;
 
 	return (
 		<div className="card boquilla-view open">
@@ -135,7 +184,7 @@ const BoquillaView = memo(function BoquillaView({
 				<div className="t-info">
 					<div className="t-name">Vista Boquilla</div>
 					<div className="t-meta">
-						{boquilleros.length} boquilla(s) · {maxTramos} tramos
+						{boquilleros.length} boquilla(s) · {tramosOrdenados.length} tramos
 						{maxCoincidentes > 1 && (
 							<span className="text-red-400 ml-2">
 								 Hasta {maxCoincidentes} boquillas dentro al mismo tiempo
@@ -158,15 +207,18 @@ const BoquillaView = memo(function BoquillaView({
 			</div>
 
 			<div className="trab-body" style={{ display: "block" }}>
-				{/* Tabla: filas = boquilleros, columnas = tramos T1..Tn */}
+				{/* Tabla: filas = boquilleros, columnas = tramos ordenados por número */}
 				<div className="plan-scroll">
 					<table className="plan-table">
 						<thead>
 							<tr>
 								<th className="col-name">Boquilla</th>
-								{tramosGlobales.map((nombre, ti) => (
+								{tramosOrdenados.map((nombre, ti) => (
 									<th key={ti} className="col-tramo">
-										<span className="truncate max-w-[60px]" title={nombre}>
+										<span
+											className="truncate max-w-[60px]"
+											title={nombre}
+										>
 											{nombre}
 										</span>
 									</th>
@@ -185,7 +237,7 @@ const BoquillaView = memo(function BoquillaView({
 										</div>
 									</td>
 									{row.celdas.map((cell, ti) => {
-										if (!cell) {
+										if (!cell.exists) {
 											return (
 												<td key={ti}>
 													<div className="pcell empty">—</div>
@@ -198,7 +250,8 @@ const BoquillaView = memo(function BoquillaView({
 										if (cell.isFuera) cls += " boq-F";
 
 										// Coincidencia: más de un boquillero dentro en el mismo tramo
-										if (coincidencias[ti].length > 1 && cell.isDentro) {
+										const coinc = coincidencias.find((c) => c.tramoNum === cell.tramoNum);
+										if (coinc && coinc.indices.length > 1 && cell.isDentro) {
 											cls += " boq-coincidence";
 										}
 
@@ -213,8 +266,13 @@ const BoquillaView = memo(function BoquillaView({
 												<div
 													className={`pcell ${cls}`}
 													onClick={() => {
-														setCellTarget({ tid: row.tid, ti, ci: row.ci });
-														openSheet("celda");
+														// Encontrar el índice real en la trabajadera original
+														const t = trabajaderas.find((x) => x.id === row.tid)!;
+														const realTi = t.tramos.indexOf(cell.tramoNombre);
+														if (realTi >= 0) {
+															setCellTarget({ tid: row.tid, ti: realTi, ci: row.ci });
+															openSheet("celda");
+														}
 													}}
 												>
 													{lbl}
@@ -238,10 +296,11 @@ const BoquillaView = memo(function BoquillaView({
 							Detalle por tramo
 						</div>
 						<div className="fc gap-2">
-							{tramosGlobales.map((nombre, ti) => {
+							{tramosOrdenados.map((nombre, ti) => {
+								const tramoNum = extractTramoNum(nombre);
 								const boqsEnTramo = rows
 									.map((r, ri) => ({ row: r, ri, cell: r.celdas[ti] }))
-									.filter((x) => x.cell !== null);
+									.filter((x) => x.cell?.exists);
 
 								const dentro = boqsEnTramo.filter((x) => x.cell!.isDentro);
 								const fuera = boqsEnTramo.filter((x) => x.cell!.isFuera);
@@ -251,7 +310,7 @@ const BoquillaView = memo(function BoquillaView({
 										key={ti}
 										className="flex items-start gap-3 px-3 py-2 rounded border border-white/5 bg-black/10"
 									>
-										<span className="text-[0.65rem] font-bold text-oro min-w-[30px]">
+										<span className="text-[0.65rem] font-bold text-oro min-w-[40px]">
 											{nombre}
 										</span>
 										<div className="flex flex-col gap-1 f1">
@@ -300,15 +359,14 @@ const BoquillaView = memo(function BoquillaView({
 							<strong> Coincidencias detectadas:</strong> más de un boquillero está{" "}
 							<strong>dentro</strong> al mismo tiempo en estos tramos:
 						</div>
-						{coincidencias.map((coincs, ti) => {
-							if (coincs.length < 2) return null;
-							return (
-								<div key={ti} className="text-[0.65rem] text-red-300 mt-1 ml-2">
-									<strong>T{ti + 1}:</strong>{" "}
-									{coincs.map((ri) => rows[ri].name).join(", ")}
+						{coincidencias
+							.filter((c) => c.indices.length > 1)
+							.map((c) => (
+								<div key={c.tramoNum} className="text-[0.65rem] text-red-300 mt-1 ml-2">
+									<strong>{c.tramoNombre}:</strong>{" "}
+									{c.indices.map((ri) => rows[ri].name).join(", ")}
 								</div>
-							);
-						})}
+							))}
 					</div>
 				)}
 			</div>
