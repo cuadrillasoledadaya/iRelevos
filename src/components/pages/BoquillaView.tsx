@@ -240,7 +240,7 @@ const BoquillaView = memo(function BoquillaView({
 							</span>
 						)}
 						{!hasAnyPlan && (
-							<span className="text-yellow-400 ml-2">
+							<span className="text-[#8B6914] ml-2">
 								· Calculá el plan para ver los datos
 							</span>
 						)}
@@ -362,17 +362,17 @@ const BoquillaView = memo(function BoquillaView({
 										key={ti}
 										className="flex items-start gap-3 px-3 py-2 rounded border border-white/5 bg-black/10"
 									>
-										<span className="text-[0.65rem] font-bold text-oro min-w-[40px]">
+										<span className="text-[0.65rem] font-bold text-[#1a1a1a] min-w-[40px]">
 											{nombre}
 										</span>
 										<div className="flex flex-col gap-1 f1">
 											{dentro.length > 0 && (
 												<div className="text-[0.65rem]">
-													<span className="text-green-400 font-bold">DENTRO:</span>{" "}
+													<span className="text-[#1a1a1a] font-bold">DENTRO:</span>{" "}
 													{dentro.map((x) => (
 														<span
 															key={x.ri}
-															className={`ml-1 ${x.cell!.inferred ? "text-green-300/60 italic" : "text-green-300"}`}
+															className={`ml-1 ${x.cell!.inferred ? "text-[#1a1a1a]/50 italic" : "text-[#1a1a1a]"}`}
 														>
 															{x.row.name}
 															{x.cell!.inferred && " (inf)"}
@@ -382,11 +382,11 @@ const BoquillaView = memo(function BoquillaView({
 											)}
 											{fuera.length > 0 && (
 												<div className="text-[0.65rem]">
-													<span className="text-yellow-400 font-bold">FUERA:</span>{" "}
+													<span className="text-[#1a1a1a] font-bold">FUERA:</span>{" "}
 													{fuera.map((x) => (
 														<span
 															key={x.ri}
-															className={`ml-1 ${x.cell!.inferred ? "text-yellow-300/60 italic" : "text-yellow-300"}`}
+															className={`ml-1 ${x.cell!.inferred ? "text-[#1a1a1a]/50 italic" : "text-[#1a1a1a]"}`}
 														>
 															{x.row.name}
 															{x.cell!.inferred && " (inf)"}
@@ -395,13 +395,13 @@ const BoquillaView = memo(function BoquillaView({
 												</div>
 											)}
 											{dentro.length === 0 && fuera.length === 0 && (
-												<div className="text-[0.65rem] text-[var(--border)]">
+												<div className="text-[0.65rem] text-[#1a1a1a]/60">
 													Sin boquilleros en este tramo
 												</div>
 											)}
 											{fuera.length > 1 && (
-												<div className="text-[0.65rem] text-red-500 font-bold">
-													 COINCIDENCIA FUERA: {fuera.length} boquillas
+												<div className="text-[0.65rem] text-[#8B1A1A] font-bold">
+													 ⚠ COINCIDENCIA FUERA: {fuera.length} boquillas
 												</div>
 											)}
 										</div>
@@ -414,17 +414,17 @@ const BoquillaView = memo(function BoquillaView({
 
 				{/* Alerta de coincidencias FUERA */}
 				{maxFuera > 1 && (
-					<div className="mt-3 p-3 bg-[rgba(239,68,68,0.15)] border border-red-800/30 rounded-xl">
-						<div className="text-[0.7rem] text-red-300">
+					<div className="mt-3 p-3 bg-[rgba(139,26,26,0.1)] border border-[#8B1A1A]/30 rounded-xl">
+						<div className="text-[0.7rem] text-[#1a1a1a]">
 							<strong>⚠ Coincidencias FUERA detectadas:</strong> más de un boquillero está{" "}
 							<strong>fuera</strong> al mismo tiempo en estos tramos:
 						</div>
 						{coincidencias
 							.filter((c) => c.fuera.length > 1)
 							.map((c) => (
-								<div key={c.tramoNum} className="text-[0.65rem] text-red-300 mt-1 ml-2">
+								<div key={c.tramoNum} className="text-[0.65rem] text-[#1a1a1a] mt-1 ml-2">
 									<strong>{c.tramoNombre}:</strong>{" "}
-									<span className="text-red-400 font-bold">
+									<span className="text-[#8B1A1A] font-bold">
 										FUERA: {c.fuera.map((ri) => rows[ri].name).join(", ")}
 									</span>
 								</div>
