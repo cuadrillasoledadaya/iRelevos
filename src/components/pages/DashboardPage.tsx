@@ -45,11 +45,11 @@ export default function DashboardPage() {
 	return (
 		<div className="flex flex-col gap-6 p-4 animate-in fade-in duration-500">
 			{/* Bienvenida */}
-			<div className="flex flex-col gap-1">
-				<h1 className="text-3xl font-black cinzel text-[var(--oro)]">
+			<div className="flex flex-col gap-1 items-center">
+				<h1 className="text-3xl font-black cinzel text-[#1a1a1a] text-center" style={{ textShadow: "0 2px 4px rgba(0,0,0,0.15)" }}>
 					¡Hola, {profile?.nombre || "Costalero"}!
 				</h1>
-				<p className="text-[var(--cre-o)] text-sm uppercase tracking-widest font-bold">
+				<p className="text-[var(--cre-o)] text-sm uppercase tracking-widest font-bold text-center">
 					Bienvenido al centro de mando
 				</p>
 			</div>
