@@ -36,8 +36,8 @@ export default function LoginPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--bg)] p-4">
       <div className="w-full max-w-sm p-8 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-xl">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-black cinzel text-[var(--oro)]">RELEVOS</h1>
-          <p className="text-[var(--cre-o)] text-sm uppercase tracking-[0.3em] mt-1">Costaleros v5</p>
+          <h1 className="text-4xl font-black cinzel text-[var(--oro)]">i-Relevos</h1>
+          <p className="text-[var(--cre-o)] text-sm uppercase tracking-[0.2em] mt-1 font-semibold">Gestión de Costaleros</p>
         </div>
         
         <form onSubmit={handleLogin} className="flex flex-col gap-6">
