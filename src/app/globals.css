@@ -1886,31 +1886,32 @@ body {
 	border-style: solid !important;
 	opacity: 0.75 !important;
 }
-.boquilla-view .pcell.boq-D {
+/* Override para modo claro - mayor especificidad que html.light .pcell.boq-D */
+html.light .boquilla-view .pcell.boq-D {
 	background: rgba(34, 197, 94, 0.25) !important;
 	border-color: rgba(34, 197, 94, 0.6) !important;
 	color: rgba(34, 197, 94, 0.9) !important;
 	box-shadow: 0 0 6px rgba(34, 197, 94, 0.3) !important;
 }
-.boquilla-view .pcell.boq-F {
+html.light .boquilla-view .pcell.boq-F {
 	background: rgba(234, 179, 8, 0.25) !important;
 	border-color: rgba(234, 179, 8, 0.6) !important;
 	color: rgba(234, 179, 8, 0.9) !important;
 	box-shadow: 0 0 6px rgba(234, 179, 8, 0.3) !important;
 }
 /* Solo advertencia cuando AMBOS están FUERA */
-.boquilla-view .pcell.boq-coincidence-fuera {
+html.light .boquilla-view .pcell.boq-coincidence-fuera {
 	background: rgba(239, 68, 68, 0.5) !important;
 	border-color: rgba(239, 68, 68, 0.9) !important;
 	color: rgba(255, 200, 200, 1) !important;
 	box-shadow: 0 0 12px rgba(239, 68, 68, 0.5) !important;
 	animation: boq-pulse-fuera 1.5s ease-in-out infinite;
 }
-.boquilla-view .pcell.inferred.boq-D {
+html.light .boquilla-view .pcell.inferred.boq-D {
 	background: rgba(34, 197, 94, 0.15) !important;
 	border-color: rgba(34, 197, 94, 0.4) !important;
 }
-.boquilla-view .pcell.inferred.boq-F {
+html.light .boquilla-view .pcell.inferred.boq-F {
 	background: rgba(234, 179, 8, 0.15) !important;
 	border-color: rgba(234, 179, 8, 0.4) !important;
 }
