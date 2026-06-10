@@ -222,19 +222,25 @@ export default function ConfigPage() {
 				{S.planes.length === 0 ? (
 					<p className="sm tcre-o mb3">No hay planes de relevos.</p>
 				) : (
-					<div className="fc gap-2 mb3">
+					<div className="fc gap-3 mb3">
 						{S.planes.map((plan: PlanRelevo) => (
 							<div
 								key={plan.id}
-								className={`flex jb aic g2 border-b pb-2 ${
+								className={`flex jb aic g2 p-3 rounded-xl border transition-all ${
 									editingPlanId === plan.id
-										? "border-[var(--oro)]/40 bg-[var(--oro)]/5 rounded px-2 py-1"
-										: "border-white/5"
+										? "border-[var(--oro)]/60 bg-[var(--oro)]/8 shadow-[0_0_12px_rgba(201,168,76,0.15)]"
+										: "border-[var(--oro)]/15 bg-[var(--card)]/60 hover:border-[var(--oro)]/30 hover:bg-[var(--oro)]/4"
 								}`}
+								style={{
+									boxShadow:
+										editingPlanId === plan.id
+											? "0 0 12px rgba(201,168,76,0.15)"
+											: "0 1px 3px rgba(0,0,0,0.2)",
+								}}
 							>
-								<div className="fc f1">
+								<div className="fc f1 gap-0.5">
 									<span
-										className="font-bold text-[var(--cre)]"
+										className="font-bold text-[var(--cre)] text-sm cinzel"
 										style={{ cursor: "pointer" }}
 										onClick={() => startEditPlan(plan)}
 										title="Click para editar"
@@ -247,7 +253,7 @@ export default function ConfigPage() {
 										{plan.tramos.length > 4 ? "…" : ""}
 									</span>
 								</div>
-								<div className="flex g1">
+								<div className="flex g1 shrink-0">
 									<button
 										className="btn btn-ghost btn-sm"
 										onClick={() => startEditPlan(plan)}
