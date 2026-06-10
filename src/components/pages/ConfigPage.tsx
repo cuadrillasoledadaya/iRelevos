@@ -110,11 +110,13 @@ export default function ConfigPage() {
 	}
 
 	function toggleTramoEnPlan(nombre: string) {
-		setSelectedTramos((prev) =>
-			prev.includes(nombre)
-				? prev.filter((t) => t !== nombre)
-				: [...prev, nombre],
-		);
+		setSelectedTramos((prev) => {
+			const exists = prev.some((t) => t.toLowerCase() === nombre.toLowerCase());
+			if (exists) {
+				return prev.filter((t) => t.toLowerCase() !== nombre.toLowerCase());
+			}
+			return [...prev, nombre];
+		});
 	}
 
 	function moveSelectedTramo(index: number, direction: number) {
@@ -310,7 +312,9 @@ export default function ConfigPage() {
 						</div>
 						<div className="flex flex-wrap gap-2">
 							{S.banco.map((nombre: string) => {
-								const isSelected = selectedTramos.includes(nombre);
+								const isSelected = selectedTramos.some(
+									(t) => t.toLowerCase() === nombre.toLowerCase(),
+								);
 								return (
 									<button
 										key={nombre}
