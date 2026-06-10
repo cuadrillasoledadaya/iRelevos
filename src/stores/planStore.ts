@@ -44,6 +44,7 @@ export interface PlanStore {
 	resetTodo: () => void;
 	addPlan: (nombre: string, tramos?: string[]) => void;
 	updatePlan: (id: string, nombre: string) => void;
+	updatePlanTramos: (id: string, tramos: string[]) => void;
 	delPlan: (id: string) => void;
 	cargarPlanEnTrabajadera: (tid: number, planId: string) => void;
 	aplicarSugerenciaLatente: (tid: number) => boolean;
@@ -263,6 +264,14 @@ export const planStore = create<PlanStore>()(() => ({
 				if (!d.planes) d.planes = [];
 				const plan = d.planes.find((p) => p.id === id);
 				if (plan) plan.nombre = nombre;
+			});
+		},
+
+		updatePlanTramos: (id, tramos) => {
+			_mutar((d) => {
+				if (!d.planes) d.planes = [];
+				const plan = d.planes.find((p) => p.id === id);
+				if (plan) plan.tramos = [...tramos];
 			});
 		},
 

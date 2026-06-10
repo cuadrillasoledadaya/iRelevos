@@ -112,6 +112,7 @@ export interface PlanActions {
   confirmarSwap: (ws: SwapState) => void
   addPlan: (nombre: string, tramos?: string[]) => void
   updatePlan: (id: string, nombre: string) => void
+  updatePlanTramos: (id: string, tramos: string[]) => void
   delPlan: (id: string) => void
   cargarPlanEnTrabajadera: (tid: number, planId: string) => void
   limpiarPlanificacion: () => void

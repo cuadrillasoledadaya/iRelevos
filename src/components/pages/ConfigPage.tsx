@@ -26,6 +26,7 @@ export default function ConfigPage() {
 	const vaciarCenso = projectStore.getState().vaciarCenso;
 	const addPlan = planStore.getState().addPlan;
 	const updatePlan = planStore.getState().updatePlan;
+	const updatePlanTramos = planStore.getState().updatePlanTramos;
 	const delPlan = planStore.getState().delPlan;
 	const [bancoInp, setBancoInp] = useState("");
 	const [newPlanName, setNewPlanName] = useState("");
@@ -33,6 +34,7 @@ export default function ConfigPage() {
 	const [editingBancoIdx, setEditingBancoIdx] = useState<number | null>(null);
 	const [editingBancoVal, setEditingBancoVal] = useState("");
 	const [dragIdx, setDragIdx] = useState<number | null>(null);
+	const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
 
 	function handleAddBanco() {
 		const val = bancoInp.trim();
@@ -82,6 +84,29 @@ export default function ConfigPage() {
 		addPlan(name, [...selectedTramos]);
 		setNewPlanName("");
 		setSelectedTramos([]);
+	}
+
+	function handleSavePlan() {
+		if (!editingPlanId) return;
+		const name = newPlanName.trim();
+		if (!name || selectedTramos.length === 0) return;
+		updatePlan(editingPlanId, name);
+		updatePlanTramos(editingPlanId, [...selectedTramos]);
+		setEditingPlanId(null);
+		setNewPlanName("");
+		setSelectedTramos([]);
+	}
+
+	function handleCancelEditPlan() {
+		setEditingPlanId(null);
+		setNewPlanName("");
+		setSelectedTramos([]);
+	}
+
+	function startEditPlan(plan: PlanRelevo) {
+		setEditingPlanId(plan.id);
+		setNewPlanName(plan.nombre);
+		setSelectedTramos([...plan.tramos]);
 	}
 
 	function toggleTramoEnPlan(nombre: string) {
@@ -201,37 +226,66 @@ export default function ConfigPage() {
 						{S.planes.map((plan: PlanRelevo) => (
 							<div
 								key={plan.id}
-								className="flex jb aic g2 border-b border-white/5 pb-2"
+								className={`flex jb aic g2 border-b pb-2 ${
+									editingPlanId === plan.id
+										? "border-[var(--oro)]/40 bg-[var(--oro)]/5 rounded px-2 py-1"
+										: "border-white/5"
+								}`}
 							>
 								<div className="fc f1">
-									<input
-										className="inp f1 sm"
-										value={plan.nombre}
-										onChange={(e) => updatePlan(plan.id, e.target.value)}
-										placeholder="Nombre del plan"
-										style={{ fontWeight: "bold" }}
-									/>
+									<span
+										className="font-bold text-[var(--cre)]"
+										style={{ cursor: "pointer" }}
+										onClick={() => startEditPlan(plan)}
+										title="Click para editar"
+									>
+										{plan.nombre}
+									</span>
 									<span className="xs tcre-o">
 										{plan.tramos.length} tramos:{" "}
 										{plan.tramos.slice(0, 4).join(", ")}
 										{plan.tramos.length > 4 ? "…" : ""}
 									</span>
 								</div>
-								<button
-									className="btn btn-ghost btn-sm"
-									onClick={() => {
-										if (confirm('¿Eliminar el plan "' + plan.nombre + '"?'))
-											delPlan(plan.id);
-									}}
-								>
-									✕
-								</button>
+								<div className="flex g1">
+									<button
+										className="btn btn-ghost btn-sm"
+										onClick={() => startEditPlan(plan)}
+										title="Editar plan"
+									>
+										✏️
+									</button>
+									<button
+										className="btn btn-ghost btn-sm"
+										onClick={() => {
+											if (confirm('¿Eliminar el plan "' + plan.nombre + '"?'))
+												delPlan(plan.id);
+										}}
+									>
+										✕
+									</button>
+								</div>
 							</div>
 						))}
 					</div>
 				)}
 
 				<div className="fc gap-3">
+					{/* Header del form */}
+					<div className="flex jb aic">
+						<span className="xs toro-o cinzel uppercase" style={{ letterSpacing: ".05em" }}>
+							{editingPlanId ? "✏️ Editando plan" : "➕ Nuevo plan"}
+						</span>
+						{editingPlanId && (
+							<button
+								className="btn btn-ghost btn-xs text-red-400"
+								onClick={handleCancelEditPlan}
+							>
+								Cancelar
+							</button>
+						)}
+					</div>
+
 					<input
 						className="inp f1"
 						placeholder="Nombre del plan…"
@@ -312,11 +366,15 @@ export default function ConfigPage() {
 					)}
 
 					<button
-						className="btn btn-out btn-sm"
-						onClick={handleAddPlan}
+						className={`btn btn-sm w-full ${
+							editingPlanId
+								? "btn-oro"
+								: "btn-out"
+						}`}
+						onClick={editingPlanId ? handleSavePlan : handleAddPlan}
 						disabled={!newPlanName.trim() || selectedTramos.length === 0}
 					>
-						+ Crear plan
+						{editingPlanId ? "💾 Guardar cambios" : "+ Crear plan"}
 					</button>
 				</div>
 			</div>
