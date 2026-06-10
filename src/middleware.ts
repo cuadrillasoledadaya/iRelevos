@@ -41,6 +41,11 @@ function getSupabaseAuthToken(request: NextRequest): string | undefined {
 }
 
 export function middleware(request: NextRequest) {
+  // TEMPORARY DISABLED: Middleware auth check is incompatible with LocalStorage session.
+  // Re-enable once @supabase/ssr is integrated for cookie-based auth.
+  return NextResponse.next()
+
+  /* 
   const { pathname } = request.nextUrl
 
   // Pass through static assets and API routes without auth check
@@ -71,6 +76,7 @@ export function middleware(request: NextRequest) {
 
   // All other routes: pass through
   return NextResponse.next()
+  */
 }
 
 export const config = {
