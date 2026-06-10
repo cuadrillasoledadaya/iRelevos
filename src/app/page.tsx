@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { uiStore } from "@/stores";
 import AppHeader from "@/components/layout/AppHeader";
 import BottomNav from "@/components/layout/BottomNav";
@@ -56,9 +58,28 @@ const CensusSheet = dynamic(() => import("@/components/sheets/CensusSheet"), {
 });
 
 export default function Home() {
+	const router = useRouter();
 	const activePage = uiStore((s) => s.activePage);
 	const activeSheet = uiStore((s) => s.activeSheet);
-	const { profile } = useAuth();
+	const { profile, session, loading } = useAuth();
+
+	// Client-side guard: redirect to login if no session
+	useEffect(() => {
+		if (!loading && !session) {
+			router.push("/login");
+		}
+	}, [loading, session, router]);
+
+	// Show nothing while checking auth
+	if (loading || !session) {
+		return (
+			<div className="flex items-center justify-center min-h-screen bg-[var(--bg)]">
+				<p className="text-[var(--oro)] cinzel text-xl animate-pulse">
+					Cargando...
+				</p>
+			</div>
+		);
+	}
 
 	const esMando =
 		profile?.role === "superadmin" ||
