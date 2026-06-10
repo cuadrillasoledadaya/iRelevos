@@ -7,8 +7,6 @@ import BottomNav from "@/components/layout/BottomNav";
 import DashboardPage from "@/components/pages/DashboardPage";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 
 const ConfigPage = dynamic(() => import("@/components/pages/ConfigPage"), {
 	ssr: false,
@@ -60,24 +58,7 @@ const CensusSheet = dynamic(() => import("@/components/sheets/CensusSheet"), {
 export default function Home() {
 	const activePage = uiStore((s) => s.activePage);
 	const activeSheet = uiStore((s) => s.activeSheet);
-	const { session, loading, profile } = useAuth();
-	const router = useRouter();
-
-	useEffect(() => {
-		if (!loading && !session) {
-			router.push("/login");
-		}
-	}, [session, loading, router]);
-
-	if (loading || !session) {
-		return (
-			<div className="flex items-center justify-center min-h-screen bg-[var(--bg)]">
-				<div className="text-[var(--oro)] cinzel text-xl animate-pulse">
-					Iniciando sesión...
-				</div>
-			</div>
-		);
-	}
+	const { profile } = useAuth();
 
 	const esMando =
 		profile?.role === "superadmin" ||
