@@ -77,7 +77,7 @@ const BoquillaView = memo(function BoquillaView({
 		isDentro: boolean;
 		isFuera: boolean;
 		planSlot: TramoSlot | null;
-		v: "L" | "D" | "F" | "LF";
+		v: "L" | "D" | "F" | "LF" | "LS";
 		cls: string;
 		exists: boolean; // true si este tramo existe en la trabajadera del boquilla
 		inferred: boolean; // true si el estado fue inferido por continuidad
@@ -117,7 +117,7 @@ const BoquillaView = memo(function BoquillaView({
 					isAutoF = (v === "L" || v === "LF") && planSlot.fuera.includes(bq.ci);
 				}
 
-				const isDentro = v === "D" || (v === "L" && isAutoD);
+				const isDentro = v === "D" || v === "LS" || (v === "L" && isAutoD);
 				const isFuera = v === "F" || (v === "L" && isAutoF);
 
 				const clsMap: Record<string, string> = {
@@ -125,6 +125,7 @@ const BoquillaView = memo(function BoquillaView({
 					D: "D",
 					F: "F",
 					LF: isAutoF ? "f" : "LF",
+					LS: "LS",
 				};
 
 				// Actualizar lastState con el estado real
