@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -11,24 +10,41 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null)
   const router = useRouter()
+
+  const isRateLimited = remainingAttempts === 0
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: password,
-    })
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      })
 
-    if (error) {
-      setError(`Error: ${error.message}`)
-      setLoading(false)
-    } else {
+      const data = await res.json()
+
+      if (data.remaining !== undefined) {
+        setRemainingAttempts(data.remaining)
+      }
+
+      if (!res.ok) {
+        setError(data.error ?? 'Error desconocido')
+        return
+      }
+
+      // Success — session cookie is set by Supabase via the API route
       router.push('/')
       router.refresh()
+    } catch {
+      setError('Ocurrió un error. Intentá de nuevo.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -51,6 +67,7 @@ export default function LoginPage() {
               placeholder="tu@email.com"
               value={email} 
               onChange={e => setEmail(e.target.value)} 
+              disabled={isRateLimited}
             />
           </div>
           
@@ -65,21 +82,37 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={password} 
                 onChange={e => setPassword(e.target.value)} 
+                disabled={isRateLimited}
               />
               <button
                 type="button"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-xl opacity-50 hover:opacity-100 transition-opacity"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={isRateLimited}
               >
                 {showPassword ? '🙈' : '👁️'}
               </button>
             </div>
           </div>
 
-          {error && <div className="text-red-500 text-sm bg-red-500/10 p-3 border border-red-500/20 rounded text-center">{error}</div>}
+          {remainingAttempts !== null && remainingAttempts > 0 && (
+            <p className="text-xs text-yellow-600 text-center">
+              Intentos restantes: {remainingAttempts}
+            </p>
+          )}
 
-          <button disabled={loading} className="btn btn-oro w-full h-14 text-xl cinzel font-black tracking-widest">
-            {loading ? 'ACCEDIENDO...' : 'ENTRAR'}
+          {isRateLimited && (
+            <div className="text-red-500 text-sm bg-red-500/10 p-3 border border-red-500/20 rounded text-center">
+              Demasiados intentos. Esperá unos minutos.
+            </div>
+          )}
+
+          {error && !isRateLimited && (
+            <div className="text-red-500 text-sm bg-red-500/10 p-3 border border-red-500/20 rounded text-center">{error}</div>
+          )}
+
+          <button disabled={loading || isRateLimited} className="btn btn-oro w-full h-14 text-xl cinzel font-black tracking-widest">
+            {loading ? 'ACCEDIENDO...' : isRateLimited ? 'BLOQUEADO' : 'ENTRAR'}
           </button>
         </form>
 

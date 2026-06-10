@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { mapRegisterError } from '@/lib/errorMap'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -66,7 +67,10 @@ export default function RegisterPage() {
       router.push('/')
       router.refresh()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error desconocido')
+      const rawMessage = err instanceof Error ? err.message : 'Error desconocido'
+      // Log original error server-side context (client-side for now, server-side later)
+      console.error('[register] Auth error:', rawMessage)
+      setError(mapRegisterError(rawMessage))
     } finally {
       setLoading(false)
     }
