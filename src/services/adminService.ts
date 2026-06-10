@@ -5,6 +5,7 @@
 import { supabase } from "@/lib/supabase";
 import type { Trabajadera, RolCode } from "@/lib/types";
 import type { UserRole } from "@/hooks/useAuth";
+import { defaultRoles } from "@/lib/roles";
 import type {
 	CensusEntry,
 	ImportEntry,
@@ -339,11 +340,17 @@ export async function syncTodoCenso(
 		}[];
 	};
 
-	// Reset nombres to placeholders
+	// Reset nombres to placeholders AND roles to defaults (clean slate)
 	content.trabajaderas.forEach((t) => {
-		t.nombres = Array(6)
+		const n = Math.max(t.nombres.length, 6);
+		t.nombres = Array(n)
 			.fill("")
 			.map((_, i) => `Costalero ${i + 1}`);
+		// Reset roles to defaults for this trabajadera — prevents stale role contamination
+		t.roles = defaultRoles(n, t.id);
+		// Reset puntuaciones and boquilla
+		t.puntuaciones = {};
+		t.boquilla = {};
 	});
 
 	// Group by trabajadera
@@ -362,15 +369,6 @@ export async function syncTodoCenso(
 		const tid = parseInt(tidStr);
 		const trab = content.trabajaderas.find((t) => t.id === tid);
 		if (!trab) return;
-
-		if (!trab.roles) trab.roles = [];
-		while (trab.roles.length < trab.nombres.length) {
-			trab.roles.push({ pri: "COR", sec: "FIJ_I" });
-		}
-
-		// Initialize puntuaciones and boquilla for this trabajadera
-		if (!trab.puntuaciones) trab.puntuaciones = {};
-		if (!trab.boquilla) trab.boquilla = {};
 
 		const esPrimero = tid === 1 || tid === 7;
 

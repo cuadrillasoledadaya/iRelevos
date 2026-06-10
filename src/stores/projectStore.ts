@@ -10,6 +10,7 @@ import type { DatosPerfil, PasoDB } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { datosVacios } from "@/lib/algoritmos";
 import { deriveFromPasos } from "./helpers";
+import { defaultRoles } from "@/lib/roles";
 
 let getActiveTemporadaId = () => "";
 
@@ -170,20 +171,54 @@ export const createProjectStore = () =>
 				},
 
 				vaciarCenso: async () => {
-					const { pid } = get();
+					const { pid, pasos } = get();
 					if (!pid) return;
 
-					const { error } = await supabase
+					// 1. Delete census entries for this project
+					const { error: censusErr } = await supabase
 						.from("census")
 						.delete()
 						.eq("proyecto_id", pid);
 
-					if (error) {
-						console.error("Error al vaciar censo:", error.message);
-						alert("Error al vaciar el censo: " + error.message);
-					} else {
-						alert("Censo vaciado correctamente.");
+					if (censusErr) {
+						console.error("Error al vaciar censo:", censusErr.message);
+						alert("Error al vaciar el censo: " + censusErr.message);
+						return;
 					}
+
+					// 2. Reset project content to clean state (remove stale names/roles)
+					const paso = pasos.find((p) => p.id === pid);
+					if (paso) {
+						const cleanContent = {
+							...paso.content,
+							trabajaderas: paso.content.trabajaderas.map((t: { id: number }) => ({
+								...t,
+								nombres: ["Costalero 1", "Costalero 2", "Costalero 3", "Costalero 4", "Costalero 5", "Costalero 6"],
+								roles: defaultRoles(6, t.id),
+								plan: null,
+								obj: {},
+								analisis: null,
+								pinned: null,
+								bajas: [],
+								puntuaciones: {},
+								boquilla: {},
+							})),
+						};
+
+						const { error: updateErr } = await supabase
+							.from("proyectos")
+							.update({ content: cleanContent })
+							.eq("id", pid);
+
+						if (updateErr) {
+							console.error("Error al resetear content:", updateErr.message);
+						}
+					}
+
+					// 3. Refetch to update local state
+					await get().refetchPasos();
+
+					alert("Censo vaciado y cuadrilla reseteada correctamente.");
 				},
 			}),
 			{
