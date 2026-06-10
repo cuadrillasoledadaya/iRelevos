@@ -448,15 +448,21 @@ export function useAdminMutations(
 				throw new Error(result.error);
 			}
 
-			await syncTodoCenso(forms.importPid);
-			await projectStore.getState().refetchPasos();
-			forms.setImportPreview(null);
-			alert(
-				`✅ Sincronización completa (full sync):\n` +
-					`- ${result.data?.deleted ?? "?"} registros eliminados del censo local\n` +
-					`- ${result.data?.inserted ?? "?"} costaleros importados desde iCuadrilla\n` +
-					`- Cuadrilla sincronizada.`,
-			);
+		await syncTodoCenso(forms.importPid);
+		await projectStore.getState().refetchPasos();
+
+		const importedCount = forms.importPreview
+			? forms.importPreview.filter((c) => c.selected).length
+			: result.data?.inserted ?? "?";
+
+		forms.setImportPreview(null);
+
+		alert(
+			`✅ Sincronización completa (full sync):\n` +
+				`- ${result.data?.deleted ?? 0} registros eliminados del censo local\n` +
+				`- ${importedCount} costaleros importados desde iCuadrilla\n` +
+				`- Cuadrilla sincronizada.`,
+		);
 		} catch (err) {
 			// eslint-disable-next-line no-console
 			console.error(err);
