@@ -294,19 +294,15 @@ const rolesValidos = ["PAT_D", "PAT_I", "COS_D", "COS_I", "FIJ_D", "FIJ_I", "COR
 
 function mapRol(
 	rol: string | null | undefined,
-	esPrimero: boolean,
+	_esPrimero: boolean,
 	fallback: RolCode,
 ): RolCode {
+	// Validate and preserve the actual role from iCuadrilla.
+	// Do NOT filter by position type — the census stores what the person IS,
+	// not what position they fit in. Position compatibility is handled
+	// later during role assignment (asignarRolesTramo).
 	if (!rol || !rolesValidos.includes(rol)) return fallback;
-	const rolBase = rol.replace(/_?[DI]$/, "") as "PAT" | "COS" | "FIJ" | "COR";
-	if (esPrimero) {
-		return rolBase === "PAT" || rolBase === "FIJ" || rolBase === "COR"
-			? (rol as RolCode)
-			: "COR";
-	}
-	return rolBase === "COS" || rolBase === "FIJ" || rolBase === "COR"
-		? (rol as RolCode)
-		: "COR";
+	return rol as RolCode;
 }
 
 export async function syncTodoCenso(
