@@ -94,7 +94,7 @@ export default function AppHeader() {
 				title="Cerrar Sesión"
 				onClick={signOut}
 			>
-				🚪
+				⏻
 			</button>
 		</header>
 	);
