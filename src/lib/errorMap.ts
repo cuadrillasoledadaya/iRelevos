@@ -32,7 +32,7 @@ export function mapAuthError(message: string): string {
 /**
  * Generic error message for registration — never reveals details.
  */
-export function mapRegisterError(_message: string): string {
+export function mapRegisterError(): string {
   // Registration errors never reveal specifics (duplicate email, weak password, etc.)
   return 'Ocurrió un error. Intentá de nuevo.'
 }

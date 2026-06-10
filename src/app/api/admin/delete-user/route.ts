@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabaseAdmin'
 import { rateLimit } from '@/lib/rateLimit'
 import { withCors, handleCorsPreflight } from '@/lib/cors'

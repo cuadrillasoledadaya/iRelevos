@@ -69,18 +69,7 @@ describe('mapAuthError', () => {
 })
 
 describe('mapRegisterError', () => {
-  it('always returns generic message regardless of error', () => {
-    expect(mapRegisterError('User already registered')).toBe(
-      'Ocurrió un error. Intentá de nuevo.',
-    )
-    expect(mapRegisterError('Password is too weak')).toBe(
-      'Ocurrió un error. Intentá de nuevo.',
-    )
-    expect(mapRegisterError('Email already exists')).toBe(
-      'Ocurrió un error. Intentá de nuevo.',
-    )
-    expect(mapRegisterError('Any error message')).toBe(
-      'Ocurrió un error. Intentá de nuevo.',
-    )
+  it('always returns generic message', () => {
+    expect(mapRegisterError()).toBe('Ocurrió un error. Intentá de nuevo.')
   })
 })

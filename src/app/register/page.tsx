@@ -70,7 +70,7 @@ export default function RegisterPage() {
       const rawMessage = err instanceof Error ? err.message : 'Error desconocido'
       // Log original error server-side context (client-side for now, server-side later)
       console.error('[register] Auth error:', rawMessage)
-      setError(mapRegisterError(rawMessage))
+      setError(mapRegisterError())
     } finally {
       setLoading(false)
     }

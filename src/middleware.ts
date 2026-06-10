@@ -31,8 +31,9 @@ export function isStaticAsset(pathname: string): boolean {
  * We search for any cookie matching that pattern.
  */
 function getSupabaseAuthToken(request: NextRequest): string | undefined {
-  for (const [name, cookie] of request.cookies) {
-    if (name.startsWith('sb-') && name.endsWith('-auth-token') && cookie.value) {
+  const cookies = request.cookies.getAll()
+  for (const cookie of cookies) {
+    if (cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token') && cookie.value) {
       return cookie.value
     }
   }
