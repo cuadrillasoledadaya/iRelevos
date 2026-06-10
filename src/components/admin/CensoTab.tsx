@@ -345,16 +345,16 @@ function ImportModal({
 
         <div className="bg-[var(--oro)]/10 p-6 border-b border-[var(--oro)]/20 flex justify-between items-center">
           <div>
-            <h3 className="text-[var(--oro)] cinzel text-xl font-bold flex items-center gap-3">
+            <h3 className="text-black cinzel text-xl font-bold flex items-center gap-3">
               <span className="text-2xl">📥</span> IMPORTAR DESDE ICUADRILLA
             </h3>
-            <p className="text-[var(--oro)]/60 text-[10px] uppercase tracking-widest font-black mt-1">
+            <p className="text-gray-600 text-[10px] uppercase tracking-widest font-black mt-1">
               {preview.filter(c => c._status === 'new').length} nuevos • {preview.filter(c => c._status === 'exists').length} a actualizar
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--oro)]/20 text-[var(--oro)] transition-colors"
+            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--oro)]/20 text-gray-700 transition-colors"
           >
             ✕
           </button>
@@ -362,7 +362,7 @@ function ImportModal({
 
         <div className="p-6 space-y-6 flex-1 overflow-y-auto">
           <div className="space-y-2">
-            <label className="text-[var(--oro)] text-[10px] uppercase font-black tracking-widest opacity-70">
+            <label className="text-gray-700 text-[10px] uppercase font-black tracking-widest">
               Asignar a Cuadrilla / Paso Destino:
             </label>
             <select
@@ -379,12 +379,12 @@ function ImportModal({
 
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <label className="text-[var(--oro)] text-[10px] uppercase font-black tracking-widest opacity-70">
+              <label className="text-gray-700 text-[10px] uppercase font-black tracking-widest">
                 Previsualización de datos:
               </label>
               <button
                 onClick={onToggleAllSelected}
-                className="text-[8px] text-[var(--oro)] uppercase font-bold border border-[var(--oro)]/30 px-2 py-1 rounded hover:bg-[var(--oro)]/10"
+                className="text-[10px] text-gray-700 uppercase font-bold border border-gray-400/50 px-2 py-1 rounded hover:bg-gray-200/50"
               >
                 {preview.every(c => c.selected) ? 'Deseleccionar todos' : 'Seleccionar todos'}
               </button>
@@ -392,7 +392,7 @@ function ImportModal({
 
             <div className="grid grid-cols-1 gap-2">
               {preview.length === 0 && (
-                <div className="text-center p-12 text-[var(--oro)]/40 italic cinzel">
+                <div className="text-center p-12 text-gray-500 italic cinzel">
                   No se encontraron costaleros.
                 </div>
               )}
@@ -409,29 +409,29 @@ function ImportModal({
                       className="w-5 h-5 accent-[var(--oro)] cursor-pointer"
                     />
                     <div className="flex flex-col">
-                      <span className={`font-bold text-base leading-tight transition-colors ${c.selected ? 'text-[var(--oro)]' : 'text-[var(--cre-o)]'}`}>
+                      <span className={`font-bold text-base leading-tight transition-colors ${c.selected ? 'text-gray-900' : 'text-gray-500'}`}>
                         {c.nombre} {c.apellidos}
                       </span>
-                      <span className="text-[var(--oro)] text-[10px] font-mono opacity-60">
+                      <span className="text-gray-500 text-[10px] font-mono">
                         {c.email || 'Sin email'}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {c.trabajadera && (
-                      <div className="flex flex-col items-center justify-center bg-[var(--oro)]/10 px-3 py-1 rounded-lg border border-[var(--oro)]/20">
-                        <span className="text-[8px] text-[var(--oro)] uppercase font-black">Trab</span>
-                        <span className="text-sm font-black text-[var(--oro)]">T{c.trabajadera}</span>
-                      </div>
-                    )}
-                    <span className={`text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-wider ${
-                      c._status === 'new'
-                        ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/20'
-                        : 'bg-amber-500/20 text-amber-600 border border-amber-500/20'
-                    }`}>
-                      {c._status === 'new' ? 'NUEVO' : 'EXISTE'}
-                    </span>
+                      {c.trabajadera && (
+                        <div className="flex flex-col items-center justify-center bg-gray-100 px-3 py-1 rounded-lg border border-gray-300">
+                          <span className="text-[8px] text-gray-600 uppercase font-black">Trab</span>
+                          <span className="text-sm font-black text-gray-900">T{c.trabajadera}</span>
+                        </div>
+                      )}
+                      <span className={`text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-wider ${
+                        c._status === 'new'
+                          ? 'bg-emerald-500/20 text-emerald-700 border border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-700 border border-amber-500/30'
+                      }`}>
+                        {c._status === 'new' ? 'NUEVO' : 'EXISTE'}
+                      </span>
                   </div>
                 </div>
               ))}
@@ -455,8 +455,8 @@ function ImportModal({
             )}
           </button>
           {!importPid && (
-            <p className="text-center text-[var(--oro)] text-[10px] mt-3 font-bold uppercase animate-pulse">
-              ⚠️ Seleccioná un paso para habilitar la importación
+            <p className="text-center text-gray-600 text-[10px] mt-3 font-bold uppercase">
+              ️               ️ Seleccioná un paso para habilitar la importación
             </p>
           )}
         </div>
