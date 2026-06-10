@@ -11,7 +11,9 @@ export type RolCode =
   | 'FIJ_D'
   | 'FIJ_I'
   | 'COR'
-export type PinState = 'L' | 'D' | 'F' | 'LF'
+export type PinState = 'L' | 'D' | 'F' | 'LF' | 'LS'
+// LS = Latent Sugerido: fijado sugerido por el sistema (top 3 en tramos clave),
+// visible con estilo especial, respetado por el algoritmo como inmutable.
 
 export interface Rol {
   pri: RolCode

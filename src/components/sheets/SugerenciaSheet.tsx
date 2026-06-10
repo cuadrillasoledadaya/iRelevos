@@ -1,6 +1,6 @@
 "use client";
 
-import { uiStore, projectStore, trabajaderaStore } from "@/stores";
+import { uiStore, projectStore, trabajaderaStore, planStore } from "@/stores";
 import { tramosOptimos } from "@/lib/algoritmos";
 import type { Trabajadera } from "@/lib/types";
 
@@ -10,6 +10,7 @@ export default function SugerenciaSheet() {
 	const closeSheet = uiStore.getState().closeSheet;
 	const bancoTarget = uiStore((s) => s.bancoTarget);
 	const sugerirTramos = trabajaderaStore.getState().sugerirTramos;
+	const aplicarLatente = planStore.getState().aplicarSugerenciaLatente;
 	const isOpen = activeSheet === "sugerencia";
 
 	if (!bancoTarget) {
@@ -41,8 +42,10 @@ export default function SugerenciaSheet() {
 	}
 
 	function aplicar(nTramos: number, sal: number) {
-		// Actualizar salidas y tramos
+		// 1. Actualizar salidas y tramos
 		sugerirTramos(tid, sal);
+		// 2. Marcar top 3 con pins LS en tramos clave+último
+		aplicarLatente(tid);
 		closeSheet();
 	}
 

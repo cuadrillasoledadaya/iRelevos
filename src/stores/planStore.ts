@@ -12,6 +12,7 @@ import {
 	validarPinned,
 	aplicarIntercambio,
 	aplicarTodasLasCorrecciones,
+	aplicarSugerenciaLatente,
 } from "@/lib/algoritmos";
 import { ordenarDentroFisico } from "@/lib/roles";
 import type {
@@ -45,6 +46,7 @@ export interface PlanStore {
 	updatePlan: (id: string, nombre: string) => void;
 	delPlan: (id: string) => void;
 	cargarPlanEnTrabajadera: (tid: number, planId: string) => void;
+	aplicarSugerenciaLatente: (tid: number) => boolean;
 }
 
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void;
@@ -173,6 +175,15 @@ export const planStore = create<PlanStore>()(() => ({
 				// NO fijar pinned automáticamente — solo se respetan los que el
 				// usuario marcó a mano. El sistema debe poder re-asignar libremente.
 			});
+		},
+
+		aplicarSugerenciaLatente: (tid) => {
+			let result = false;
+			_mutar((d) => {
+				const t = _getTrab(d, tid);
+				result = aplicarSugerenciaLatente(t);
+			});
+			return result;
 		},
 
 		limpiarPlanificacion: () => {

@@ -347,6 +347,13 @@ html.light .pcell.F {
 html.light .pcell.LF {
 	color: #7a5500;
 }
+html.light .pcell.LS {
+	background: rgba(201, 168, 76, 0.15) !important;
+	border-color: rgba(201, 168, 76, 0.7) !important;
+	color: rgba(180, 140, 50, 0.9) !important;
+	box-shadow: 0 0 10px rgba(201, 168, 76, 0.3) !important;
+	animation: ls-pulse 2s ease-in-out infinite;
+}
 html.light .pcell.d {
 	color: rgba(26, 92, 42, 0.6);
 }
@@ -1687,6 +1694,11 @@ body {
 	background: rgba(139, 26, 26, 0.6);
 	border: 1px solid rgba(192, 57, 43, 0.6);
 }
+.leg-dot.LS {
+	background: rgba(201, 168, 76, 0.5);
+	border: 1px solid rgba(201, 168, 76, 0.7);
+	box-shadow: 0 0 4px rgba(201, 168, 76, 0.3);
+}
 .plan-scroll {
 	overflow-x: auto;
 	-webkit-overflow-scrolling: touch;
@@ -1788,6 +1800,18 @@ body {
 	border-color: rgba(230, 140, 20, 0.65);
 	color: var(--warn-oro);
 	box-shadow: 0 0 7px rgba(230, 140, 20, 0.25);
+}
+/* LS = Latent Sugerido: top 3 costaleros en tramos clave — brillo dorado pulsante */
+.pcell.LS {
+	background: rgba(201, 168, 76, 0.25);
+	border-color: rgba(201, 168, 76, 0.8);
+	color: var(--oro);
+	box-shadow: 0 0 12px rgba(201, 168, 76, 0.4);
+	animation: ls-pulse 2s ease-in-out infinite;
+}
+@keyframes ls-pulse {
+	0%, 100% { box-shadow: 0 0 8px rgba(201, 168, 76, 0.3); }
+	50% { box-shadow: 0 0 18px rgba(201, 168, 76, 0.6); }
 }
 .pcell.sel {
 	outline: 3px solid var(--oro);

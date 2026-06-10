@@ -6,6 +6,52 @@ import type { Trabajadera } from "../types";
 import { getPinned } from "./pinned";
 
 /**
+ * Aplica pins LS (Latent Sugerido) a los top 3 costaleros con mayor puntuación
+ * en los tramos clave + último. Los pins LS son tratados como fijos DENTRO
+ * por el algoritmo, pero visualmente se distinguen de los pins D manuales.
+ *
+ * @returns true si se aplicaron pins, false si no hay costaleros con puntuación
+ */
+export function aplicarSugerenciaLatente(t: Trabajadera): boolean {
+	const top3 = t.nombres
+		.map((nombre, idx) => ({
+			nombre,
+			idx,
+			puntuacion: t.puntuaciones[nombre] || 0,
+		}))
+		.filter((x) => x.puntuacion > 0)
+		.sort((a, b) => b.puntuacion - a.puntuacion)
+		.slice(0, 3);
+
+	if (top3.length === 0) return false;
+
+	const ultimoIdx = t.tramos.length - 1;
+	const tramosClaves = t.tramosClaves || [];
+	const tramosObjetivo = Array.from(
+		new Set([...tramosClaves, ultimoIdx]),
+	).sort((a, b) => a - b);
+
+	if (tramosObjetivo.length === 0) return false;
+
+	const p = getPinned(t);
+
+	// Aplicar LS pins: top 3 → DENTRO en tramos objetivo
+	top3.forEach((c) => {
+		tramosObjetivo.forEach((ti) => {
+			if (p[ti]) {
+				const actual = p[ti][c.idx];
+				// No override pins manuales F/LF (fijos fuera)
+				if (actual === "F" || actual === "LF") return;
+				p[ti][c.idx] = "LS";
+			}
+		});
+	});
+
+	t.pinned = p;
+	return true;
+}
+
+/**
  * Detalle de la asignación que se aplicaría a un costalero del top3.
  * `tramosAplicar` son los tramos objetivo donde efectivamente se pondrá D.
  * `tramosRespetados` son los tramos objetivo donde ya tenía un pin manual

@@ -26,18 +26,21 @@ export function getPinned(t: Trabajadera): PinState[][] {
 export function countPinned(t: Trabajadera): {
 	d: number;
 	f: number;
+	ls: number;
 	total: number;
 } {
 	const p = getPinned(t);
 	let d = 0,
-		f = 0;
+		f = 0,
+		ls = 0;
 	p.forEach((row) =>
 		row.forEach((v) => {
 			if (v === "D") d++;
 			if (v === "F" || v === "LF") f++;
+			if (v === "LS") ls++;
 		}),
 	);
-	return { d, f, total: d + f };
+	return { d, f, ls, total: d + f + ls };
 }
 
 export function validarPinned(t: Trabajadera): string[] {
@@ -50,7 +53,7 @@ export function validarPinned(t: Trabajadera): string[] {
 
 	for (let ti = 0; ti < nAct; ti++) {
 		const row = p[ti];
-		const forzDentro = row.filter((v) => v === "D").length;
+		const forzDentro = row.filter((v) => v === "D" || v === "LS").length;
 		const forzFuera = row.filter((v) => v === "F" || v === "LF").length;
 		const libres = row.filter((v) => v === "L").length;
 		if (forzDentro > 5)
@@ -92,7 +95,7 @@ export function completarAuto(
 	});
 	for (let ti = 0; ti < nAct; ti++) {
 		p[ti].forEach((v, ci) => {
-			if (v === "F" || v === "LF") usadas[ci]++;
+			if (v === "F" || v === "LF" || v === "LS") usadas[ci]++;
 		});
 	}
 
@@ -112,7 +115,7 @@ export function completarAuto(
 		const esU = ti === nAct - 1;
 		const dT0 = esU && plan[0] ? plan[0].fuera : [];
 
-		const forzDentro = todos.filter((c) => row[c] === "D");
+		const forzDentro = todos.filter((c) => row[c] === "D" || row[c] === "LS");
 		const forzFuera = todos.filter((c) => row[c] === "F" || row[c] === "LF");
 		const libres = todos.filter((c) => row[c] === "L");
 		const needFuera = F - forzFuera.length;

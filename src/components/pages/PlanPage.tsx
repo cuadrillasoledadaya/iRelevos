@@ -428,7 +428,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						Relevos <br />
 						{hasPins && (
 							<span className="locked-count">
-								({pinStatus.d} fijos D, {pinStatus.f} fijos F)
+								({pinStatus.d} fijos D, {pinStatus.ls} sugeridos ★, {pinStatus.f} fijos F)
 							</span>
 						)}
 					</div>
@@ -438,6 +438,9 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						</div>
 						<div className="leg-item">
 							<div className="leg-dot F"></div> F
+						</div>
+						<div className="leg-item">
+							<div className="leg-dot LS"></div> ★ Sugerido
 						</div>
 						<div className="leg-item">
 							<div className="leg-dot L"></div> Auto
@@ -592,13 +595,14 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 												}
 											}
 
-											const clsMap = {
+											const clsMap: Record<string, string> = {
 												L: isAutoD ? "d" : isAutoF ? "f" : "L",
 												D: "D",
 												F: "F",
 												LF: isAutoF ? "f" : "LF",
+												LS: "LS", // Latent Sugerido — estilo especial
 											};
-											let cls = clsMap[v];
+											let cls = clsMap[v] ?? "L";
 											if (hasWarn) cls += " warn-v";
 											if (hasCons && !hasWarn) cls += " cons-v";
 											if (isHighlighted) cls += " highlight-sug";
@@ -606,7 +610,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											// Boquilla: costaleros marcados con boquilla=true en el censo
 											const esBoquilla = censusBoquilla[name] ?? false;
 											if (esBoquilla) {
-												if (v === "D" || (v === "L" && isAutoD)) cls += " boq-D";
+												if (v === "D" || (v === "L" && isAutoD) || v === "LS") cls += " boq-D";
 												if (v === "F" || (v === "L" && isAutoF)) cls += " boq-F";
 											}
 
@@ -621,9 +625,11 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 														? "D"
 														: v === "F"
 															? "F"
-															: isAutoF
-																? "F"
-																: "⚡";
+															: v === "LS"
+																? "★"
+																: isAutoF
+																	? "F"
+																	: "⚡";
 
 											return (
 												<td key={ti}>

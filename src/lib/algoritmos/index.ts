@@ -19,7 +19,7 @@ export {
 } from "./pinned";
 
 // Sugerencias
-export { generarSugerencias, aplicarSugerencias } from "./sugerencias";
+export { generarSugerencias, aplicarSugerencias, aplicarSugerenciaLatente } from "./sugerencias";
 export type { SugerenciaRes, SugerenciaAsignacion } from "./sugerencias";
 
 // Correcciones
