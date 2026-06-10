@@ -38,9 +38,10 @@ function rolCodeToLabel(rol: RolCode): string {
 export function mapRelevos(
 	t: Trabajadera,
 	costaleroIdx = -1,
+	fechaOverride?: string,
 ): RelevosTableData {
 	// ── Fecha ──────────────────────────────────────────────────────
-	const fecha = new Date().toLocaleDateString("es-ES", {
+	const fecha = fechaOverride ?? new Date().toLocaleDateString("es-ES", {
 		day: "2-digit",
 		month: "long",
 		year: "numeric",

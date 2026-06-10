@@ -7,7 +7,7 @@ import { mapMasivo } from './mappers/mapMasivo'
 import { masivoPage } from './templates/masivoPage'
 import { masivoBaseCSS } from './styles/masivo'
 
-export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: string): void {
+export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: string, fecha?: string): void {
   const conPlan = trabajaderas.filter(t => t.plan && t.analisis)
   if (!conPlan.length) {
     alert('⚠ Calcula las rotaciones de al menos una trabajadera primero.')
@@ -22,7 +22,7 @@ export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: 
       .filter(({ ci }) => !t.bajas?.includes(ci))
 
     activos.forEach(({ nombre: nombreCostalero, ci: costaleroIdx }) => {
-      const data = mapMasivo(t, nombreCostalero, costaleroIdx, nombrePaso)
+      const data = mapMasivo(t, nombreCostalero, costaleroIdx, nombrePaso, fecha)
       paginas.push(masivoPage(data))
     })
   })

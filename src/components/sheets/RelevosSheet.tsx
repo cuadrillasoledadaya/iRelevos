@@ -29,6 +29,25 @@ export default function RelevosSheet() {
 	const [seleccionadas, setSeleccionadas] = useState<Set<number>>(new Set());
 	const [tidIndividual, setTidIndividual] = useState<number | "">("");
 	const [ciIndividual, setCiIndividual] = useState<number | "">("");
+	const [exportDate, setExportDate] = useState<string>(() => {
+		const today = new Date();
+		return today.toISOString().split("T")[0]; // YYYY-MM-DD
+	});
+
+	// Formatear fecha para exportación: "10 de junio de 2025"
+	function formatExportDate(dateStr: string): string {
+		if (!dateStr) return new Date().toLocaleDateString("es-ES", {
+			day: "2-digit",
+			month: "long",
+			year: "numeric",
+		});
+		const [y, m, d] = dateStr.split("-").map(Number);
+		return new Date(y, m - 1, d).toLocaleDateString("es-ES", {
+			day: "2-digit",
+			month: "long",
+			year: "numeric",
+		});
+	}
 
 	function toggleTrab(id: number) {
 		setSeleccionadas((prev) => {
@@ -49,7 +68,7 @@ export default function RelevosSheet() {
 			return;
 		}
 		closeSheet();
-		exportarRelevos(trabs);
+		exportarRelevos(trabs, formatExportDate(exportDate));
 	}
 
 	function handleGenerarIndividual() {
@@ -67,7 +86,7 @@ export default function RelevosSheet() {
 		if (!t) return;
 		const ci = +ciIndividual;
 		closeSheet();
-		exportarRelevosIndividual(t, ci, t.nombres[ci]);
+		exportarRelevosIndividual(t, ci, t.nombres[ci], formatExportDate(exportDate));
 	}
 
 	function handleGenerarTodos() {
@@ -89,7 +108,7 @@ export default function RelevosSheet() {
 			const indices = t.nombres
 				.map((_: string, i: number) => i)
 				.filter((i: number) => !t.bajas?.includes(i));
-			exportarRelevosMultiplesItems(t, indices);
+			exportarRelevosMultiplesItems(t, indices, formatExportDate(exportDate));
 		}
 	}
 
@@ -123,6 +142,40 @@ export default function RelevosSheet() {
 								gap: "1.2rem",
 							}}
 						>
+							{/* Selector de fecha — aparece en todas las opciones */}
+							<div
+								style={{
+									display: "flex",
+									alignItems: "center",
+									gap: ".75rem",
+									padding: ".75rem",
+									background: "rgba(201,168,76,.06)",
+									border: "1px solid rgba(201,168,76,.15)",
+									borderRadius: "6px",
+								}}
+							>
+								<label
+									style={{
+										fontSize: ".75rem",
+										color: "var(--cre-o)",
+										fontWeight: 600,
+										whiteSpace: "nowrap",
+									}}
+								>
+									📅 Fecha:
+								</label>
+								<input
+									type="date"
+									className="inp"
+									value={exportDate}
+									onChange={(e) => setExportDate(e.target.value)}
+									style={{
+										flex: 1,
+										height: "36px",
+										fontSize: ".85rem",
+									}}
+								/>
+							</div>
 							{/* Opción 1 */}
 							<div>
 								<div className="sec" style={{ marginBottom: ".6rem" }}>
@@ -304,7 +357,7 @@ export default function RelevosSheet() {
 									className="btn btn-oro w100"
 									onClick={() => {
 										closeSheet();
-										exportarPDF(conPlan);
+										exportarPDF(conPlan, formatExportDate(exportDate));
 									}}
 								>
 									⚙ Generar PDF Capataz
@@ -360,7 +413,7 @@ export default function RelevosSheet() {
 									}}
 									onClick={() => {
 										closeSheet();
-										exportarPDFMasivoTodas(conPlan, nombrePaso);
+										exportarPDFMasivoTodas(conPlan, nombrePaso, formatExportDate(exportDate));
 									}}
 								>
 									🚀 Generar PDF para WhatsApp

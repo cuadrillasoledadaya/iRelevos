@@ -43,9 +43,10 @@ export function mapMasivo(
 	costaleroNombre: string,
 	costaleroIdx: number,
 	nombrePaso = "",
+	fechaOverride?: string,
 ): MasivoPageData {
 	// ── Fecha ──────────────────────────────────────────────────────
-	const fecha = new Date()
+	const fecha = fechaOverride ?? new Date()
 		.toLocaleDateString("es-ES", {
 			weekday: "long",
 			day: "2-digit",

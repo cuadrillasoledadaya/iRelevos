@@ -7,7 +7,7 @@ import { mapCapataz } from './mappers/mapCapataz'
 import { capatazPage } from './templates/capatazPage'
 import { capatazBaseCSS } from './styles/capataz'
 
-export function exportarPDF(trabajaderas: Trabajadera[]): void {
+export function exportarPDF(trabajaderas: Trabajadera[], fecha?: string): void {
   const conPlan = trabajaderas.filter(t => t.plan && t.analisis)
   if (!conPlan.length) {
     alert('⚠ Calcula las rotaciones de al menos una trabajadera primero.')
@@ -15,7 +15,7 @@ export function exportarPDF(trabajaderas: Trabajadera[]): void {
   }
 
   const paginas = conPlan
-    .map(t => capatazPage(mapCapataz(t)))
+    .map(t => capatazPage(mapCapataz(t, fecha)))
     .join('')
 
   const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Hoja del Capataz — Costaleros</title>

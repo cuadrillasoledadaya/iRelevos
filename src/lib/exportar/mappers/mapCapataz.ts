@@ -22,13 +22,13 @@ function nombrCompleto(t: Trabajadera, idx: number): string {
  * @param t Trabajadera con plan y análisis (puede ser parcial)
  * @returns CapatazTableData con todas las celdas HTML precomputadas
  */
-export function mapCapataz(t: Trabajadera): CapatazTableData {
+export function mapCapataz(t: Trabajadera, fechaOverride?: string): CapatazTableData {
   const total = t.nombres.length
   const F = total - 5
   const nAct = t.tramos.length
 
   // ── Fecha ──────────────────────────────────────────────────────
-  const fecha = new Date().toLocaleDateString('es-ES', {
+  const fecha = fechaOverride ?? new Date().toLocaleDateString('es-ES', {
     day: '2-digit',
     month: 'long',
     year: 'numeric',
