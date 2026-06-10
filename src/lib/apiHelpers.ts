@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 
-const MAX_BODY_SIZE = 1024 * 1024; // 1 MB
+const DEFAULT_MAX_BODY_SIZE = 1024 * 1024; // 1 MB
 
-export function checkBodySize(request: Request): NextResponse | null {
+export function checkBodySize(
+	request: Request,
+	maxBytes: number = DEFAULT_MAX_BODY_SIZE,
+): NextResponse | null {
 	const contentLength = request.headers.get("content-length");
-	if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+	if (contentLength && parseInt(contentLength, 10) > maxBytes) {
 		return NextResponse.json(
-			{ error: "Request body too large. Max 1MB allowed." },
+			{ error: "Cuerpo de solicitud demasiado grande." },
 			{ status: 413 },
 		);
 	}

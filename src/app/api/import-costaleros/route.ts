@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { mapPuestoToRolCode } from "@/lib/roles";
 import type { RolCode } from "@/lib/types";
+import { rateLimit } from "@/lib/rateLimit";
+import { withCors, handleCorsPreflight } from "@/lib/cors";
+import { checkBodySize, jsonResponse } from "@/lib/apiHelpers";
+import { isValidUUID } from "@/lib/validation";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
+
+const IMPORT_RATE_LIMIT = { limit: 5, windowMs: 60_000 }; // 5 per minute
+const IMPORT_MAX_BODY_SIZE = 5 * 1024 * 1024; // 5 MB
 
 interface ICuadrillaRaw {
 	id?: string | number;
@@ -22,14 +30,11 @@ interface ICuadrillaRaw {
 	fila?: number;
 	altura?: number;
 	estado?: string;
-	// Campo rol/puesto en iCuadrilla - puede venir con varios nombres posibles
 	puesto?: string;
 	rol?: string;
 	role?: string;
 	posicion?: string;
-	// Puesto secundario - el campo exacto en iCuadrilla
 	puesto_secundario?: string;
-	// Puntuación total del costalero
 	puntuacion_total?: number;
 	puntuacion?: number;
 	score?: number;
@@ -59,17 +64,21 @@ async function authenticateAdmin(
 	const token = authHeader?.replace("Bearer ", "");
 
 	if (!token) {
-		console.error(
-			"[Import API] 401: No se recibió token en Authorization header",
+		logger.error("[Import API] 401: No token in Authorization header");
+		return NextResponse.json(
+			{ error: "No autenticado." },
+			{ status: 401 },
 		);
-		return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 	}
 
 	const admin = getSupabaseAdmin();
 	const { data: userData, error: userError } = await admin.auth.getUser(token);
 	if (userError || !userData.user) {
-		console.error("[Import API] 401: Token inválido", userError?.message);
-		return NextResponse.json({ error: "Token inválido" }, { status: 401 });
+		logger.error("[Import API] 401: Invalid token", userError?.message);
+		return NextResponse.json(
+			{ error: "No autenticado." },
+			{ status: 401 },
+		);
 	}
 
 	const { data: requesterProfile, error: profileError } = await admin
@@ -79,21 +88,21 @@ async function authenticateAdmin(
 		.single();
 
 	if (profileError) {
-		console.error(
-			"[Import API] 500: Error al consultar profiles",
+		logger.error(
+			"[Import API] 500: Error querying profiles",
 			profileError.message,
 		);
 		return NextResponse.json(
-			{ error: `Error DB profiles: ${profileError.message}` },
+			{ error: "Error interno. Intentá más tarde." },
 			{ status: 500 },
 		);
 	}
 
 	const rol = requesterProfile?.role;
 	if (rol !== "superadmin" && rol !== "capataz" && rol !== "auxiliar") {
-		console.error("[Import API] 403: Rol no autorizado:", rol);
+		logger.warn("[Import API] 403: Insufficient role:", rol);
 		return NextResponse.json(
-			{ error: "Solo admins pueden importar costaleros" },
+			{ error: "No autorizado." },
 			{ status: 403 },
 		);
 	}
@@ -110,13 +119,11 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 	const apiToken = process.env.ICUADRILLA_API_TOKEN;
 
 	if (!apiUrl || !apiToken) {
-		console.error("[Import API] 500: Faltan variables de entorno");
-		throw new Error(
-			"Faltan variables de entorno ICUADRILLA_API_URL o ICUADRILLA_API_TOKEN",
-		);
+		logger.error("[Import API] 500: Missing environment variables");
+		throw new Error("Error interno. Intentá más tarde.");
 	}
 
-	console.log("[Import API] Fetching iCuadrilla:", apiUrl);
+	logger.log("[Import API] Fetching iCuadrilla:", apiUrl);
 	const res = await fetch(`${apiUrl}?select=*`, {
 		headers: {
 			apikey: apiToken,
@@ -125,17 +132,16 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 		},
 		cache: "no-store",
 	});
-	console.log("[Import API] iCuadrilla respondió status:", res.status);
+	logger.log("[Import API] iCuadrilla responded status:", res.status);
 
 	if (!res.ok) {
 		const errorText = await res.text();
-		console.error(
-			"[Import API] iCuadrilla error body:",
-			errorText.substring(0, 500),
+		logger.error(
+			"[Import API] iCuadrilla error:",
+			res.status,
+			errorText.substring(0, 200),
 		);
-		throw new Error(
-			`iCuadrilla API respondió con ${res.status}: ${errorText.substring(0, 200)}`,
-		);
+		throw new Error("Error al obtener datos externos.");
 	}
 
 	const data = await res.json();
@@ -144,23 +150,9 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 	const activos = raw.filter((u) => u.estado !== "baja");
 	const filtrados = raw.length - activos.length;
 
-	console.log(
-		`[Import API] Recibidos ${raw.length} registros de iCuadrilla — activos: ${activos.length}, filtrados (baja): ${filtrados}`,
+	logger.log(
+		`[Import API] Received ${raw.length} records — active: ${activos.length}, filtered (baja): ${filtrados}`,
 	);
-	if (activos.length > 0) {
-		// Log TODOS los campos del primer registro para debug
-		const firstRecord = activos[0];
-		console.log(`[Import API] TODOS LOS CAMPOS DEL REGISTRO (CRUDO):`);
-		Object.keys(firstRecord).forEach((key) => {
-			console.log(
-				`  ${key} = "${firstRecord[key as keyof typeof firstRecord]}"`,
-			);
-		});
-		// Log explícito de puntuacion_total
-		console.log(
-			`[Import API] puntuacion_total explícito: "${firstRecord.puntuacion_total}" (tipo: ${typeof firstRecord.puntuacion_total})`,
-		);
-	}
 
 	return activos.map((u: ICuadrillaRaw) => {
 		const cleanNombre = (
@@ -178,28 +170,18 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
 		const rawEmail = (u.email || u.correo || u.mail || "").toLowerCase().trim();
 		const email = rawEmail === "" ? null : rawEmail;
 
-		// Mapear el puesto/rol principal desde iCuadrilla (probar múltiples nombres de campo posibles)
 		const puesto = u.puesto || u.rol || u.role || u.posicion || null;
 		const rolCostalero = mapPuestoToRolCode(puesto);
 
-		// Mapear el puesto secundario (rol secundario) - el campo en iCuadrilla es puesto_secundario
 		const puestoSec = u.puesto_secundario || null;
 		const rolSecCostalero = mapPuestoToRolCode(puestoSec);
 
-		// Extraer puntuación total (probar múltiples nombres de campo posibles)
 		const rawPuntuacion =
 			u.puntuacion_total ?? u.puntuacion ?? u.score ?? 0;
 		const puntuacion =
 			typeof rawPuntuacion === "string"
 				? parseFloat(rawPuntuacion) || 0
 				: Number(rawPuntuacion);
-
-		console.log(
-			`[Import API] Costalero ${cleanNombre} ${cleanApellidos}: rawPuntuacion="${rawPuntuacion}" (tipo: ${typeof rawPuntuacion}) → puntuacion=${puntuacion} (tipo: ${typeof puntuacion})`,
-		);
-		console.log(
-			`[Import API] Campos disponibles: puesto="${u.puesto}", rol="${u.rol}", role="${u.role}", posicion="${u.posicion}", puesto_secundario="${u.puesto_secundario}", puntuacion_total="${u.puntuacion_total}"`,
-		);
 
 		return {
 			external_id: String(u.id),
@@ -223,21 +205,70 @@ async function fetchICuadrillaCostaleros(): Promise<NormalizedCostalero[]> {
  * Requiere autenticación y rol de admin (superadmin/capataz/auxiliar).
  */
 export async function GET(request: Request) {
+	// Handle CORS preflight
+	const preflight = handleCorsPreflight(request);
+	if (preflight) return preflight;
+
+	const startTime = Date.now();
+	const route = "/api/import-costaleros";
+
+	// Rate limit
+	const ip = request.headers.get("x-forwarded-for") ?? "anonymous";
+	const rateResult = rateLimit(ip, IMPORT_RATE_LIMIT);
+	if (!rateResult.success) {
+		logger.warn(`${route} 429: rate limit exceeded for ${ip}`);
+		return withCors(
+			jsonResponse(
+				{ error: "Demasiados intentos. Intentá de nuevo." },
+				{ status: 429 },
+			),
+			request,
+		);
+	}
+
 	try {
 		const authResult = await authenticateAdmin(request);
-		if (authResult instanceof NextResponse) return authResult;
+		if (authResult instanceof NextResponse) {
+			return withCors(authResult, request);
+		}
 
-		// Llamar a la función que ya hace el fetch y devuelve los datos
 		const normalized = await fetchICuadrillaCostaleros();
-		return NextResponse.json(normalized);
+
+		const duration = Date.now() - startTime;
+		logger.log(
+			`${route} 200: import fetched`,
+			JSON.stringify({
+				timestamp: new Date().toISOString(),
+				route,
+				method: "GET",
+				user_id: authResult.id,
+				action: "import-costaleros-get",
+				outcome: "success",
+				duration_ms: duration,
+			}),
+		);
+
+		return withCors(jsonResponse(normalized), request);
 	} catch (err) {
-		const msg = err instanceof Error ? err.message : "Error desconocido";
-		const stack = err instanceof Error ? err.stack : "";
-		console.error("[Import API] 500: Error no controlado:", msg);
-		console.error("[Import API] Stack:", stack);
-		return NextResponse.json(
-			{ error: `Error de conexión o procesamiento: ${msg}` },
-			{ status: 500 },
+		const duration = Date.now() - startTime;
+		logger.error(
+			`${route} 500: unexpected error`,
+			err instanceof Error ? err.message : "unknown",
+			JSON.stringify({
+				timestamp: new Date().toISOString(),
+				route,
+				method: "GET",
+				action: "import-costaleros-get",
+				outcome: "error",
+				duration_ms: duration,
+			}),
+		);
+		return withCors(
+			jsonResponse(
+				{ error: "Error interno. Intentá más tarde." },
+				{ status: 500 },
+			),
+			request,
 		);
 	}
 }
@@ -253,9 +284,39 @@ export async function GET(request: Request) {
  * Body: { proyecto_id: string }
  */
 export async function POST(request: Request) {
+	// Handle CORS preflight
+	const preflight = handleCorsPreflight(request);
+	if (preflight) return preflight;
+
+	const startTime = Date.now();
+	const route = "/api/import-costaleros";
+
+	// Body size check (5MB for import)
+	const sizeCheck = checkBodySize(request, IMPORT_MAX_BODY_SIZE);
+	if (sizeCheck) {
+		logger.error(`${route} 413: body too large`);
+		return withCors(sizeCheck, request);
+	}
+
+	// Rate limit
+	const ip = request.headers.get("x-forwarded-for") ?? "anonymous";
+	const rateResult = rateLimit(ip, IMPORT_RATE_LIMIT);
+	if (!rateResult.success) {
+		logger.warn(`${route} 429: rate limit exceeded for ${ip}`);
+		return withCors(
+			jsonResponse(
+				{ error: "Demasiados intentos. Intentá de nuevo." },
+				{ status: 429 },
+			),
+			request,
+		);
+	}
+
 	try {
 		const authResult = await authenticateAdmin(request);
-		if (authResult instanceof NextResponse) return authResult;
+		if (authResult instanceof NextResponse) {
+			return withCors(authResult, request);
+		}
 
 		const body = await request.json().catch(() => null);
 		if (
@@ -263,14 +324,24 @@ export async function POST(request: Request) {
 			typeof body.proyecto_id !== "string" ||
 			body.proyecto_id.trim() === ""
 		) {
-			return NextResponse.json(
-				{ error: "proyecto_id es requerido" },
-				{ status: 400 },
+			return withCors(
+				jsonResponse({ error: "Datos inválidos." }, { status: 400 }),
+				request,
 			);
 		}
 
 		const proyectoId = body.proyecto_id.trim();
-		console.log("[Import API] Iniciando full sync para proyecto:", proyectoId);
+
+		// UUID validation on proyecto_id
+		if (!isValidUUID(proyectoId)) {
+			logger.warn(`${route} 400: invalid proyecto_id UUID format`);
+			return withCors(
+				jsonResponse({ error: "Datos inválidos." }, { status: 400 }),
+				request,
+			);
+		}
+
+		logger.log(`${route}: Starting full sync for project`, proyectoId);
 
 		const normalized = await fetchICuadrillaCostaleros();
 
@@ -281,26 +352,54 @@ export async function POST(request: Request) {
 		});
 
 		if (error) {
-			console.error(
-				"[Import API] Error en RPC full_sync_icuadrilla_census:",
+			logger.error(
+				`${route} 500: RPC full_sync_icuadrilla_census failed`,
 				error.message,
 			);
-			return NextResponse.json(
-				{ error: `Error en sincronización: ${error.message}` },
-				{ status: 500 },
+			return withCors(
+				jsonResponse(
+					{ error: "Error interno. Intentá más tarde." },
+					{ status: 500 },
+				),
+				request,
 			);
 		}
 
-		console.log("[Import API] Full sync exitoso:", data);
-		return NextResponse.json(data);
+		const duration = Date.now() - startTime;
+		logger.log(
+			`${route} 200: full sync completed`,
+			JSON.stringify({
+				timestamp: new Date().toISOString(),
+				route,
+				method: "POST",
+				user_id: authResult.id,
+				action: "import-costaleros-post",
+				outcome: "success",
+				duration_ms: duration,
+			}),
+		);
+
+		return withCors(jsonResponse(data), request);
 	} catch (err) {
-		const msg = err instanceof Error ? err.message : "Error desconocido";
-		const stack = err instanceof Error ? err.stack : "";
-		console.error("[Import API] 500: Error no controlado en POST:", msg);
-		console.error("[Import API] Stack:", stack);
-		return NextResponse.json(
-			{ error: `Error de conexión o procesamiento: ${msg}` },
-			{ status: 500 },
+		const duration = Date.now() - startTime;
+		logger.error(
+			`${route} 500: unexpected error in POST`,
+			err instanceof Error ? err.message : "unknown",
+			JSON.stringify({
+				timestamp: new Date().toISOString(),
+				route,
+				method: "POST",
+				action: "import-costaleros-post",
+				outcome: "error",
+				duration_ms: duration,
+			}),
+		);
+		return withCors(
+			jsonResponse(
+				{ error: "Error interno. Intentá más tarde." },
+				{ status: 500 },
+			),
+			request,
 		);
 	}
 }

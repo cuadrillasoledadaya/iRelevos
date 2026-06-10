@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { GET, POST } from "./route";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import * as rateLimitModule from "@/lib/rateLimit";
+import * as corsModule from "@/lib/cors";
 
 vi.mock("@/lib/supabaseAdmin");
+
+// Valid UUID v4 format
+const VALID_UUID = "550e8400-e29b-41d4-a716-446655440000";
 
 describe("GET /api/import-costaleros", () => {
 	const mockAdmin = {
@@ -17,7 +22,32 @@ describe("GET /api/import-costaleros", () => {
 		vi.mocked(getSupabaseAdmin).mockReturnValue(
 			mockAdmin as unknown as ReturnType<typeof getSupabaseAdmin>,
 		);
+		vi.spyOn(rateLimitModule, "rateLimit").mockReturnValue({
+			success: true,
+			limit: 5,
+			remaining: 4,
+			resetAt: Date.now() + 60_000,
+		});
+		vi.spyOn(corsModule, "withCors").mockImplementation(
+			(response) => response,
+		);
 	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	function setupAuth(role = "superadmin") {
+		mockAdmin.auth.getUser.mockResolvedValue({
+			data: { user: { id: "admin-1" } },
+			error: null,
+		});
+		mockAdmin.from.mockReturnValue({
+			select: vi.fn().mockReturnThis(),
+			eq: vi.fn().mockReturnThis(),
+			single: vi.fn().mockResolvedValue({ data: { role }, error: null }),
+		});
+	}
 
 	it("should return 401 when no Authorization header", async () => {
 		const req = new Request("http://localhost/api/import-costaleros");
@@ -25,7 +55,7 @@ describe("GET /api/import-costaleros", () => {
 		const json = await res.json();
 
 		expect(res.status).toBe(401);
-		expect(json.error).toBe("No autenticado");
+		expect(json.error).toBe("No autenticado.");
 	});
 
 	it("should return 401 when token is invalid", async () => {
@@ -41,22 +71,11 @@ describe("GET /api/import-costaleros", () => {
 		const json = await res.json();
 
 		expect(res.status).toBe(401);
-		expect(json.error).toBe("Token inválido");
+		expect(json.error).toBe("No autenticado.");
 	});
 
 	it("should return 403 when user is not admin", async () => {
-		mockAdmin.auth.getUser.mockResolvedValue({
-			data: { user: { id: "user-1" } },
-			error: null,
-		});
-
-		mockAdmin.from.mockReturnValue({
-			select: vi.fn().mockReturnThis(),
-			eq: vi.fn().mockReturnThis(),
-			single: vi
-				.fn()
-				.mockResolvedValue({ data: { role: "costalero" }, error: null }),
-		});
+		setupAuth("costalero");
 
 		const req = new Request("http://localhost/api/import-costaleros", {
 			headers: { Authorization: "Bearer valid-token" },
@@ -65,22 +84,31 @@ describe("GET /api/import-costaleros", () => {
 		const json = await res.json();
 
 		expect(res.status).toBe(403);
-		expect(json.error).toBe("Solo admins pueden importar costaleros");
+		expect(json.error).toBe("No autorizado.");
 	});
 
-	it("should return 500 when env vars are missing", async () => {
-		mockAdmin.auth.getUser.mockResolvedValue({
-			data: { user: { id: "admin-1" } },
-			error: null,
+	it("should return 429 when rate limit is exceeded", async () => {
+		vi.mocked(rateLimitModule.rateLimit).mockReturnValue({
+			success: false,
+			limit: 5,
+			remaining: 0,
+			resetAt: Date.now() + 60_000,
 		});
 
-		mockAdmin.from.mockReturnValue({
-			select: vi.fn().mockReturnThis(),
-			eq: vi.fn().mockReturnThis(),
-			single: vi
-				.fn()
-				.mockResolvedValue({ data: { role: "superadmin" }, error: null }),
+		const req = new Request("http://localhost/api/import-costaleros", {
+			headers: {
+				Authorization: "Bearer valid-token",
+			},
 		});
+		const res = await GET(req);
+		const json = await res.json();
+
+		expect(res.status).toBe(429);
+		expect(json.error).toBe("Demasiados intentos. Intentá de nuevo.");
+	});
+
+	it("should return 500 with generic error when env vars are missing", async () => {
+		setupAuth("superadmin");
 
 		const originalUrl = process.env.ICUADRILLA_API_URL;
 		const originalToken = process.env.ICUADRILLA_API_TOKEN;
@@ -94,7 +122,7 @@ describe("GET /api/import-costaleros", () => {
 		const json = await res.json();
 
 		expect(res.status).toBe(500);
-		expect(json.error).toContain("Faltan variables de entorno");
+		expect(json.error).toBe("Error interno. Intentá más tarde.");
 
 		process.env.ICUADRILLA_API_URL = originalUrl;
 		process.env.ICUADRILLA_API_TOKEN = originalToken;
@@ -118,13 +146,23 @@ describe("POST /api/import-costaleros", () => {
 		vi.mocked(getSupabaseAdmin).mockReturnValue(
 			mockAdmin as unknown as ReturnType<typeof getSupabaseAdmin>,
 		);
+		vi.spyOn(rateLimitModule, "rateLimit").mockReturnValue({
+			success: true,
+			limit: 5,
+			remaining: 4,
+			resetAt: Date.now() + 60_000,
+		});
+		vi.spyOn(corsModule, "withCors").mockImplementation(
+			(response) => response,
+		);
 	});
 
 	afterEach(() => {
 		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
 	});
 
-	function authMocks(role = "superadmin") {
+	function setupAuth(role = "superadmin") {
 		mockAdmin.auth.getUser.mockResolvedValue({
 			data: { user: { id: "admin-1" } },
 			error: null,
@@ -136,8 +174,56 @@ describe("POST /api/import-costaleros", () => {
 		});
 	}
 
+	// ── Body size ──
+
+	it("should return 413 when body exceeds 5MB", async () => {
+		setupAuth();
+
+		const req = new Request("http://localhost/api/import-costaleros", {
+			method: "POST",
+			headers: {
+				Authorization: "Bearer valid-token",
+				"Content-Type": "application/json",
+				"Content-Length": String(6 * 1024 * 1024),
+			},
+			body: JSON.stringify({ proyecto_id: VALID_UUID }),
+		});
+		const res = await POST(req);
+		const json = await res.json();
+
+		expect(res.status).toBe(413);
+		expect(json.error).toContain("demasiado grande");
+	});
+
+	// ── Rate limiting ──
+
+	it("should return 429 when rate limit is exceeded", async () => {
+		vi.mocked(rateLimitModule.rateLimit).mockReturnValue({
+			success: false,
+			limit: 5,
+			remaining: 0,
+			resetAt: Date.now() + 60_000,
+		});
+
+		const req = new Request("http://localhost/api/import-costaleros", {
+			method: "POST",
+			headers: {
+				Authorization: "Bearer valid-token",
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ proyecto_id: VALID_UUID }),
+		});
+		const res = await POST(req);
+		const json = await res.json();
+
+		expect(res.status).toBe(429);
+		expect(json.error).toBe("Demasiados intentos. Intentá de nuevo.");
+	});
+
+	// ── Validation ──
+
 	it("should return 400 when proyecto_id is missing", async () => {
-		authMocks();
+		setupAuth();
 
 		const req = new Request("http://localhost/api/import-costaleros", {
 			method: "POST",
@@ -151,11 +237,31 @@ describe("POST /api/import-costaleros", () => {
 		const json = await res.json();
 
 		expect(res.status).toBe(400);
-		expect(json.error).toBe("proyecto_id es requerido");
+		expect(json.error).toBe("Datos inválidos.");
 	});
 
-	it("should return 500 when iCuadrilla API fails", async () => {
-		authMocks();
+	it("should return 400 when proyecto_id is not a valid UUID", async () => {
+		setupAuth();
+
+		const req = new Request("http://localhost/api/import-costaleros", {
+			method: "POST",
+			headers: {
+				Authorization: "Bearer valid-token",
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ proyecto_id: "not-a-uuid" }),
+		});
+		const res = await POST(req);
+		const json = await res.json();
+
+		expect(res.status).toBe(400);
+		expect(json.error).toBe("Datos inválidos.");
+	});
+
+	// ── iCuadrilla API errors ──
+
+	it("should return generic error when iCuadrilla API fails", async () => {
+		setupAuth();
 		process.env.ICUADRILLA_API_URL = "https://api.icuadrilla.test";
 		process.env.ICUADRILLA_API_TOKEN = "test-token";
 
@@ -171,17 +277,17 @@ describe("POST /api/import-costaleros", () => {
 				Authorization: "Bearer valid-token",
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({ proyecto_id: "proj-1" }),
+			body: JSON.stringify({ proyecto_id: VALID_UUID }),
 		});
 		const res = await POST(req);
 		const json = await res.json();
 
 		expect(res.status).toBe(500);
-		expect(json.error).toContain("iCuadrilla API respondió con 502");
+		expect(json.error).toBe("Error interno. Intentá más tarde.");
 	});
 
-	it("should return 500 when RPC fails", async () => {
-		authMocks();
+	it("should return generic error when RPC fails", async () => {
+		setupAuth();
 		process.env.ICUADRILLA_API_URL = "https://api.icuadrilla.test";
 		process.env.ICUADRILLA_API_TOKEN = "test-token";
 
@@ -211,17 +317,17 @@ describe("POST /api/import-costaleros", () => {
 				Authorization: "Bearer valid-token",
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({ proyecto_id: "proj-1" }),
+			body: JSON.stringify({ proyecto_id: VALID_UUID }),
 		});
 		const res = await POST(req);
 		const json = await res.json();
 
 		expect(res.status).toBe(500);
-		expect(json.error).toContain("DB transaction failed");
+		expect(json.error).toBe("Error interno. Intentá más tarde.");
 	});
 
 	it("should perform full sync successfully", async () => {
-		authMocks();
+		setupAuth();
 		process.env.ICUADRILLA_API_URL = "https://api.icuadrilla.test";
 		process.env.ICUADRILLA_API_TOKEN = "test-token";
 
@@ -261,7 +367,7 @@ describe("POST /api/import-costaleros", () => {
 				Authorization: "Bearer valid-token",
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({ proyecto_id: "proj-1" }),
+			body: JSON.stringify({ proyecto_id: VALID_UUID }),
 		});
 		const res = await POST(req);
 		const json = await res.json();
@@ -271,7 +377,7 @@ describe("POST /api/import-costaleros", () => {
 		expect(json.inserted).toBe(2);
 
 		expect(mockAdmin.rpc).toHaveBeenCalledWith("full_sync_icuadrilla_census", {
-			p_proyecto_id: "proj-1",
+			p_proyecto_id: VALID_UUID,
 			p_records: [
 				{
 					external_id: "1",
@@ -299,5 +405,36 @@ describe("POST /api/import-costaleros", () => {
 				},
 			],
 		});
+	});
+
+	// ── CORS ──
+
+	it("should call withCors on response", async () => {
+		setupAuth();
+		process.env.ICUADRILLA_API_URL = "https://api.icuadrilla.test";
+		process.env.ICUADRILLA_API_TOKEN = "test-token";
+
+		mockFetch.mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => [],
+		});
+
+		mockAdmin.rpc.mockResolvedValue({
+			data: { deleted: 0, inserted: 0 },
+			error: null,
+		});
+
+		const req = new Request("http://localhost/api/import-costaleros", {
+			method: "POST",
+			headers: {
+				Authorization: "Bearer valid-token",
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ proyecto_id: VALID_UUID }),
+		});
+		await POST(req);
+
+		expect(corsModule.withCors).toHaveBeenCalled();
 	});
 });
