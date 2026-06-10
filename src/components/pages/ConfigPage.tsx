@@ -307,11 +307,6 @@ export default function ConfigPage() {
 							style={{ letterSpacing: ".05em" }}
 						>
 							Seleccionar del banco
-							{editingPlanId && (
-								<span className="text-[var(--oro)] ml-1">
-									— {selectedTramos.length} seleccionado(s)
-								</span>
-							)}
 						</div>
 						<div className="flex flex-wrap gap-2">
 							{S.banco.map((nombre: string) => {
@@ -319,11 +314,7 @@ export default function ConfigPage() {
 								return (
 									<button
 										key={nombre}
-										className={`btn btn-sm transition-all ${
-											isSelected
-												? "btn-oro scale-[1.02] shadow-[0_0_8px_rgba(201,168,76,0.3)]"
-												: "btn-ghost opacity-60 hover:opacity-100"
-										}`}
+										className={`btn btn-sm ${isSelected ? "btn-oro" : "btn-ghost"}`}
 										onClick={() => toggleTramoEnPlan(nombre)}
 										title={isSelected ? "Quitar del plan" : "Añadir al plan"}
 									>
@@ -342,17 +333,13 @@ export default function ConfigPage() {
 								className="xs toro-o cinzel uppercase mb2"
 								style={{ letterSpacing: ".05em" }}
 							>
-								{editingPlanId ? "📋 Tramos actuales del plan" : "Orden del plan"} ({selectedTramos.length})
+								Orden del plan ({selectedTramos.length})
 							</div>
 							<div className="fc gap-2">
 								{selectedTramos.map((nombre, idx) => (
 									<div
 										key={`${nombre}-${idx}`}
-										className={`flex jb aic g2 border rounded px-2 py-1.5 transition-all ${
-											editingPlanId
-												? "border-[var(--oro)]/40 bg-[var(--oro)]/8"
-												: "border-white/10 bg-black/20"
-										}`}
+										className="flex jb aic g2 border border-white/10 rounded px-2 py-1.5 bg-black/20"
 									>
 										<span className="sm font-bold text-oro">{idx + 1}.</span>
 										<span className="sm f1">{nombre}</span>
