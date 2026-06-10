@@ -11,6 +11,7 @@ export default function SugerenciaSheet() {
 	const bancoTarget = uiStore((s) => s.bancoTarget);
 	const sugerirTramos = trabajaderaStore.getState().sugerirTramos;
 	const aplicarLatente = planStore.getState().aplicarSugerenciaLatente;
+	const completarPlan = planStore.getState().completarPlan;
 	const isOpen = activeSheet === "sugerencia";
 
 	if (!bancoTarget) {
@@ -42,10 +43,22 @@ export default function SugerenciaSheet() {
 	}
 
 	function aplicar(nTramos: number, sal: number) {
-		// 1. Actualizar salidas y tramos
+		// 1. Actualizar salidas y tramos (esto limpia plan y pinned)
 		sugerirTramos(tid, sal);
 		// 2. Marcar top 3 con pins LS en tramos clave+último
-		aplicarLatente(tid);
+		const aplicado = aplicarLatente(tid);
+		// 3. Calcular el plan respetando los pins LS (o calcula auto si no hay pins)
+		completarPlan(tid);
+		// 4. Feedback al usuario
+		if (aplicado) {
+			alert(
+				`✅ Plan calculado con los 3 mejores costaleros fijados (★) en tramos clave.\n\nEl algoritmo no los moverá de esas posiciones.`,
+			);
+		} else {
+			alert(
+				`✅ Plan calculado.\n\n⚠ No se aplicaron sugerencias latentes: ningún costalero tiene puntuación > 0. Asigná puntuaciones en la página de Equipo para activar esta función.`,
+			);
+		}
 		closeSheet();
 	}
 
