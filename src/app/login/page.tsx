@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -38,9 +39,12 @@ export default function LoginPage() {
         return
       }
 
-      // Success — session cookie is set by Supabase via the API route
-      router.push('/')
-      router.refresh()
+      // Success — save session to client storage and redirect
+      if (data.session) {
+        await supabase.auth.setSession(data.session)
+        router.push('/')
+        router.refresh()
+      }
     } catch {
       setError('Ocurrió un error. Intentá de nuevo.')
     } finally {
