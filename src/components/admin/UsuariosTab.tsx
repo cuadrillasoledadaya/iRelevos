@@ -41,7 +41,7 @@ export default function UsuariosTab({
               🗑️
             </button>
           </div>
-          <div className="flex justify-between items-start pr-8">
+          <div className="flex justify-between items-start pr-20">
             <div>
               <h3 className="font-bold text-[var(--cre)]">{u.nombre} {u.apellidos}</h3>
               <p className="text-xs text-[var(--oro)] font-bold uppercase tracking-widest">@{u.apodo || 'sin-apodo'}</p>
