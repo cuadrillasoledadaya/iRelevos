@@ -2681,3 +2681,61 @@ html.light .swap-card.COR {
 		flex-wrap: wrap;
 	}
 }
+
+/* ── COSTALERO PLAN VIEW ── */
+.pos-chip {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 20px;
+	height: 20px;
+	padding: 0 5px;
+	border-radius: 10px;
+	background: var(--oro);
+	color: #000;
+	font-family: "Cinzel", serif;
+	font-size: 0.65rem;
+	font-weight: 900;
+	margin-right: 4px;
+}
+
+.role-label {
+	font-family: "Lato", sans-serif;
+	font-size: 0.65rem;
+	font-weight: 700;
+	color: rgba(0, 0, 0, 0.7);
+}
+
+.paso-pill.sel-mia {
+	outline: 2px solid var(--oro);
+	box-shadow: 0 0 8px var(--oro);
+}
+
+/* ── DOT STRIP — 5-dot position indicator ── */
+.dot-strip {
+	display: flex;
+	flex-direction: row;
+	gap: 4px;
+	align-items: center;
+}
+
+.dot {
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	border: 2px solid var(--oro);
+	background: transparent;
+	transition: all 0.15s;
+}
+
+.dot-active {
+	background: var(--oro);
+	box-shadow: 0 0 6px var(--oro), 0 0 12px rgba(201, 168, 76, 0.3);
+}
+
+.dot-empty {
+	border-style: dashed;
+	background: transparent;
+	opacity: 0.5;
+}

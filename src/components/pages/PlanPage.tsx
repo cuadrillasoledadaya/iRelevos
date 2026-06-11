@@ -9,7 +9,8 @@ import {
 	generarSugerenciasCorreccion,
 } from "@/lib/algoritmos";
 import { nameAt, shortName } from "@/lib/nombres";
-import type { Trabajadera } from "@/lib/types";
+import { getDentroFisico, estructuraPaso, rolLabel, rolBase } from "@/lib/roles";
+import type { Trabajadera, RolCode } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import BoquillaView from "./BoquillaView";
 
@@ -131,6 +132,9 @@ function MiPlanPersonal({
 		}
 	}
 
+	// Expanded tramo for tap-to-show formation (must be before early return)
+	const [expandedTramo, setExpandedTramo] = useState<number | null>(null);
+
 	if (!match || !match.t.plan) {
 		return (
 			<div className="flex flex-col gap-4 p-4">
@@ -224,39 +228,138 @@ function MiPlanPersonal({
 						const esFuera = r.fuera.includes(ci);
 						const esClave = t.tramosClaves?.includes(ti);
 
+						// Position lookup for DENTRO costaleros
+						const dentroFisico = esDentro
+							? getDentroFisico(t, r)
+							: [];
+						const posIdx = esDentro ? dentroFisico.indexOf(ci) : -1;
+						const rol: RolCode | null =
+							posIdx !== -1 ? estructuraPaso(t.id)[posIdx] ?? null : null;
+						const label = rol ? rolLabel(rol, t.id) : null;
+
 						return (
-							<div
-								key={ti}
-								className={`flex items-center gap-3 rounded-xl px-4 py-3 border transition-all ${
-									esDentro
-										? "bg-[var(--oro)] border-[var(--oro)] shadow-lg"
-										: esFuera
-											? "bg-[var(--card)] border-[var(--border)]"
-											: "bg-[var(--card)] border-[var(--border)] opacity-40"
-								}`}
-							>
+							<div key={ti}>
 								<div
-									className={`text-[10px] font-black cinzel w-12 shrink-0 ${esDentro ? "text-black" : "text-[var(--oro)]"}`}
+									className={`flex items-center gap-3 rounded-xl px-4 py-3 border transition-all ${
+										esDentro
+											? "bg-[var(--oro)] border-[var(--oro)] shadow-lg"
+											: esFuera
+												? "bg-[var(--card)] border-[var(--border)]"
+												: "bg-[var(--card)] border-[var(--border)] opacity-40"
+									}`}
+									onClick={
+										esDentro
+											? () =>
+													setExpandedTramo(
+														expandedTramo === ti ? null : ti,
+													)
+											: undefined
+									}
+									style={esDentro ? { cursor: "pointer" } : undefined}
 								>
-									{t.tramos[ti] || `T${ti + 1}`}
-								</div>
+									<div
+										className={`text-[10px] font-black cinzel w-12 shrink-0 ${esDentro ? "text-black" : "text-[var(--oro)]"}`}
+									>
+										{t.tramos[ti] || `T${ti + 1}`}
+									</div>
 								<div
 									className={`flex-1 text-xs font-bold truncate ${esDentro ? "text-black" : "text-[var(--cre)]"}`}
 								>
 									{nombreTramo}
-									{esClave && <span className="ml-1 text-[0.55rem]">★</span>}
+									{esClave && (
+										<span className="ml-1 text-[0.55rem]">★</span>
+									)}
 								</div>
+
+								{/* 5-Dot Strip — only for DENTRO with valid position */}
+								{esDentro && posIdx !== -1 && (
+									<div className="dot-strip" data-testid="dot-strip">
+										{Array.from({ length: 5 }, (_, pi) => {
+											const mateIdx = dentroFisico[pi];
+											const isEmpty = mateIdx === null || mateIdx === undefined;
+											const isActive = pi === posIdx;
+											return (
+												<span
+													key={pi}
+													className={`dot ${isActive ? "dot-active" : isEmpty ? "dot-empty" : ""}`}
+												/>
+											);
+										})}
+									</div>
+								)}
+
 								<div
-									className={`text-xs font-black uppercase tracking-wider shrink-0 ${
-										esDentro
-											? "text-black"
-											: esFuera
-												? "text-[var(--cre-o)]"
-												: "text-[var(--border)]"
-									}`}
-								>
-									{esDentro ? "⬇ DENTRO" : esFuera ? "FUERA" : "—"}
+										className={`text-xs font-black uppercase tracking-wider shrink-0 ${
+											esDentro
+												? "text-black"
+												: esFuera
+													? "text-[var(--cre-o)]"
+													: "text-[var(--border)]"
+										}`}
+									>
+										{esDentro ? (
+											posIdx !== -1 ? (
+												<>
+													<span
+														className="pos-chip"
+														data-testid="pos-chip"
+													>
+														{posIdx + 1}
+													</span>
+													<span
+														className="role-label"
+														data-testid="role-label"
+													>
+														{label}
+													</span>
+												</>
+											) : (
+												<span data-status="dentro">⬇ DENTRO</span>
+											)
+										) : esFuera ? (
+											<span data-status="fuera">FUERA</span>
+										) : (
+											"—"
+										)}
+									</div>
 								</div>
+
+								{/* Expanded formation row */}
+								{esDentro && expandedTramo === ti && (
+									<div className="paso-row ml-4 mt-1">
+										{dentroFisico.map((mateIdx, pi) => {
+											const mateRol = estructuraPaso(t.id)[pi];
+											const isMine = mateIdx === ci;
+											const rolClass = mateRol
+												? rolBase(mateRol)
+												: "";
+											return (
+												<div
+													key={pi}
+													className="paso-slot"
+												>
+													{mateIdx !== null ? (
+														<div
+															className={`paso-pill ${rolClass} ${isMine ? "sel-mia" : ""}`}
+														>
+															<span className="paso-pill-name">
+																{isMine
+																	? "Vos"
+																	: shortName(
+																			nameAt(t, mateIdx),
+																		)}
+															</span>
+														</div>
+													) : (
+														<div className="paso-pill vacio">
+															Hueco
+														</div>
+													)}
+												</div>
+											);
+										})}
+									</div>
+								)}
 							</div>
 						);
 					})}
