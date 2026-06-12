@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { uiStore, projectStore, historyStore } from "@/stores";
 import { useAuth } from "@/hooks/useAuth";
+import type { PlanSnapshotSummary, DatosPerfil } from "@/lib/types";
 
 export default function HistorySheet() {
   const activeSheet = uiStore((s) => s.activeSheet);
@@ -12,10 +13,10 @@ export default function HistorySheet() {
   const getSnapshot = historyStore.getState().getSnapshot;
   const saveSnapshot = historyStore.getState().saveSnapshot;
   const previewRestore = historyStore.getState().previewRestore;
-  const snapshots = historyStore((s) => s.snapshots);
-  const isLoading = historyStore((s) => s.isLoading);
-  const error = historyStore((s) => s.error);
-  const S = projectStore((s) => s.S);
+  const snapshots = historyStore((s: { snapshots: PlanSnapshotSummary[] }) => s.snapshots);
+  const isLoading = historyStore((s: { isLoading: boolean }) => s.isLoading);
+  const error = historyStore((s: { error: string | null }) => s.error);
+  const S = projectStore((s: { S: DatosPerfil }) => s.S);
   const pid = projectStore((s) => s.pid);
   const { profile } = useAuth();
 
@@ -165,7 +166,7 @@ export default function HistorySheet() {
             </div>
           )}
 
-          {snapshots.map((snap) => (
+          {snapshots.map((snap: PlanSnapshotSummary) => (
             <div key={snap.id} className="snapshot-item">
               <div className="snapshot-item-info">
                 <div className="snapshot-item-name">{snap.nombre}</div>

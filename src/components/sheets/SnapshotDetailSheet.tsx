@@ -1,12 +1,12 @@
 "use client";
 
 import { uiStore, historyStore } from "@/stores";
-import type { Trabajadera } from "@/lib/types";
+import type { Trabajadera, PlanSnapshot } from "@/lib/types";
 
 export default function SnapshotDetailSheet() {
   const activeSheet = uiStore((s) => s.activeSheet);
   const closeSheet = uiStore.getState().closeSheet;
-  const currentSnapshot = historyStore((s) => s.currentSnapshot);
+  const currentSnapshot = historyStore((s: { currentSnapshot: PlanSnapshot | null }) => s.currentSnapshot);
   const isOpen = activeSheet === "detail";
 
   if (!currentSnapshot) {

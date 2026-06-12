@@ -1,14 +1,15 @@
 "use client";
 
 import { uiStore, historyStore } from "@/stores";
+import type { PlanSnapshot, Trabajadera } from "@/lib/types";
 
 export default function RestoreSheet() {
   const activeSheet = uiStore((s) => s.activeSheet);
   const closeSheet = uiStore.getState().closeSheet;
-  const restorePreview = historyStore((s) => s.restorePreview);
-  const isLoading = historyStore((s) => s.isLoading);
-  const error = historyStore((s) => s.error);
-  const currentSnapshot = historyStore((s) => s.currentSnapshot);
+  const restorePreview = historyStore((s: { restorePreview: { snapshotData: Trabajadera; snapshotId: string; currentHash: string } | null }) => s.restorePreview);
+  const isLoading = historyStore((s: { isLoading: boolean }) => s.isLoading);
+  const error = historyStore((s: { error: string | null }) => s.error);
+  const currentSnapshot = historyStore((s: { currentSnapshot: PlanSnapshot | null }) => s.currentSnapshot);
 
   const isOpen = activeSheet === "restore";
 
@@ -88,7 +89,7 @@ export default function RestoreSheet() {
                 Costaleros en la instantánea
               </h5>
               <ul className="list-none p0 m0 text-sm">
-                {snapshotData.nombres.map((name, i) => {
+                {snapshotData.nombres.map((name: string, i: number) => {
                   const isBaja = snapshotData.bajas?.includes(i);
                   return (
                     <li key={i} className={`py1 border-b border-muted ${isBaja ? "text-muted line-through" : ""}`}>
@@ -112,7 +113,7 @@ export default function RestoreSheet() {
                   <thead>
                     <tr>
                       <th className="col-name">Costalero</th>
-                      {snapshotData.tramos.map((tramoName, ti) => (
+                      {snapshotData.tramos.map((tramoName: string, ti: number) => (
                         <th key={ti} className="col-tramo">
                           <span title={tramoName}>
                             {tramoName || `T${ti + 1}`}
@@ -122,14 +123,14 @@ export default function RestoreSheet() {
                     </tr>
                   </thead>
                   <tbody>
-                    {snapshotData.nombres.map((name, ci) => {
+                    {snapshotData.nombres.map((name: string, ci: number) => {
                       if (snapshotData.bajas?.includes(ci)) return null;
                       return (
                         <tr key={ci}>
                           <td className="td-name">
                             <span className="truncate">{shortName(name)}</span>
                           </td>
-                          {snapshotData.tramos.map((_, ti) => {
+                          {snapshotData.tramos.map((_tramo: string, ti: number) => {
                             const slot = snapshotData.plan![ti];
                             const isDentro = slot?.dentro.includes(ci) ?? false;
                             const isFuera = slot?.fuera.includes(ci) ?? false;

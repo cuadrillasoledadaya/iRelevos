@@ -225,7 +225,7 @@ export const historyStore = create<HistoryStore>()(() => ({
       plan_summary: planSummary,
     };
 
-    historyStore.setState((state) => ({
+    historyStore.setState((state: HistoryStore) => ({
       snapshots: [newSummary, ...state.snapshots],
       isLoading: false,
     }));
@@ -302,17 +302,17 @@ export const historyStore = create<HistoryStore>()(() => ({
       return;
     }
 
-    historyStore.setState((state) => ({
-      snapshots: state.snapshots.filter((s) => s.id !== id),
+    historyStore.setState((state: HistoryStore) => ({
+      snapshots: state.snapshots.filter((s: PlanSnapshotSummary) => s.id !== id),
       currentSnapshot: state.currentSnapshot?.id === id ? null : state.currentSnapshot,
       isLoading: false,
     }));
   },
 
-  previewRestore: async (snapshotId: string) => {
+  previewRestore: async (snapshotId: string): Promise<{ snapshotData: Trabajadera } | null> => {
     historyStore.setState({ isLoading: true, error: null });
 
-    const snapshot = await historyStore.getState().getSnapshot(snapshotId);
+    const snapshot: PlanSnapshot | null = await historyStore.getState().getSnapshot(snapshotId);
     if (!snapshot) {
       historyStore.setState({ isLoading: false, error: "Instantánea no encontrada" });
       return null;
