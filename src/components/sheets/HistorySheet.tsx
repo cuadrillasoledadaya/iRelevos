@@ -1,0 +1,264 @@
+"use client";
+
+import { useState } from "react";
+import { uiStore, projectStore, historyStore } from "@/stores";
+import { useAuth } from "@/hooks/useAuth";
+
+export default function HistorySheet() {
+  const activeSheet = uiStore((s) => s.activeSheet);
+  const closeSheet = uiStore.getState().closeSheet;
+  const openSheet = uiStore.getState().openSheet;
+  const listSnapshots = historyStore.getState().listSnapshots;
+  const getSnapshot = historyStore.getState().getSnapshot;
+  const saveSnapshot = historyStore.getState().saveSnapshot;
+  const previewRestore = historyStore.getState().previewRestore;
+  const snapshots = historyStore((s) => s.snapshots);
+  const isLoading = historyStore((s) => s.isLoading);
+  const error = historyStore((s) => s.error);
+  const S = projectStore((s) => s.S);
+  const pid = projectStore((s) => s.pid);
+  const { profile } = useAuth();
+
+  const esMando =
+    profile?.role === "superadmin" ||
+    profile?.role === "capataz" ||
+    profile?.role === "auxiliar";
+
+  const isOpen = activeSheet === "history";
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [snapshotName, setSnapshotName] = useState("");
+
+  // Load snapshots when sheet opens
+  if (isOpen && snapshots.length === 0 && !isLoading) {
+    void listSnapshots();
+  }
+
+  const defaultName = getDefaultSnapshotName(S);
+
+  function handleOpenSave() {
+    setSnapshotName(defaultName);
+    setShowSaveDialog(true);
+  }
+
+  async function handleSave() {
+    if (!pid || !snapshotName.trim()) return;
+    await saveSnapshot(pid, snapshotName.trim());
+    setShowSaveDialog(false);
+  }
+
+  async function handleView(id: string) {
+    const snap = await getSnapshot(id);
+    if (snap) {
+      openSheet("detail");
+    }
+  }
+
+  async function handleCompare(id: string) {
+    const snap = await getSnapshot(id);
+    if (snap) {
+      openSheet("compare");
+    }
+  }
+
+  async function handleRestore(id: string) {
+    const snap = await getSnapshot(id);
+    if (snap) {
+      await previewRestore(id);
+      openSheet("restore");
+    }
+  }
+
+  if (!esMando) {
+    return (
+      <>
+        <div className={`bso${isOpen ? " open" : ""}`} onClick={closeSheet} />
+        <div className={`bss${isOpen ? " open" : ""}`}>
+          <div className="bs-handle" />
+          <div className="bs-hdr">
+            <span className="bs-title">Historial</span>
+            <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
+              ✕
+            </button>
+          </div>
+          <div className="bs-body">
+            <div className="p4 text-center text-muted">
+              Solo los mandos pueden ver el historial de instantáneas.
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className={`bso${isOpen ? " open" : ""}`} onClick={closeSheet} />
+      <div className={`bss${isOpen ? " open" : ""}`}>
+        <div className="bs-handle" />
+        <div className="bs-hdr">
+          <span className="bs-title">Historial de Instantáneas</span>
+          <div className="flex gap-2">
+            <button
+              className="btn btn-oro btn-sm"
+              onClick={handleOpenSave}
+              disabled={!S.trabajaderas.some((t) => t.analisis?.okObj)}
+              title="Guardar plan actual como instantánea"
+            >
+              + Guardar
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
+              ✕
+            </button>
+          </div>
+        </div>
+        <div className="bs-body">
+          {error && (
+            <div className="alert warn mb3">{error}</div>
+          )}
+
+          {isLoading && snapshots.length === 0 && (
+            <div className="p4 text-center text-muted">Cargando...</div>
+          )}
+
+          {!isLoading && snapshots.length === 0 && (
+            <div className="p4 text-center">
+              <p className="text-muted mb3">
+                Aún no tienes instantáneas guardadas. Guarda tu primera
+                planificación para poder compararla o restaurarla más adelante.
+              </p>
+              <button className="btn btn-oro" onClick={handleOpenSave}>
+                + Guardar plan actual
+              </button>
+            </div>
+          )}
+
+          {snapshots.map((snap) => (
+            <div key={snap.id} className="snapshot-item">
+              <div className="snapshot-item-info">
+                <div className="snapshot-item-name">{snap.nombre}</div>
+                <div className="snapshot-item-meta">
+                  {formatDate(snap.created_at)}
+                  {snap.proyecto_nombre && ` · ${snap.proyecto_nombre}`}
+                  {snap.temporada_nombre && ` · ${snap.temporada_nombre}`}
+                  {snap.plan_summary.status === "ok" && (
+                    <span className="badge-ok">✓ OK</span>
+                  )}
+                  {snap.plan_summary.status === "incomplete" && (
+                    <span className="badge-warn">⚠ Incompleto</span>
+                  )}
+                </div>
+              </div>
+              <div className="snapshot-actions">
+                <button
+                  className="btn btn-sm btn-ghost"
+                  title="Ver detalle"
+                  onClick={() => handleView(snap.id)}
+                >
+                  Ver
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  title="Comparar con actual"
+                  onClick={() => handleCompare(snap.id)}
+                >
+                  Comparar
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  title="Restaurar esta instantánea"
+                  onClick={() => handleRestore(snap.id)}
+                >
+                  Restaurar
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost text-err"
+                  title="Borrar instantánea"
+                  onClick={() => handleDelete(snap.id)}
+                >
+                  Borrar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Save Dialog */}
+      {showSaveDialog && (
+        <div className="bso open" onClick={() => setShowSaveDialog(false)}>
+          <div
+            className="bss open"
+            style={{ maxHeight: "50vh" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bs-handle" />
+            <div className="bs-hdr">
+              <span className="bs-title">Guardar Instantánea</span>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowSaveDialog(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="bs-body">
+              <label className="form-label">Nombre</label>
+              <input
+                className="form-input"
+                type="text"
+                value={snapshotName}
+                onChange={(e) => setSnapshotName(e.target.value)}
+                placeholder="Trabajadera X — DD/MM/YYYY"
+              />
+              <div className="flex gap-2 mt3">
+                <button
+                  className="btn btn-oro f1"
+                  onClick={handleSave}
+                  disabled={!snapshotName.trim() || isLoading}
+                >
+                  {isLoading ? "Guardando..." : "Guardar"}
+                </button>
+                <button
+                  className="btn btn-ghost f1"
+                  onClick={() => setShowSaveDialog(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  async function handleDelete(id: string) {
+    if (!confirm("¿Borrar esta instantánea? Esta acción no se puede deshacer."))
+      return;
+    await historyStore.getState().deleteSnapshot(id);
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+
+function getDefaultSnapshotName(S: {
+  trabajaderas: { id: number; analisis: { okObj: boolean } | null }[];
+}): string {
+  const planned = S.trabajaderas.find((t) => t.analisis?.okObj);
+  const tid = planned?.id ?? 1;
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const yyyy = now.getFullYear();
+  return `Trabajadera ${tid} — ${dd}/${mm}/${yyyy}`;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}

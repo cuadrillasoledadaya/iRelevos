@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { uiStore } from "@/stores";
+import { uiStore, setEsMandoGetter } from "@/stores";
 import AppHeader from "@/components/layout/AppHeader";
 import BottomNav from "@/components/layout/BottomNav";
 import DashboardPage from "@/components/pages/DashboardPage";
@@ -56,6 +56,19 @@ const RelevosSheet = dynamic(() => import("@/components/sheets/RelevosSheet"), {
 const CensusSheet = dynamic(() => import("@/components/sheets/CensusSheet"), {
 	ssr: false,
 });
+const HistorySheet = dynamic(() => import("@/components/sheets/HistorySheet"), {
+	ssr: false,
+});
+const SnapshotDetailSheet = dynamic(
+	() => import("@/components/sheets/SnapshotDetailSheet"),
+	{ ssr: false },
+);
+const CompareSheet = dynamic(() => import("@/components/sheets/CompareSheet"), {
+  ssr: false,
+});
+const RestoreSheet = dynamic(() => import("@/components/sheets/RestoreSheet"), {
+  ssr: false,
+});
 
 export default function Home() {
 	const router = useRouter();
@@ -69,6 +82,15 @@ export default function Home() {
 			router.push("/login");
 		}
 	}, [loading, session, router]);
+
+	// Wire esMando permission getter to historyStore (defense-in-depth)
+	useEffect(() => {
+		const isMando =
+			profile?.role === "superadmin" ||
+			profile?.role === "capataz" ||
+			profile?.role === "auxiliar";
+		setEsMandoGetter(() => isMando);
+	}, [profile?.role]);
 
 	// Show nothing while checking auth
 	if (loading || !session) {
@@ -135,6 +157,10 @@ export default function Home() {
 			{activeSheet === "sugerencia-asig" && <SugerenciaAsignacionSheet />}
 			{activeSheet === "relevos" && <RelevosSheet />}
 			{activeSheet === "censo" && <CensusSheet />}
+			{activeSheet === "history" && <HistorySheet />}
+			{activeSheet === "detail" && <SnapshotDetailSheet />}
+			{activeSheet === "compare" && <CompareSheet />}
+      {activeSheet === "restore" && <RestoreSheet />}
 		</div>
 	);
 }

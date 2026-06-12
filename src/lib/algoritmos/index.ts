@@ -32,3 +32,7 @@ export type { CorreccionSugerida, Prioridad, AnalisisCorrecciones } from "./corr
 
 // Utils
 export { isGenericTramo } from "./utils";
+
+// Reconcile (plan-history)
+export { reconcile, normalizeName } from "./reconcile";
+export type { ReconcileResult } from "./reconcile";

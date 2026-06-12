@@ -55,6 +55,15 @@ export default function PlanPage() {
 							🔶 Boquillas ({boquillaCount})
 						</button>
 					)}
+					{esMando && (
+						<button
+							className="btn btn-ghost btn-sm"
+							onClick={() => uiStore.getState().openSheet("history")}
+							title="Ver historial de instantáneas"
+						>
+							📋 Historial
+						</button>
+					)}
 					<button className="btn btn-oro btn-sm" onClick={calcularTodo}>
 						⚙ Calcular Todos
 					</button>

@@ -9,6 +9,7 @@ import { temporadaStore, setTemporadaRefetch } from "./temporadaStore";
 import { setTrabajaderaDeps, trabajaderaStore } from "./trabajaderaStore";
 import { setPlanDeps, planStore } from "./planStore";
 import { setBancoMutar, bancoStore } from "./bancoStore";
+import { setHistoryDeps, historyStore, setEsMandoGetter } from "./historyStore";
 import { createMutar } from "./mutar";
 import { saveCloud } from "./saveCloud";
 import { getTrab } from "./helpers";
@@ -30,6 +31,7 @@ setTrabajaderaDeps(mutar, getTrab, (tid) =>
 	() => projectStore.getState().S,
 );
 setBancoMutar(mutar);
+setHistoryDeps(mutar, () => projectStore.getState().S);
 setTemporadaRefetch(() => projectStore.getState().refetchPasos());
 
 // Inyectar el getter de temporada activa en projectStore
@@ -39,7 +41,7 @@ setTemporadaGetter(() => temporadaStore.getState().activeTemporadaId);
 // ── Re-exportar stores standalone ─────────────────────────────────
 // Los consumidores pueden importar directamente si lo prefieren.
 
-export { uiStore, projectStore, temporadaStore, trabajaderaStore, planStore, bancoStore };
+export { uiStore, projectStore, temporadaStore, trabajaderaStore, planStore, bancoStore, historyStore, setEsMandoGetter };
 
 // ── Helper: re-export mutar para tests avanzados ──────────────────
 export { mutar };

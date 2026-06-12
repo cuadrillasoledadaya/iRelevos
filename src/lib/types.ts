@@ -109,7 +109,7 @@ export interface BsTarget {
 
 export type ActivePage = 'home' | 'config' | 'equipo' | 'plan' | 'capataz' | 'carga' | 'admin'
 export type ActiveSheet =
-  | 'banco' | 'perfiles' | 'celda' | 'swap' | 'sugerencia' | 'sugerencia-asig' | 'relevos' | 'censo' | null
+  | 'banco' | 'perfiles' | 'celda' | 'swap' | 'sugerencia' | 'sugerencia-asig' | 'relevos' | 'censo' | 'history' | 'detail' | 'compare' | 'restore' | null
 
 export interface CensusTarget {
   tid: number
@@ -133,4 +133,42 @@ export interface PasoDB {
   temporada_id?: string
   /** Owner del proyecto (auth.users.id). Requiere columna en Supabase. */
   user_id?: string
+}
+
+// ── Plan History Types ────────────────────────────────────────────
+
+export interface PlanSnapshot {
+  id: string
+  proyecto_id: string
+  temporada_id: string
+  user_id: string
+  nombre: string
+  descripcion?: string
+  created_at: string
+  plan_data: DatosPerfil          // full Trabajadera[] — same shape as S.trabajaderas
+  trabajadera_count: number
+  trabajadera_ids: number[]
+  trabajadera_nombres: { tid: number; nombres: string[] }[]
+  plan_summary: {
+    status: 'ok' | 'incomplete' | 'error'
+    salidas_por_trab: number[]
+    tramos_por_trab: number[]
+  }
+}
+
+export interface PlanSnapshotSummary {
+  id: string
+  nombre: string
+  created_at: string
+  trabajadera_count: number
+  plan_summary: PlanSnapshot['plan_summary']
+  proyecto_nombre?: string
+  temporada_nombre?: string
+}
+
+export interface ReconcileDiff {
+  removed:   { tid: number; idx: number; nombre: string; tramos_affected: number }[]
+  new:       { tid: number; idx: number; nombre: string }[]
+  mapped:    { tid: number; old_nombre: string; new_nombre: string; old_idx: number; new_idx: number }[]
+  unmapped:  { tid: number; idx: number; nombre: string; reason: 'ambiguous' | 'not_found' }[]
 }

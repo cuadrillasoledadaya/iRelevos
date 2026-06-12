@@ -2739,3 +2739,140 @@ html.light .swap-card.COR {
 	background: transparent;
 	opacity: 0.5;
 }
+
+/* ── PLAN HISTORY: Snapshot Detail & Compare ── */
+
+.snapshot-item {
+	padding: 0.75rem;
+	border-bottom: 1px solid var(--border);
+}
+
+.snapshot-item:last-child {
+	border-bottom: none;
+}
+
+.snapshot-item-info {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.snapshot-item-name {
+	font-weight: 700;
+	font-size: 0.85rem;
+}
+
+.snapshot-item-meta {
+	font-size: 0.7rem;
+	color: var(--cre-o);
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.snapshot-actions {
+	display: flex;
+	gap: 0.25rem;
+	margin-top: 0.5rem;
+}
+
+.snapshot-trab {
+	margin-bottom: 1rem;
+}
+
+.snapshot-trab-header {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 0;
+	border-bottom: 1px solid var(--border);
+	margin-bottom: 0.5rem;
+}
+
+.pcell.readonly {
+	pointer-events: none;
+	opacity: 0.85;
+}
+
+/* Compare sheet */
+.compare-legend {
+	border-bottom: 1px solid var(--border);
+}
+
+.dot-legend {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+	margin-right: 4px;
+	vertical-align: middle;
+}
+
+.dot-legend.neutral {
+	background: var(--cre-o);
+	opacity: 0.4;
+}
+
+.dot-legend.removed {
+	background: #e67e22;
+}
+
+.dot-legend.added {
+	background: #3498db;
+}
+
+.compare-columns-header {
+	padding: 0.25rem 0;
+}
+
+.compare-trab {
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 1rem;
+}
+
+.compare-table th.compare-snap {
+	border-top: 2px solid #e67e22;
+}
+
+.compare-table th.compare-curr {
+	border-top: 2px solid #3498db;
+}
+
+.compare-cell {
+	position: relative;
+}
+
+.compare-cell.compare-removed {
+	outline: 2px solid #e67e22;
+	outline-offset: -1px;
+}
+
+.compare-cell.compare-new {
+	outline: 2px solid #3498db;
+	outline-offset: -1px;
+}
+
+.compare-cell.compare-neutral {
+	opacity: 0.7;
+}
+
+/* Badge styles for snapshot items */
+.badge-ok {
+	display: inline-block;
+	padding: 1px 6px;
+	border-radius: 8px;
+	background: rgba(39, 174, 96, 0.15);
+	color: #27ae60;
+	font-size: 0.65rem;
+	font-weight: 700;
+}
+
+.badge-warn {
+	display: inline-block;
+	padding: 1px 6px;
+	border-radius: 8px;
+	background: rgba(230, 126, 34, 0.15);
+	color: #e67e22;
+	font-size: 0.65rem;
+	font-weight: 700;
+}
