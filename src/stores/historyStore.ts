@@ -114,7 +114,7 @@ export const historyStore = create<HistoryStore>()(() => ({
       const { data, error } = await supabase
         .from("plan_snapshots")
         .select(
-          "id, nombre, creado_en, snapshot->plan_summary, snapshot->trabajadera_count, proyectos!inner(nombre), temporadas!inner(nombre)",
+          "id, nombre, creado_en, snapshot->plan_summary, snapshot->trabajadera_count, proyectos!inner(nombre_paso), temporadas!inner(nombre)",
         )
         .eq("user_id", session.user.id)
         .order("creado_en", { ascending: false });
@@ -134,7 +134,7 @@ export const historyStore = create<HistoryStore>()(() => ({
               plan_summary: PlanSnapshotSummary["plan_summary"];
               trabajadera_count: number;
             };
-            proyectos: { nombre: string };
+            proyectos: { nombre_paso: string };
             temporadas: { nombre: string };
           };
           return {
@@ -147,7 +147,7 @@ export const historyStore = create<HistoryStore>()(() => ({
               salidas_por_trab: [],
               tramos_por_trab: [],
             },
-            proyecto_nombre: r.proyectos?.nombre,
+            proyecto_nombre: r.proyectos?.nombre_paso,
             temporada_nombre: r.temporadas?.nombre,
           };
         },

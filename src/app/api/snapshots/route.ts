@@ -66,7 +66,7 @@ export async function GET(request: Request) {
   const { data, error } = await admin
     .from("plan_snapshots")
     .select(
-      "id, nombre, creado_en, snapshot, proyectos!inner(nombre), temporadas!inner(nombre)",
+      "id, nombre, creado_en, snapshot, proyectos!inner(nombre_paso), temporadas!inner(nombre)",
     )
     .eq("user_id", authResult.id)
     .order("creado_en", { ascending: false });
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
         plan_summary: unknown;
         trabajadera_count: number;
       };
-      proyectos: { nombre: string };
+      proyectos: { nombre_paso: string };
       temporadas: { nombre: string };
     };
     return {
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
         salidas_por_trab: [],
         tramos_por_trab: [],
       },
-      proyecto_nombre: r.proyectos?.nombre,
+      proyecto_nombre: r.proyectos?.nombre_paso,
       temporada_nombre: r.temporadas?.nombre,
     };
   });
