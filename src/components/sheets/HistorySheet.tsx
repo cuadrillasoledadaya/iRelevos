@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { uiStore, projectStore, historyStore } from "@/stores";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -29,9 +29,11 @@ export default function HistorySheet() {
   const [snapshotName, setSnapshotName] = useState("");
 
   // Load snapshots when sheet opens
-  if (isOpen && snapshots.length === 0 && !isLoading) {
-    void listSnapshots();
-  }
+  useEffect(() => {
+    if (isOpen) {
+      void listSnapshots();
+    }
+  }, [isOpen, listSnapshots]);
 
   const defaultName = getDefaultSnapshotName(S);
 

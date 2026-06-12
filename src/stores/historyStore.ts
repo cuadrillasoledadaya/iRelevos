@@ -99,60 +99,67 @@ export const historyStore = create<HistoryStore>()(() => ({
   listSnapshots: async () => {
     historyStore.setState({ isLoading: true, error: null });
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.user) {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) {
+        historyStore.setState({
+          isLoading: false,
+          error: "No autenticado",
+        });
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("plan_snapshots")
+        .select(
+          "id, nombre, creado_en, snapshot->plan_summary, snapshot->trabajadera_count, proyectos!inner(nombre), temporadas!inner(nombre)",
+        )
+        .eq("user_id", session.user.id)
+        .order("creado_en", { ascending: false });
+
+      if (error) {
+        historyStore.setState({ isLoading: false, error: error.message });
+        return;
+      }
+
+      const summaries: PlanSnapshotSummary[] = (data ?? []).map(
+        (row: Record<string, unknown>) => {
+          const r = row as {
+            id: string;
+            nombre: string;
+            creado_en: string;
+            snapshot: {
+              plan_summary: PlanSnapshotSummary["plan_summary"];
+              trabajadera_count: number;
+            };
+            proyectos: { nombre: string };
+            temporadas: { nombre: string };
+          };
+          return {
+            id: r.id,
+            nombre: r.nombre,
+            created_at: r.creado_en,
+            trabajadera_count: r.snapshot?.trabajadera_count ?? 0,
+            plan_summary: r.snapshot?.plan_summary ?? {
+              status: "incomplete",
+              salidas_por_trab: [],
+              tramos_por_trab: [],
+            },
+            proyecto_nombre: r.proyectos?.nombre,
+            temporada_nombre: r.temporadas?.nombre,
+          };
+        },
+      );
+
+      historyStore.setState({ snapshots: summaries, isLoading: false });
+    } catch (err) {
       historyStore.setState({
         isLoading: false,
-        error: "No autenticado",
+        error: err instanceof Error ? err.message : "Error desconocido",
       });
-      return;
     }
-
-    const { data, error } = await supabase
-      .from("plan_snapshots")
-      .select(
-        "id, nombre, creado_en, snapshot->plan_summary, snapshot->trabajadera_count, proyectos!inner(nombre), temporadas!inner(nombre)",
-      )
-      .eq("user_id", session.user.id)
-      .order("creado_en", { ascending: false });
-
-    if (error) {
-      historyStore.setState({ isLoading: false, error: error.message });
-      return;
-    }
-
-    const summaries: PlanSnapshotSummary[] = (data ?? []).map(
-      (row: Record<string, unknown>) => {
-        const r = row as {
-          id: string;
-          nombre: string;
-          creado_en: string;
-          snapshot: {
-            plan_summary: PlanSnapshotSummary["plan_summary"];
-            trabajadera_count: number;
-          };
-          proyectos: { nombre: string };
-          temporadas: { nombre: string };
-        };
-        return {
-          id: r.id,
-          nombre: r.nombre,
-          created_at: r.creado_en,
-          trabajadera_count: r.snapshot?.trabajadera_count ?? 0,
-          plan_summary: r.snapshot?.plan_summary ?? {
-            status: "incomplete",
-            salidas_por_trab: [],
-            tramos_por_trab: [],
-          },
-          proyecto_nombre: r.proyectos?.nombre,
-          temporada_nombre: r.temporadas?.nombre,
-        };
-      },
-    );
-
-    historyStore.setState({ snapshots: summaries, isLoading: false });
   },
 
   saveSnapshot: async (
