@@ -2,13 +2,13 @@
 
 import { uiStore, historyStore, projectStore } from "@/stores";
 import { comparePlans, type CellComparison } from "@/lib/comparePlans";
-import type { Trabajadera } from "@/lib/types";
+import type { Trabajadera, PlanSnapshot, DatosPerfil } from "@/lib/types";
 
 export default function CompareSheet() {
   const activeSheet = uiStore((s) => s.activeSheet);
   const closeSheet = uiStore.getState().closeSheet;
-  const currentSnapshot = historyStore((s) => s.currentSnapshot);
-  const S = projectStore((s) => s.S);
+  const currentSnapshot = historyStore((s: { currentSnapshot: PlanSnapshot | null }) => s.currentSnapshot);
+  const S = projectStore((s: { S: DatosPerfil }) => s.S);
   const isOpen = activeSheet === "compare";
 
   if (!currentSnapshot) {
