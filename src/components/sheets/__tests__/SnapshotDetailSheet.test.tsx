@@ -1,10 +1,10 @@
 // ══════════════════════════════════════════════════════════════════
-// TESTS — SnapshotDetailSheet.tsx (plan-history Slice 2)
+// TESTS — SnapshotDetailSheet.tsx (plan-history Slice 2 — single trabajadera)
 // Read-only view of a snapshot's plan (tramo-by-tramo, dentro/fuera badges)
-// ══════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import SnapshotDetailSheet from "../SnapshotDetailSheet";
 import type { PlanSnapshot, Trabajadera } from "@/lib/types";
 
@@ -68,7 +68,7 @@ vi.mock("@/stores", () => ({
 // ── Helpers ──────────────────────────────────────────────────────
 
 function makeSnapshot(
-  trabajaderas: Trabajadera[],
+  trabajadera: Trabajadera,
   overrides: Partial<PlanSnapshot> = {}
 ): PlanSnapshot {
   return {
@@ -76,19 +76,14 @@ function makeSnapshot(
     proyecto_id: "proj-1",
     temporada_id: "temp-1",
     user_id: "user-1",
+    trabajadera_id: trabajadera.id,
     nombre: "Test Snapshot",
     created_at: "2026-06-11T10:00:00Z",
-    plan_data: { banco: [], planes: [], trabajaderas },
-    trabajadera_count: trabajaderas.length,
-    trabajadera_ids: trabajaderas.map((t) => t.id),
-    trabajadera_nombres: trabajaderas.map((t) => ({
-      tid: t.id,
-      nombres: [...t.nombres],
-    })),
+    plan_data: trabajadera,
     plan_summary: {
       status: "ok",
-      salidas_por_trab: trabajaderas.map(() => 3),
-      tramos_por_trab: trabajaderas.map((t) => t.tramos.length),
+      salidas: 3,
+      tramos: trabajadera.tramos.length,
     },
     ...overrides,
   };
@@ -130,7 +125,7 @@ function renderSnapshotDetail(snapshot: PlanSnapshot) {
   return render(<SnapshotDetailSheet />);
 }
 
-// ── Test suite ───────────────────────────────────────────────────
+// ─ Test suite ───────────────────────────────────────────────────
 
 describe("SnapshotDetailSheet", () => {
   beforeEach(() => {
@@ -144,7 +139,7 @@ describe("SnapshotDetailSheet", () => {
   describe("header and metadata", () => {
     it("displays snapshot name in the header", () => {
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
-      const snap = makeSnapshot([t], { nombre: "Mi Plan Especial" });
+      const snap = makeSnapshot(t, { nombre: "Mi Plan Especial" });
 
       renderSnapshotDetail(snap);
 
@@ -153,7 +148,7 @@ describe("SnapshotDetailSheet", () => {
 
     it("displays snapshot date", () => {
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
-      const snap = makeSnapshot([t]);
+      const snap = makeSnapshot(t);
 
       renderSnapshotDetail(snap);
 
@@ -169,7 +164,7 @@ describe("SnapshotDetailSheet", () => {
   describe("plan table rendering", () => {
     it("renders tramo names as column headers", () => {
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["Primer Tramo", "Segundo Tramo"], makePlan(2, [[0, 1, 2, 3, 4], [0, 1, 2, 3, 4]], [[], []]));
-      const snap = makeSnapshot([t]);
+      const snap = makeSnapshot(t);
 
       renderSnapshotDetail(snap);
 
@@ -179,7 +174,7 @@ describe("SnapshotDetailSheet", () => {
 
     it("renders costalero names in the first column", () => {
       const t = makeTrabajadera(1, ["Alice", "Bob", "Charlie", "Dana", "Eve"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
-      const snap = makeSnapshot([t]);
+      const snap = makeSnapshot(t);
 
       renderSnapshotDetail(snap);
 
@@ -190,7 +185,7 @@ describe("SnapshotDetailSheet", () => {
 
     it("shows DENTRO badge for costaleros inside a tramo", () => {
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
-      const snap = makeSnapshot([t]);
+      const snap = makeSnapshot(t);
 
       renderSnapshotDetail(snap);
 
@@ -201,7 +196,7 @@ describe("SnapshotDetailSheet", () => {
 
     it("shows FUERA badge for costaleros outside a tramo", () => {
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3]], [[4]]));
-      const snap = makeSnapshot([t]);
+      const snap = makeSnapshot(t);
 
       renderSnapshotDetail(snap);
 
@@ -210,16 +205,14 @@ describe("SnapshotDetailSheet", () => {
       expect(fueraBadges.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("renders multiple trabajaderas", () => {
-      const t1 = makeTrabajadera(1, ["A", "B"], ["T1"], makePlan(1, [[0, 1]], [[]]));
-      const t2 = makeTrabajadera(2, ["X", "Y", "Z"], ["T1"], makePlan(1, [[0, 1, 2]], [[]]));
-      const snap = makeSnapshot([t1, t2]);
+    it("shows working summary for single trabajadera", () => {
+      const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1", "T2"], makePlan(2, [[0, 1, 2, 3, 4], [0, 1, 2, 3, 4]], [[], []]));
+      const snap = makeSnapshot(t);
 
       renderSnapshotDetail(snap);
 
-      // Both trabajaderas' costaleros visible
-      expect(screen.getByText("A")).toBeInTheDocument();
-      expect(screen.getByText("X")).toBeInTheDocument();
+      expect(screen.getByText(/5 act/)).toBeInTheDocument();
+      expect(screen.getByText(/2 tramos/)).toBeInTheDocument();
     });
   });
 
@@ -230,7 +223,7 @@ describe("SnapshotDetailSheet", () => {
   describe("read-only behavior", () => {
     it("does not render any edit or calculate buttons", () => {
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
-      const snap = makeSnapshot([t]);
+      const snap = makeSnapshot(t);
 
       renderSnapshotDetail(snap);
 
@@ -240,7 +233,7 @@ describe("SnapshotDetailSheet", () => {
 
     it("does not render tramo add/remove controls", () => {
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
-      const snap = makeSnapshot([t]);
+      const snap = makeSnapshot(t);
 
       renderSnapshotDetail(snap);
 

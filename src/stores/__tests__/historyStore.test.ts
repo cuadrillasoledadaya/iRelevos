@@ -68,7 +68,7 @@ describe("historyStore", () => {
         order: vi.fn().mockResolvedValue({ data: [], error: null }),
       } as never);
 
-      await historyStore.getState().listSnapshots();
+      await historyStore.getState().listSnapshots(1);
 
       const state = historyStore.getState();
       expect(state.snapshots).toEqual([]);
@@ -79,19 +79,17 @@ describe("historyStore", () => {
     it("should populate snapshots when data is returned", async () => {
       setDeps();
 
-      const mockSummaries: PlanSnapshotSummary[] = [
+      const mockDbRows = [
         {
           id: "snap-1",
           nombre: "Trabajadera 1 — 11/06/2026",
-          created_at: "2026-06-11T10:00:00Z",
-          trabajadera_count: 2,
-          plan_summary: {
-            status: "ok",
-            salidas_por_trab: [3, 3],
-            tramos_por_trab: [5, 5],
+          creado_en: "2026-06-11T10:00:00Z",
+          snapshot: {
+            plan_summary: { status: "ok", salidas: 3, tramos: 5 },
+            trabajadera_id: 1,
           },
-          proyecto_nombre: "Paso Test",
-          temporada_nombre: "2026",
+          proyectos: { nombre_paso: "Paso Test" },
+          temporadas: { nombre: "2026" },
         },
       ];
 
@@ -103,14 +101,15 @@ describe("historyStore", () => {
       mockSupabase.from.mockReturnValue({
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
-        order: vi.fn().mockResolvedValue({ data: mockSummaries, error: null }),
+        order: vi.fn().mockResolvedValue({ data: mockDbRows, error: null }),
       } as never);
 
-      await historyStore.getState().listSnapshots();
+      await historyStore.getState().listSnapshots(1);
 
       const state = historyStore.getState();
       expect(state.snapshots).toHaveLength(1);
       expect(state.snapshots[0].nombre).toBe("Trabajadera 1 — 11/06/2026");
+      expect(state.snapshots[0].trabajadera_id).toBe(1);
       expect(state.isLoading).toBe(false);
     });
 
@@ -131,7 +130,7 @@ describe("historyStore", () => {
         }),
       } as never);
 
-      await historyStore.getState().listSnapshots();
+      await historyStore.getState().listSnapshots(1);
 
       const state = historyStore.getState();
       expect(state.error).toBe("DB error");
@@ -142,28 +141,26 @@ describe("historyStore", () => {
   // ── saveSnapshot ──
 
   describe("saveSnapshot", () => {
-    it("should save snapshot with real temporada_id and prepend to list", async () => {
-      const mockTrabajaderas = [
-        {
-          id: 1,
-          nombres: ["A", "B"],
-          tramos: ["T1"],
-          plan: [{ dentro: [0, 1], fuera: [] }],
-          analisis: { okObj: true } as any,
-          pinned: null,
-          obj: null,
-          bajas: [],
-          regla5costaleros: false,
-          roles: [],
-          puntuaciones: {},
-          tramosClaves: [],
-        },
-      ];
+    it("should save snapshot with real temporada_id and trabajadera_id", async () => {
+      const mockTrabajadera = {
+        id: 1,
+        nombres: ["A", "B"],
+        tramos: ["T1"],
+        plan: [{ dentro: [0, 1], fuera: [] }],
+        analisis: { okObj: true } as any,
+        pinned: null,
+        obj: null,
+        bajas: [],
+        regla5costaleros: false,
+        roles: [],
+        puntuaciones: {},
+        tramosClaves: [],
+      };
 
       setDeps(() => ({
         banco: [],
         planes: [],
-        trabajaderas: mockTrabajaderas,
+        trabajaderas: [mockTrabajadera],
       }));
 
       (mockSupabase.auth.getSession as unknown as Mock).mockResolvedValue({
@@ -176,8 +173,8 @@ describe("historyStore", () => {
         nombre: "Test Snapshot",
         creado_en: "2026-06-12T10:00:00Z",
         snapshot: {
-          trabajadera_count: 1,
-          plan_summary: { status: "ok", salidas_por_trab: [2], tramos_por_trab: [1] },
+          trabajadera_id: 1,
+          plan_summary: { status: "ok", salidas: 2, tramos: 1 },
         },
       };
 
@@ -187,28 +184,36 @@ describe("historyStore", () => {
         single: vi.fn().mockResolvedValue({ data: insertedRow, error: null }),
       } as never);
 
-      await historyStore.getState().saveSnapshot("proj-1", "Test Snapshot");
+      await historyStore.getState().saveSnapshot("proj-1", 1, "Test Snapshot");
 
       const state = historyStore.getState();
       expect(state.snapshots).toHaveLength(1);
       expect(state.snapshots[0].id).toBe("snap-new");
       expect(state.isLoading).toBe(false);
       expect(state.error).toBeNull();
-
-      // Verify temporada_id was NOT empty string
-      const insertCall = (mockSupabase.from as any).mock.calls.find(
-        (c: string[]) => c[0] === "plan_snapshots",
-      );
-      // The insert arg is in the chain; verify via the mock chain
-      const insertArg = (mockSupabase.from as any).mock.results[0]?.value?.insert?.mock?.calls?.[0]?.[0];
-      if (insertArg) {
-        expect(insertArg.temporada_id).toBe("temp-1");
-        expect(insertArg.temporada_id).not.toBe("");
-      }
     });
 
     it("should set error when insert fails", async () => {
-      setDeps();
+      const mockTrabajadera = {
+        id: 1,
+        nombres: ["A", "B"],
+        tramos: ["T1"],
+        plan: [{ dentro: [0, 1], fuera: [] }],
+        analisis: { okObj: true } as any,
+        pinned: null,
+        obj: null,
+        bajas: [],
+        regla5costaleros: false,
+        roles: [],
+        puntuaciones: {},
+        tramosClaves: [],
+      };
+
+      setDeps(() => ({
+        banco: [],
+        planes: [],
+        trabajaderas: [mockTrabajadera],
+      }));
 
       (mockSupabase.auth.getSession as unknown as Mock).mockResolvedValue({
         data: { session: { user: { id: "user-1" } } },
@@ -221,10 +226,29 @@ describe("historyStore", () => {
         single: vi.fn().mockResolvedValue({ data: null, error: { message: "FK violation" } }),
       } as never);
 
-      await historyStore.getState().saveSnapshot("proj-1", "Test");
+      await historyStore.getState().saveSnapshot("proj-1", 1, "Test");
 
       const state = historyStore.getState();
       expect(state.error).toBe("FK violation");
+      expect(state.isLoading).toBe(false);
+    });
+
+    it("should set error when trabajadera not found", async () => {
+      setDeps(() => ({
+        banco: [],
+        planes: [],
+        trabajaderas: [{ id: 1, nombres: ["A"], tramos: ["T1"], plan: null, analisis: null, pinned: null, obj: null, bajas: [], regla5costaleros: false, roles: [], puntuaciones: {}, tramosClaves: [] }],
+      }));
+
+      (mockSupabase.auth.getSession as unknown as Mock).mockResolvedValue({
+        data: { session: { user: { id: "user-1" } } },
+        error: null,
+      });
+
+      await historyStore.getState().saveSnapshot("proj-1", 99, "Test");
+
+      const state = historyStore.getState();
+      expect(state.error).toBe("Trabajadera 99 no encontrada");
       expect(state.isLoading).toBe(false);
     });
   });

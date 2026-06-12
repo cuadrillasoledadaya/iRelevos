@@ -50,8 +50,8 @@ async function authenticateMando(
 }
 
 /**
- * GET /api/snapshots
- * List all snapshots for the authenticated user, sorted by created_at DESC.
+ * GET /api/snapshots?trabajadera_id=N
+ * List snapshots for the authenticated user, optionally filtered by trabajadera_id.
  */
 export async function GET(request: Request) {
   const preflight = handleCorsPreflight(request);
@@ -62,14 +62,23 @@ export async function GET(request: Request) {
     return withCors(authResult, request);
   }
 
+  const url = new URL(request.url);
+  const trabajaderaIdParam = url.searchParams.get("trabajadera_id");
+  const trabajaderaId = trabajaderaIdParam ? parseInt(trabajaderaIdParam, 10) : null;
+
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin
+  let query = admin
     .from("plan_snapshots")
     .select(
       "id, nombre, creado_en, snapshot, proyectos!inner(nombre_paso), temporadas!inner(nombre)",
     )
-    .eq("user_id", authResult.id)
-    .order("creado_en", { ascending: false });
+    .eq("user_id", authResult.id);
+
+  if (trabajaderaId !== null) {
+    query = query.eq("trabajadera_id", trabajaderaId);
+  }
+
+  const { data, error } = await query.order("creado_en", { ascending: false });
 
   if (error) {
     logger.error("[Snapshots API] GET error:", error.message);
@@ -86,7 +95,7 @@ export async function GET(request: Request) {
       creado_en: string;
       snapshot: {
         plan_summary: unknown;
-        trabajadera_count: number;
+        trabajadera_id: number;
       };
       proyectos: { nombre_paso: string };
       temporadas: { nombre: string };
@@ -95,11 +104,11 @@ export async function GET(request: Request) {
       id: r.id,
       nombre: r.nombre,
       created_at: r.creado_en,
-      trabajadera_count: r.snapshot?.trabajadera_count ?? 0,
+      trabajadera_id: r.snapshot?.trabajadera_id ?? 1,
       plan_summary: r.snapshot?.plan_summary ?? {
         status: "incomplete",
-        salidas_por_trab: [],
-        tramos_por_trab: [],
+        salidas: 0,
+        tramos: 0,
       },
       proyecto_nombre: r.proyectos?.nombre_paso,
       temporada_nombre: r.temporadas?.nombre,
@@ -133,6 +142,7 @@ export async function POST(request: Request) {
     typeof body.proyecto_id !== "string" ||
     typeof body.temporada_id !== "string" ||
     typeof body.nombre !== "string" ||
+    typeof body.trabajadera_id !== "number" ||
     !body.snapshot ||
     typeof body.snapshot !== "object"
   ) {
@@ -156,12 +166,13 @@ export async function POST(request: Request) {
       proyecto_id: body.proyecto_id.trim(),
       temporada_id: body.temporada_id.trim(),
       user_id: authResult.id,
+      trabajadera_id: body.trabajadera_id,
       nombre: body.nombre.trim(),
       descripcion: body.descripcion ?? null,
       snapshot: body.snapshot,
       creado_por: authResult.id,
     })
-    .select("id, nombre, creado_en, snapshot")
+    .select("id, nombre, creado_en, snapshot, trabajadera_id")
     .single();
 
   if (error) {

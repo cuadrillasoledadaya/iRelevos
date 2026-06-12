@@ -27,15 +27,28 @@ export default function HistorySheet() {
   const isOpen = activeSheet === "history";
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [snapshotName, setSnapshotName] = useState("");
+  const [selectedTrabajaderaId, setSelectedTrabajaderaId] = useState<number>(
+    S.trabajaderas[0]?.id ?? 1,
+  );
 
-  // Load snapshots when sheet opens
+  // Update selected trabajadera when S changes
   useEffect(() => {
-    if (isOpen) {
-      void listSnapshots();
+    if (S.trabajaderas.length > 0 && !S.trabajaderas.find((t) => t.id === selectedTrabajaderaId)) {
+      setSelectedTrabajaderaId(S.trabajaderas[0].id);
     }
-  }, [isOpen, listSnapshots]);
+  }, [S.trabajaderas, selectedTrabajaderaId]);
 
-  const defaultName = getDefaultSnapshotName(S);
+  // Load snapshots when sheet opens or trabajadera changes
+  useEffect(() => {
+    if (isOpen && S.trabajaderas.length > 0) {
+      void listSnapshots(selectedTrabajaderaId);
+    }
+  }, [isOpen, selectedTrabajaderaId, listSnapshots, S.trabajaderas.length]);
+
+  const selectedTrab = S.trabajaderas.find((t) => t.id === selectedTrabajaderaId);
+  const defaultName = selectedTrab
+    ? `Trabajadera ${selectedTrab.id} — ${formatDateShort(new Date())}`
+    : "";
 
   function handleOpenSave() {
     setSnapshotName(defaultName);
@@ -43,8 +56,8 @@ export default function HistorySheet() {
   }
 
   async function handleSave() {
-    if (!pid || !snapshotName.trim()) return;
-    await saveSnapshot(pid, snapshotName.trim());
+    if (!pid || !snapshotName.trim() || !selectedTrabajaderaId) return;
+    await saveSnapshot(pid, selectedTrabajaderaId, snapshotName.trim());
     setShowSaveDialog(false);
   }
 
@@ -103,8 +116,8 @@ export default function HistorySheet() {
             <button
               className="btn btn-oro btn-sm"
               onClick={handleOpenSave}
-              disabled={!S.trabajaderas.some((t) => t.analisis?.okObj)}
-              title="Guardar plan actual como instantánea"
+              disabled={!selectedTrab?.analisis?.okObj}
+              title="Guardar plan de esta trabajadera como instantánea"
             >
               + Guardar
             </button>
@@ -114,6 +127,24 @@ export default function HistorySheet() {
           </div>
         </div>
         <div className="bs-body">
+          {/* Trabajadera selector */}
+          {S.trabajaderas.length > 1 && (
+            <div className="mb3">
+              <label className="form-label text-xs">Trabajadera</label>
+              <select
+                className="form-input"
+                value={selectedTrabajaderaId}
+                onChange={(e) => setSelectedTrabajaderaId(Number(e.target.value))}
+              >
+                {S.trabajaderas.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    Trabajadera {t.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {error && (
             <div className="alert warn mb3">{error}</div>
           )}
@@ -125,8 +156,8 @@ export default function HistorySheet() {
           {!isLoading && snapshots.length === 0 && (
             <div className="p4 text-center">
               <p className="text-muted mb3">
-                Aún no tienes instantáneas guardadas. Guarda tu primera
-                planificación para poder compararla o restaurarla más adelante.
+                Aún no tienes instantáneas guardadas para esta trabajadera.
+                Guarda tu planificación para poder compararla o restaurarla más adelante.
               </p>
               <button className="btn btn-oro" onClick={handleOpenSave}>
                 + Guardar plan actual
@@ -146,7 +177,7 @@ export default function HistorySheet() {
                     <span className="badge-ok">✓ OK</span>
                   )}
                   {snap.plan_summary.status === "incomplete" && (
-                    <span className="badge-warn">⚠ Incompleto</span>
+                    <span className="badge-warn"> Incompleto</span>
                   )}
                 </div>
               </div>
@@ -243,18 +274,6 @@ export default function HistorySheet() {
 
 // ── Helpers ───────────────────────────────────────────────────────
 
-function getDefaultSnapshotName(S: {
-  trabajaderas: { id: number; analisis: { okObj: boolean } | null }[];
-}): string {
-  const planned = S.trabajaderas.find((t) => t.analisis?.okObj);
-  const tid = planned?.id ?? 1;
-  const now = new Date();
-  const dd = String(now.getDate()).padStart(2, "0");
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const yyyy = now.getFullYear();
-  return `Trabajadera ${tid} — ${dd}/${mm}/${yyyy}`;
-}
-
 function formatDate(iso: string): string {
   const d = new Date(iso);
   const dd = String(d.getDate()).padStart(2, "0");
@@ -263,4 +282,11 @@ function formatDate(iso: string): string {
   const hh = String(d.getHours()).padStart(2, "0");
   const min = String(d.getMinutes()).padStart(2, "0");
   return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
+
+function formatDateShort(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }

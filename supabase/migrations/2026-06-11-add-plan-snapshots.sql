@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS plan_snapshots (
   proyecto_id         UUID NOT NULL REFERENCES proyectos(id) ON DELETE CASCADE,
   temporada_id        UUID NOT NULL REFERENCES temporadas(id) ON DELETE CASCADE,
   user_id             UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  trabajadera_id      INTEGER NOT NULL DEFAULT 1,
   nombre              TEXT NOT NULL,
   descripcion         TEXT,
   snapshot            JSONB NOT NULL,

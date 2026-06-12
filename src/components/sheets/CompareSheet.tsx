@@ -33,11 +33,15 @@ export default function CompareSheet() {
     );
   }
 
-  const { nombre, created_at, plan_data } = currentSnapshot;
-  const snapshotTrabajaderas = plan_data?.trabajaderas ?? [];
-  const currentTrabajaderas = S.trabajaderas ?? [];
+  const { nombre, created_at, plan_data, trabajadera_id } = currentSnapshot;
+  const snapshotTrabajadera = plan_data;
+  const currentTrabajadera = S.trabajaderas.find((t) => t.id === trabajadera_id) ?? null;
 
-  const comparisons = comparePlans(snapshotTrabajaderas, currentTrabajaderas);
+  // Compare single trabajadera
+  const comparisons = comparePlans(
+    snapshotTrabajadera ? [snapshotTrabajadera] : [],
+    currentTrabajadera ? [currentTrabajadera] : [],
+  );
 
   return (
     <>
@@ -56,36 +60,17 @@ export default function CompareSheet() {
             <span><span className="dot-legend neutral" /> Igual</span>
             <span><span className="dot-legend removed" /> Quitado</span>
             <span><span className="dot-legend added" /> Nuevo</span>
+            <span><span className="dot-legend mapped" /> Mismo costalero, distinto tramo</span>
           </div>
 
-          {snapshotTrabajaderas.map((snapT, trabIdx) => {
-            const currT = currentTrabajaderas[trabIdx];
-            return (
-              <CompareTrabajadera
-                key={trabIdx}
-                snapT={snapT}
-                currT={currT ?? null}
-                comparison={comparisons[trabIdx] ?? []}
-                snapshotName={nombre}
-                snapshotDate={created_at}
-              />
-            );
-          })}
-
-          {/* Current-only trabajaderas (not in snapshot) */}
-          {currentTrabajaderas.slice(snapshotTrabajaderas.length).map((currT, idx) => {
-            const trabIdx = snapshotTrabajaderas.length + idx;
-            return (
-              <CompareTrabajadera
-                key={trabIdx}
-                snapT={null}
-                currT={currT}
-                comparison={comparisons[trabIdx] ?? []}
-                snapshotName={nombre}
-                snapshotDate={created_at}
-              />
-            );
-          })}
+          <CompareTrabajadera
+            snapT={snapshotTrabajadera}
+            currT={currentTrabajadera}
+            comparison={comparisons[0] ?? []}
+            snapshotName={nombre}
+            snapshotDate={created_at}
+            snapshotTrabajaderaId={trabajadera_id}
+          />
         </div>
       </div>
     </>
@@ -100,12 +85,14 @@ function CompareTrabajadera({
   comparison,
   snapshotName,
   snapshotDate,
+  snapshotTrabajaderaId,
 }: {
   snapT: Trabajadera | null;
   currT: Trabajadera | null;
   comparison: CellComparison[][];
   snapshotName: string;
   snapshotDate: string;
+  snapshotTrabajaderaId: number;
 }) {
   const allNames = [...new Set([
     ...(snapT?.nombres ?? []),
@@ -122,9 +109,9 @@ function CompareTrabajadera({
       {/* Column headers */}
       <div className="compare-columns-header flex gap-2 mb2 text-xs font-bold uppercase tracking-wider">
         <div className="f1 text-center text-muted">
-          SNAPSHOT ({snapshotName} — {formatDateShort(snapshotDate)})
+          SNAPSHOT (T{snapshotTrabajaderaId} — {snapshotName} — {formatDateShort(snapshotDate)})
         </div>
-        <div className="f1 text-center text-primary">ACTUAL</div>
+        <div className="f1 text-center text-primary">ACTUAL (T{currT?.id ?? "—"})</div>
       </div>
 
       <div className="plan-scroll">

@@ -1,11 +1,10 @@
 // ══════════════════════════════════════════════════════════════════
-// HISTORY STORE — Slice para instantáneas del plan (plan-history)
+// HISTORY STORE — Snapshots por trabajadera individual (plan-history)
 // Delega a mutar() para modificar el projectStore.
 // ══════════════════════════════════════════════════════════════════
 
 import { create } from "zustand";
 import { supabase } from "@/lib/supabase";
-import { reconcile } from "@/lib/algoritmos/reconcile";
 import { analizar } from "@/lib/algoritmos";
 import { ordenarDentroFisico } from "@/lib/roles";
 import { temporadaStore } from "@/stores/temporadaStore";
@@ -13,7 +12,6 @@ import type {
   DatosPerfil,
   PlanSnapshot,
   PlanSnapshotSummary,
-  ReconcileDiff,
   Trabajadera,
 } from "@/lib/types";
 
@@ -23,32 +21,32 @@ export interface HistoryStore {
   isLoading: boolean;
   error: string | null;
   restorePreview: {
-    mapped: Trabajadera[];
-    diff: ReconcileDiff;
+    snapshotData: Trabajadera;
     snapshotId: string;
     currentHash: string;
   } | null;
   // Actions
-  listSnapshots: () => Promise<void>;
+  listSnapshots: (trabajaderaId: number) => Promise<void>;
   saveSnapshot: (
     proyectoId: string,
+    trabajaderaId: number,
     nombre: string,
     descripcion?: string,
   ) => Promise<void>;
   getSnapshot: (id: string) => Promise<PlanSnapshot | null>;
   deleteSnapshot: (id: string) => Promise<void>;
-  previewRestore: (snapshotId: string) => Promise<{ mapped: Trabajadera[]; diff: ReconcileDiff } | null>;
+  previewRestore: (snapshotId: string) => Promise<{ snapshotData: Trabajadera } | null>;
   applyRestore: (snapshotId: string) => Promise<{ ok: boolean; error?: string }>;
 }
 
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void;
 type GetSFn = () => DatosPerfil;
 type GetEsMandoFn = () => boolean;
-type RecalcAnalisisFn = (trabajaderas: Trabajadera[]) => void;
+type RecalcAnalisisFn = (t: Trabajadera) => void;
 
 let _mutar: MutarFn;
 let _getS: GetSFn;
-let _getEsMando: GetEsMandoFn = () => true; // default permissive; override via setEsMandoGetter
+let _getEsMando: GetEsMandoFn = () => true;
 let _recalcAnalisis: RecalcAnalisisFn;
 
 export function setHistoryDeps(
@@ -63,30 +61,26 @@ export function setHistoryDeps(
 
 /**
  * Set the esMando permission getter. Call this from app init after auth is ready.
- * Default is permissive (true) so the store works before auth is initialized.
  */
 export function setEsMandoGetter(fn: GetEsMandoFn) {
   _getEsMando = fn;
 }
 
-/** Default analisis recomputation: re-analyze each trabajadera with its existing plan. */
-function defaultRecalcAnalisis(trabajaderas: Trabajadera[]) {
-  for (const t of trabajaderas) {
-    if (!t.plan) {
-      t.analisis = null;
-      continue;
-    }
-    // Recompute objetivo from current plan fuera counts
-    const obj: Record<number, number> = {};
-    for (let i = 0; i < t.nombres.length; i++) obj[i] = 0;
-    for (const tramo of t.plan) {
-      for (const ci of tramo.fuera) {
-        obj[ci] = (obj[ci] ?? 0) + 1;
-      }
-    }
-    ordenarDentroFisico(t, t.plan);
-    t.analisis = analizar(t.plan, t.nombres.length, obj, t);
+/** Recompute analisis for a single trabajadera. */
+function defaultRecalcAnalisis(t: Trabajadera) {
+  if (!t.plan) {
+    t.analisis = null;
+    return;
   }
+  const obj: Record<number, number> = {};
+  for (let i = 0; i < t.nombres.length; i++) obj[i] = 0;
+  for (const tramo of t.plan) {
+    for (const ci of tramo.fuera) {
+      obj[ci] = (obj[ci] ?? 0) + 1;
+    }
+  }
+  ordenarDentroFisico(t, t.plan);
+  t.analisis = analizar(t.plan, t.nombres.length, obj, t);
 }
 
 export const historyStore = create<HistoryStore>()(() => ({
@@ -96,7 +90,7 @@ export const historyStore = create<HistoryStore>()(() => ({
   error: null,
   restorePreview: null,
 
-  listSnapshots: async () => {
+  listSnapshots: async (trabajaderaId: number) => {
     historyStore.setState({ isLoading: true, error: null });
 
     try {
@@ -114,9 +108,10 @@ export const historyStore = create<HistoryStore>()(() => ({
       const { data, error } = await supabase
         .from("plan_snapshots")
         .select(
-          "id, nombre, creado_en, snapshot->plan_summary, snapshot->trabajadera_count, proyectos!inner(nombre_paso), temporadas!inner(nombre)",
+          "id, nombre, creado_en, snapshot->plan_summary, snapshot->trabajadera_id, proyectos!inner(nombre_paso), temporadas!inner(nombre)",
         )
         .eq("user_id", session.user.id)
+        .eq("trabajadera_id", trabajaderaId)
         .order("creado_en", { ascending: false });
 
       if (error) {
@@ -132,7 +127,7 @@ export const historyStore = create<HistoryStore>()(() => ({
             creado_en: string;
             snapshot: {
               plan_summary: PlanSnapshotSummary["plan_summary"];
-              trabajadera_count: number;
+              trabajadera_id: number;
             };
             proyectos: { nombre_paso: string };
             temporadas: { nombre: string };
@@ -141,11 +136,11 @@ export const historyStore = create<HistoryStore>()(() => ({
             id: r.id,
             nombre: r.nombre,
             created_at: r.creado_en,
-            trabajadera_count: r.snapshot?.trabajadera_count ?? 0,
+            trabajadera_id: r.snapshot?.trabajadera_id ?? trabajaderaId,
             plan_summary: r.snapshot?.plan_summary ?? {
               status: "incomplete",
-              salidas_por_trab: [],
-              tramos_por_trab: [],
+              salidas: 0,
+              tramos: 0,
             },
             proyecto_nombre: r.proyectos?.nombre_paso,
             temporada_nombre: r.temporadas?.nombre,
@@ -164,6 +159,7 @@ export const historyStore = create<HistoryStore>()(() => ({
 
   saveSnapshot: async (
     proyectoId: string,
+    trabajaderaId: number,
     nombre: string,
     descripcion?: string,
   ) => {
@@ -181,23 +177,21 @@ export const historyStore = create<HistoryStore>()(() => ({
     }
 
     const S = _getS();
-    const trabajaderas = S.trabajaderas;
+    const trabajadera = S.trabajaderas.find((t) => t.id === trabajaderaId);
 
-    // Build denormalized metadata
-    const trabajaderaCount = trabajaderas.length;
-    const trabajaderaIds = trabajaderas.map((t) => t.id);
-    const trabajaderaNombres = trabajaderas.map((t) => ({
-      tid: t.id,
-      nombres: [...t.nombres],
-    }));
+    if (!trabajadera) {
+      historyStore.setState({
+        isLoading: false,
+        error: `Trabajadera ${trabajaderaId} no encontrada`,
+      });
+      return;
+    }
 
-    const planSummary = computePlanSummary(trabajaderas);
+    const planSummary = computePlanSummary(trabajadera);
 
     const snapshotPayload = {
-      plan_data: trabajaderas,
-      trabajadera_count: trabajaderaCount,
-      trabajadera_ids: trabajaderaIds,
-      trabajadera_nombres: trabajaderaNombres,
+      plan_data: trabajadera,
+      trabajadera_id: trabajaderaId,
       plan_summary: planSummary,
     };
 
@@ -207,6 +201,7 @@ export const historyStore = create<HistoryStore>()(() => ({
         proyecto_id: proyectoId,
         temporada_id: temporadaStore.getState().activeTemporadaId || null,
         user_id: session.user.id,
+        trabajadera_id: trabajaderaId,
         nombre,
         descripcion: descripcion ?? null,
         snapshot: snapshotPayload,
@@ -226,7 +221,7 @@ export const historyStore = create<HistoryStore>()(() => ({
       id: row.id as string,
       nombre: row.nombre as string,
       created_at: row.creado_en as string,
-      trabajadera_count: trabajaderaCount,
+      trabajadera_id: trabajaderaId,
       plan_summary: planSummary,
     };
 
@@ -268,17 +263,12 @@ export const historyStore = create<HistoryStore>()(() => ({
       proyecto_id: row.proyecto_id as string,
       temporada_id: row.temporada_id as string,
       user_id: row.user_id as string,
+      trabajadera_id: row.trabajadera_id as number,
       nombre: row.nombre as string,
       descripcion: row.descripcion as string | undefined,
       created_at: row.creado_en as string,
       plan_data: (row.snapshot as Record<string, unknown>)
-        ?.plan_data as DatosPerfil,
-      trabajadera_count: (row.snapshot as Record<string, unknown>)
-        ?.trabajadera_count as number,
-      trabajadera_ids: (row.snapshot as Record<string, unknown>)
-        ?.trabajadera_ids as number[],
-      trabajadera_nombres: (row.snapshot as Record<string, unknown>)
-        ?.trabajadera_nombres as { tid: number; nombres: string[] }[],
+        ?.plan_data as Trabajadera,
       plan_summary: (row.snapshot as Record<string, unknown>)
         ?.plan_summary as PlanSnapshot["plan_summary"],
     };
@@ -329,28 +319,34 @@ export const historyStore = create<HistoryStore>()(() => ({
     }
 
     const S = _getS();
-    const snapshotTrabajaderas = snapshot.plan_data?.trabajaderas ?? [];
-    const currentTrabajaderas = S.trabajaderas;
+    const currentTrabajadera = S.trabajaderas.find(
+      (t) => t.id === snapshot.trabajadera_id,
+    );
 
-    const result = reconcile(snapshotTrabajaderas, currentTrabajaderas);
+    if (!currentTrabajadera) {
+      historyStore.setState({
+        isLoading: false,
+        error: "La trabajadera de esta instantánea ya no existe en el proyecto",
+      });
+      return null;
+    }
 
     // Hash current state for stale detection
-    const currentHash = JSON.stringify(currentTrabajaderas.map((t) => ({
-      nombres: t.nombres,
-      tramos: t.tramos,
-    })));
+    const currentHash = JSON.stringify({
+      nombres: currentTrabajadera.nombres,
+      plan: currentTrabajadera.plan,
+    });
 
     historyStore.setState({
       restorePreview: {
-        mapped: result.mapped,
-        diff: result.diff,
+        snapshotData: snapshot.plan_data,
         snapshotId,
         currentHash,
       },
       isLoading: false,
     });
 
-    return result;
+    return { snapshotData: snapshot.plan_data };
   },
 
   applyRestore: async (snapshotId: string) => {
@@ -367,23 +363,37 @@ export const historyStore = create<HistoryStore>()(() => ({
 
     // Stale guard: re-derive current state and compare hash
     const S = _getS();
-    const currentHash = JSON.stringify(S.trabajaderas.map((t) => ({
-      nombres: t.nombres,
-      tramos: t.tramos,
-    })));
+    const currentTrabajadera = S.trabajaderas.find(
+      (t) => t.id === preview.snapshotData.id,
+    );
 
-    if (currentHash !== preview.currentHash) {
-      return { ok: false, error: "La planificación ha cambiado desde la previsualización. Por favor, revisa la reconciliación de nuevo." };
+    if (!currentTrabajadera) {
+      return { ok: false, error: "La trabajadera ya no existe en el proyecto" };
     }
 
-    // Apply the reconciled plan via mutar
-    _mutar((d) => {
-      d.trabajaderas = preview.mapped;
+    const currentHash = JSON.stringify({
+      nombres: currentTrabajadera.nombres,
+      plan: currentTrabajadera.plan,
     });
 
-    // Recompute analisis for all restored trabajaderas (REQ-PH-004 scenario 1)
+    if (currentHash !== preview.currentHash) {
+      return { ok: false, error: "La planificación ha cambiado desde la previsualización. Por favor, revisa de nuevo." };
+    }
+
+    // Apply the restored plan to this single trabajadera
+    _mutar((d) => {
+      const idx = d.trabajaderas.findIndex((t) => t.id === preview.snapshotData.id);
+      if (idx !== -1) {
+        d.trabajaderas[idx] = preview.snapshotData;
+      }
+    });
+
+    // Recompute analisis for the restored trabajadera
     const restored = _getS();
-    _recalcAnalisis(restored.trabajaderas);
+    const t = restored.trabajaderas.find((t) => t.id === preview.snapshotData.id);
+    if (t) {
+      _recalcAnalisis(t);
+    }
 
     historyStore.setState({ restorePreview: null });
 
@@ -391,21 +401,18 @@ export const historyStore = create<HistoryStore>()(() => ({
   },
 }));
 
-// ── Pure helper: compute plan summary from trabajaderas ───────────
+// ── Pure helper: compute plan summary from single trabajadera ─────
 
-function computePlanSummary(trabajaderas: Trabajadera[]): PlanSnapshot["plan_summary"] {
-  const allOk = trabajaderas.every((t) => t.analisis?.okObj ?? false);
-  const hasAnyPlan = trabajaderas.some((t) => t.plan !== null);
-
-  const status: "ok" | "incomplete" | "error" = allOk
+function computePlanSummary(t: Trabajadera): PlanSnapshot["plan_summary"] {
+  const status: "ok" | "incomplete" | "error" = t.analisis?.okObj
     ? "ok"
-    : hasAnyPlan
+    : t.plan
       ? "incomplete"
       : "incomplete";
 
   return {
     status,
-    salidas_por_trab: trabajaderas.map((t) => t.nombres.length),
-    tramos_por_trab: trabajaderas.map((t) => t.tramos.length),
+    salidas: t.nombres.length,
+    tramos: t.tramos.length,
   };
 }

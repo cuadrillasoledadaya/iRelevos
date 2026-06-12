@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════
-// TESTS — HistorySheet.tsx (plan-history)
-// List, save, and manage plan snapshots
+// TESTS — HistorySheet.tsx (plan-history — single trabajadera)
+// List, save, and manage plan snapshots per trabajadera
 // ══════════════════════════════════════════════════════════════════
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -101,6 +101,7 @@ describe("HistorySheet", () => {
 
   it("shows empty state call-to-action when no snapshots", () => {
     mockProfile.profile = { role: "capataz" };
+    mockTrabajaderas.trabajaderas = [{ id: 1, analisis: { okObj: true } }];
     render(<HistorySheet />);
 
     expect(screen.getByText(/Aún no tienes instantáneas guardadas/)).toBeInTheDocument();
@@ -109,13 +110,14 @@ describe("HistorySheet", () => {
 
   it("displays snapshot list items", () => {
     mockProfile.profile = { role: "capataz" };
+    mockTrabajaderas.trabajaderas = [{ id: 1, analisis: { okObj: true } }];
     mockSnapshots.snapshots = [
       {
         id: "snap-1",
         nombre: "Trabajadera 1 — 11/06/2026",
         created_at: "2026-06-11T10:00:00Z",
-        trabajadera_count: 2,
-        plan_summary: { status: "ok", salidas_por_trab: [3], tramos_por_trab: [5] },
+        trabajadera_id: 1,
+        plan_summary: { status: "ok", salidas: 3, tramos: 5 },
         proyecto_nombre: "Paso Test",
         temporada_nombre: "2026",
       },
@@ -124,7 +126,7 @@ describe("HistorySheet", () => {
     render(<HistorySheet />);
 
     expect(screen.getByText("Trabajadera 1 — 11/06/2026")).toBeInTheDocument();
-    expect(screen.getByText("✓ OK")).toBeInTheDocument();
+    expect(screen.getByText(/ OK/)).toBeInTheDocument();
     expect(screen.getByText("Ver")).toBeInTheDocument();
     expect(screen.getByText("Comparar")).toBeInTheDocument();
     expect(screen.getByText("Restaurar")).toBeInTheDocument();
@@ -133,18 +135,19 @@ describe("HistorySheet", () => {
 
   it("shows incomplete badge when plan is not ok", () => {
     mockProfile.profile = { role: "capataz" };
+    mockTrabajaderas.trabajaderas = [{ id: 1, analisis: { okObj: true } }];
     mockSnapshots.snapshots = [
       {
         id: "snap-2",
         nombre: "Partial Plan",
         created_at: "2026-06-11T10:00:00Z",
-        trabajadera_count: 1,
-        plan_summary: { status: "incomplete", salidas_por_trab: [2], tramos_por_trab: [3] },
+        trabajadera_id: 1,
+        plan_summary: { status: "incomplete", salidas: 2, tramos: 3 },
       },
     ];
 
     render(<HistorySheet />);
 
-    expect(screen.getByText("⚠ Incompleto")).toBeInTheDocument();
+    expect(screen.getByText(/Incompleto/)).toBeInTheDocument();
   });
 });

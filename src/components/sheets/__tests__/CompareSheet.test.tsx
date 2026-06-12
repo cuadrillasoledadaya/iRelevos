@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════
-// TESTS — CompareSheet.tsx (plan-history Slice 2)
+// TESTS — CompareSheet.tsx (plan-history Slice 2 — single trabajadera)
 // Side-by-side comparison of snapshot vs current plan with color-coded cells
 // ══════════════════════════════════════════════════════════════════
 
@@ -66,10 +66,10 @@ vi.mock("@/stores", () => ({
   get projectStore() { return mockProjectStore; },
 }));
 
-// ── Helpers ──────────────────────────────────────────────────────
+// ─ Helpers ──────────────────────────────────────────────────────
 
 function makeSnapshot(
-  trabajaderas: Trabajadera[],
+  trabajadera: Trabajadera,
   overrides: Partial<PlanSnapshot> = {}
 ): PlanSnapshot {
   return {
@@ -77,19 +77,14 @@ function makeSnapshot(
     proyecto_id: "proj-1",
     temporada_id: "temp-1",
     user_id: "user-1",
+    trabajadera_id: trabajadera.id,
     nombre: "Test Snapshot",
     created_at: "2026-06-11T10:00:00Z",
-    plan_data: { banco: [], planes: [], trabajaderas },
-    trabajadera_count: trabajaderas.length,
-    trabajadera_ids: trabajaderas.map((t) => t.id),
-    trabajadera_nombres: trabajaderas.map((t) => ({
-      tid: t.id,
-      nombres: [...t.nombres],
-    })),
+    plan_data: trabajadera,
     plan_summary: {
       status: "ok",
-      salidas_por_trab: trabajaderas.map(() => 3),
-      tramos_por_trab: trabajaderas.map((t) => t.tramos.length),
+      salidas: 3,
+      tramos: trabajadera.tramos.length,
     },
     ...overrides,
   };
@@ -127,13 +122,13 @@ function makePlan(tramos: number, dentro: number[][], fuera: number[][]): Trabaj
 
 function renderCompareSheet({
   snapshot,
-  currentTrabajaderas,
+  currentTrabajadera,
 }: {
   snapshot: PlanSnapshot;
-  currentTrabajaderas: Trabajadera[];
+  currentTrabajadera: Trabajadera | null;
 }) {
   mockCurrentSnapshot.currentSnapshot = snapshot;
-  mockCurrentTrabajaderas.trabajaderas = currentTrabajaderas;
+  mockCurrentTrabajaderas.trabajaderas = currentTrabajadera ? [currentTrabajadera] : [];
 
   return render(<CompareSheet />);
 }
@@ -152,22 +147,22 @@ describe("CompareSheet", () => {
   describe("header and layout", () => {
     it("displays snapshot name and date in the snapshot column header", () => {
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
-      const snap = makeSnapshot([t], { nombre: "Plan Junio" });
-      const current = [makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]))];
+      const snap = makeSnapshot(t, { nombre: "Plan Junio" });
+      const current = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
 
-      renderCompareSheet({ snapshot: snap, currentTrabajaderas: current });
+      renderCompareSheet({ snapshot: snap, currentTrabajadera: current });
 
       expect(screen.getByText(/Plan Junio/)).toBeInTheDocument();
     });
 
     it("displays 'ACTUAL' label for the current plan column", () => {
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
-      const snap = makeSnapshot([t]);
-      const current = [makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]))];
+      const snap = makeSnapshot(t);
+      const current = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], makePlan(1, [[0, 1, 2, 3, 4]], [[]]));
 
-      renderCompareSheet({ snapshot: snap, currentTrabajaderas: current });
+      renderCompareSheet({ snapshot: snap, currentTrabajadera: current });
 
-      expect(screen.getByText("ACTUAL")).toBeInTheDocument();
+      expect(screen.getByText(/ACTUAL/)).toBeInTheDocument();
     });
   });
 
@@ -179,10 +174,10 @@ describe("CompareSheet", () => {
     it("renders neutral cells when snapshot and current are identical", () => {
       const plan = makePlan(1, [[0, 1, 2, 3, 4]], [[]]);
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], plan);
-      const snap = makeSnapshot([t]);
-      const current = [makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], plan)];
+      const snap = makeSnapshot(t);
+      const current = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], plan);
 
-      renderCompareSheet({ snapshot: snap, currentTrabajaderas: current });
+      renderCompareSheet({ snapshot: snap, currentTrabajadera: current });
 
       // All cells should be neutral — D badges present for both columns
       const dentroBadges = screen.getAllByText("D");
@@ -193,10 +188,10 @@ describe("CompareSheet", () => {
       const snapPlan = makePlan(1, [[0, 1, 2, 3, 4]], [[]]);
       const currPlan = makePlan(1, [[1, 2, 3, 4]], [[0]]);
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], snapPlan);
-      const snap = makeSnapshot([t]);
-      const current = [makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], currPlan)];
+      const snap = makeSnapshot(t);
+      const current = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], currPlan);
 
-      renderCompareSheet({ snapshot: snap, currentTrabajaderas: current });
+      renderCompareSheet({ snapshot: snap, currentTrabajadera: current });
 
       // A is DENTRO in snapshot, FUERA in current
       // Snapshot column shows D (removed), current column shows F
@@ -211,10 +206,10 @@ describe("CompareSheet", () => {
       const snapPlan = makePlan(1, [[1, 2, 3, 4]], [[0]]);
       const currPlan = makePlan(1, [[0, 1, 2, 3, 4]], [[]]);
       const t = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], snapPlan);
-      const snap = makeSnapshot([t]);
-      const current = [makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], currPlan)];
+      const snap = makeSnapshot(t);
+      const current = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1"], currPlan);
 
-      renderCompareSheet({ snapshot: snap, currentTrabajaderas: current });
+      renderCompareSheet({ snapshot: snap, currentTrabajadera: current });
 
       // A is FUERA in snapshot, DENTRO in current
       const allD = screen.getAllByText("D");
@@ -231,21 +226,21 @@ describe("CompareSheet", () => {
   describe("edge cases", () => {
     it("handles null snapshot plan gracefully", () => {
       const t = makeTrabajadera(1, ["A", "B"], ["T1"], null);
-      const snap = makeSnapshot([t]);
-      const current = [makeTrabajadera(1, ["A", "B"], ["T1"], makePlan(1, [[0, 1]], [[]]))];
+      const snap = makeSnapshot(t);
+      const current = makeTrabajadera(1, ["A", "B"], ["T1"], makePlan(1, [[0, 1]], [[]]));
 
-      renderCompareSheet({ snapshot: snap, currentTrabajaderas: current });
+      renderCompareSheet({ snapshot: snap, currentTrabajadera: current });
 
       // Should render without crashing
-      expect(screen.getByText("ACTUAL")).toBeInTheDocument();
+      expect(screen.getByText(/ACTUAL/)).toBeInTheDocument();
     });
 
     it("handles null current plan gracefully", () => {
       const t = makeTrabajadera(1, ["A", "B"], ["T1"], makePlan(1, [[0, 1]], [[]]));
-      const snap = makeSnapshot([t]);
-      const current = [makeTrabajadera(1, ["A", "B"], ["T1"], null)];
+      const snap = makeSnapshot(t);
+      const current = makeTrabajadera(1, ["A", "B"], ["T1"], null);
 
-      renderCompareSheet({ snapshot: snap, currentTrabajaderas: current });
+      renderCompareSheet({ snapshot: snap, currentTrabajadera: current });
 
       // Should render without crashing
       expect(screen.getByText(/ACTUAL/)).toBeInTheDocument();

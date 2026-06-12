@@ -1,12 +1,12 @@
 // ══════════════════════════════════════════════════════════════════
-// TESTS — RestoreSheet.tsx (plan-history)
-// Restore snapshot with reconciliation preview
+// TESTS — RestoreSheet.tsx (plan-history — single trabajadera)
+// Restore snapshot with preview
 // ══════════════════════════════════════════════════════════════════
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import RestoreSheet from "../RestoreSheet";
-import type { PlanSnapshot, ReconcileDiff, Trabajadera } from "@/lib/types";
+import type { PlanSnapshot, Trabajadera } from "@/lib/types";
 
 // ── Mock stores ──────────────────────────────────────────────────
 
@@ -15,8 +15,7 @@ const mockActiveSheet = "restore";
 const mockCurrentSnapshot = { currentSnapshot: null as PlanSnapshot | null };
 const mockRestorePreview = {
   restorePreview: null as {
-    mapped: Trabajadera[];
-    diff: ReconcileDiff;
+    snapshotData: Trabajadera;
     snapshotId: string;
     currentHash: string;
   } | null,
@@ -48,20 +47,35 @@ mockHistoryStore.getState = () => ({
   applyRestore: vi.fn(),
 });
 
-const mockProjectStore = vi.fn((selector?: (s: any) => any) => {
-  if (typeof selector === "function") {
-    return selector({ S: { trabajaderas: [] } });
-  }
-  return { S: { trabajaderas: [] } };
-}) as any;
-
 vi.mock("@/stores", () => ({
   get uiStore() { return mockUIStore; },
   get historyStore() { return mockHistoryStore; },
-  get projectStore() { return mockProjectStore; },
 }));
 
-// ── Helpers ──────────────────────────────────────────────────────
+// ─ Helpers ──────────────────────────────────────────────────────
+
+function makeTrabajadera(
+  id: number,
+  nombres: string[],
+  tramos: string[],
+  plan: Trabajadera["plan"]
+): Trabajadera {
+  return {
+    id,
+    nombres,
+    roles: nombres.map(() => ({ pri: "COS_I" as const, sec: "FIJ_I" as const })),
+    salidas: 2,
+    tramos,
+    bajas: [],
+    regla5costaleros: false,
+    plan,
+    obj: Object.fromEntries(nombres.map((_, i) => [i, 2])),
+    analisis: null,
+    pinned: null,
+    puntuaciones: {},
+    tramosClaves: [],
+  };
+}
 
 function makeSnapshot(overrides: Partial<PlanSnapshot> = {}): PlanSnapshot {
   return {
@@ -69,38 +83,25 @@ function makeSnapshot(overrides: Partial<PlanSnapshot> = {}): PlanSnapshot {
     proyecto_id: "proj-1",
     temporada_id: "temp-1",
     user_id: "user-1",
+    trabajadera_id: 1,
     nombre: "Test Snapshot",
     created_at: "2026-06-11T10:00:00Z",
-    plan_data: { banco: [], planes: [], trabajaderas: [] },
-    trabajadera_count: 0,
-    trabajadera_ids: [],
-    trabajadera_nombres: [],
-    plan_summary: { status: "ok", salidas_por_trab: [], tramos_por_trab: [] },
-    ...overrides,
-  };
-}
-
-function makeDiff(overrides: Partial<ReconcileDiff> = {}): ReconcileDiff {
-  return {
-    removed: [],
-    new: [],
-    mapped: [],
-    unmapped: [],
+    plan_data: makeTrabajadera(1, ["A", "B", "C"], ["T1", "T2"], null),
+    plan_summary: { status: "ok", salidas: 3, tramos: 2 },
     ...overrides,
   };
 }
 
 function renderRestoreSheet({
   snapshot,
-  diff,
+  snapshotData,
 }: {
   snapshot: PlanSnapshot;
-  diff: ReconcileDiff;
+  snapshotData: Trabajadera;
 }) {
   mockCurrentSnapshot.currentSnapshot = snapshot;
   mockRestorePreview.restorePreview = {
-    mapped: [],
-    diff,
+    snapshotData,
     snapshotId: snapshot.id,
     currentHash: "hash-1",
   };
@@ -129,51 +130,37 @@ describe("RestoreSheet", () => {
 
   it("displays snapshot name in header", () => {
     const snap = makeSnapshot({ nombre: "Plan Junio 2026" });
-    const diff = makeDiff();
-    renderRestoreSheet({ snapshot: snap, diff });
+    const trab = makeTrabajadera(1, ["A", "B", "C"], ["T1", "T2"], null);
+    renderRestoreSheet({ snapshot: snap, snapshotData: trab });
 
     expect(screen.getByText(/Restaurar: Plan Junio 2026/)).toBeInTheDocument();
   });
 
-  it("shows reconciliation summary counts", () => {
+  it("shows snapshot summary with trabajadera info", () => {
     const snap = makeSnapshot();
-    const diff = makeDiff({
-      removed: [{ tid: 1, idx: 0, nombre: "Pepe", tramos_affected: 2 }],
-      new: [{ tid: 1, idx: 3, nombre: "Maria" }],
-      mapped: [{ tid: 1, old_nombre: "Juan", new_nombre: "Juan", old_idx: 0, new_idx: 1 }],
-      unmapped: [{ tid: 1, idx: 2, nombre: "Duplicate", reason: "ambiguous" }],
-    });
-    renderRestoreSheet({ snapshot: snap, diff });
+    const trab = makeTrabajadera(1, ["A", "B", "C", "D", "E"], ["T1", "T2", "T3"], null);
+    renderRestoreSheet({ snapshot: snap, snapshotData: trab });
 
-    // Summary section has the counts
-    expect(screen.getByText(/Resumen de reconciliación/)).toBeInTheDocument();
-    expect(screen.getByText(/Preservados:/)).toBeInTheDocument();
-    expect(screen.getByText(/Quitados → FUERA:/)).toBeInTheDocument();
-    expect(screen.getByText(/Nuevos → FUERA:/)).toBeInTheDocument();
-    expect(screen.getByText(/Ambiguos:/)).toBeInTheDocument();
-    // Check mapped count in the mapped section header
-    expect(screen.getByText(/Mapeados \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Resumen de la instantánea/)).toBeInTheDocument();
+    expect(screen.getByText(/Trabajadera:/)).toBeInTheDocument();
+    expect(screen.getByText(/Costaleros activos:/)).toBeInTheDocument();
+    expect(screen.getByText(/Tramos:/)).toBeInTheDocument();
   });
 
-  it("lists removed costaleros", () => {
+  it("lists costaleros in the snapshot", () => {
     const snap = makeSnapshot();
-    const diff = makeDiff({
-      removed: [
-        { tid: 1, idx: 0, nombre: "Pepe", tramos_affected: 3 },
-        { tid: 1, idx: 1, nombre: "Ana", tramos_affected: 1 },
-      ],
-    });
-    renderRestoreSheet({ snapshot: snap, diff });
+    const trab = makeTrabajadera(1, ["Pepe", "Ana", "Juan"], ["T1"], null);
+    renderRestoreSheet({ snapshot: snap, snapshotData: trab });
 
     expect(screen.getByText(/Pepe/)).toBeInTheDocument();
     expect(screen.getByText(/Ana/)).toBeInTheDocument();
-    expect(screen.getByText(/3 tramos afectados/)).toBeInTheDocument();
+    expect(screen.getByText(/Juan/)).toBeInTheDocument();
   });
 
   it("shows apply and cancel buttons", () => {
     const snap = makeSnapshot();
-    const diff = makeDiff();
-    renderRestoreSheet({ snapshot: snap, diff });
+    const trab = makeTrabajadera(1, ["A", "B"], ["T1"], null);
+    renderRestoreSheet({ snapshot: snap, snapshotData: trab });
 
     expect(screen.getByText("Aplicar restauración")).toBeInTheDocument();
     expect(screen.getByText("Cancelar")).toBeInTheDocument();

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { uiStore, historyStore } from "@/stores";
 import type { Trabajadera } from "@/lib/types";
 
@@ -9,12 +8,6 @@ export default function SnapshotDetailSheet() {
   const closeSheet = uiStore.getState().closeSheet;
   const currentSnapshot = historyStore((s) => s.currentSnapshot);
   const isOpen = activeSheet === "detail";
-
-  useEffect(() => {
-    if (isOpen && !currentSnapshot) {
-      // Snapshot should already be loaded by HistorySheet before opening
-    }
-  }, [isOpen, currentSnapshot]);
 
   if (!currentSnapshot) {
     return (
@@ -38,8 +31,7 @@ export default function SnapshotDetailSheet() {
     );
   }
 
-  const { nombre, created_at, plan_data } = currentSnapshot;
-  const trabajaderas = plan_data?.trabajaderas ?? [];
+  const { nombre, created_at, plan_data, trabajadera_id } = currentSnapshot;
 
   return (
     <>
@@ -56,18 +48,16 @@ export default function SnapshotDetailSheet() {
           </div>
         </div>
         <div className="bs-body">
-          {trabajaderas.map((t) => (
-            <SnapshotTrabajadera key={t.id} t={t} />
-          ))}
+          <SnapshotTrabajadera t={plan_data} snapshotTrabajaderaId={trabajadera_id} />
         </div>
       </div>
     </>
   );
 }
 
-// ── Read-only Trabajadera view ────────────────────────────────────
+// ── Read-only Trabajadera view ───────────────────────────────────
 
-function SnapshotTrabajadera({ t }: { t: Trabajadera }) {
+function SnapshotTrabajadera({ t, snapshotTrabajaderaId }: { t: Trabajadera; snapshotTrabajaderaId: number }) {
   const plan = t.plan;
   const nBajas = t.bajas?.length ?? 0;
   const nActivos = t.nombres.length - nBajas;
@@ -75,9 +65,9 @@ function SnapshotTrabajadera({ t }: { t: Trabajadera }) {
   return (
     <div className="snapshot-trab">
       <div className="snapshot-trab-header">
-        <div className="t-badge">{t.id}</div>
+        <div className="t-badge">{snapshotTrabajaderaId}</div>
         <div className="t-info">
-          <div className="t-name">Trabajadera {t.id}</div>
+          <div className="t-name">Trabajadera {snapshotTrabajaderaId}</div>
           <div className="t-meta">
             {nActivos} act. · {t.tramos.length} tramos
           </div>

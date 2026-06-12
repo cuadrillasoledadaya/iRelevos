@@ -77,9 +77,9 @@ describe("GET /api/snapshots", () => {
         creado_en: "2026-06-11T10:00:00Z",
         snapshot: {
           plan_summary: { status: "ok" },
-          trabajadera_count: 1,
+          trabajadera_id: 1,
         },
-        proyectos: { nombre: "Paso Test" },
+        proyectos: { nombre_paso: "Paso Test" },
         temporadas: { nombre: "2026" },
       },
       {
@@ -88,9 +88,9 @@ describe("GET /api/snapshots", () => {
         creado_en: "2026-06-10T10:00:00Z",
         snapshot: {
           plan_summary: { status: "incomplete" },
-          trabajadera_count: 1,
+          trabajadera_id: 1,
         },
-        proyectos: { nombre: "Paso Test" },
+        proyectos: { nombre_paso: "Paso Test" },
         temporadas: { nombre: "2026" },
       },
     ];
@@ -178,7 +178,8 @@ describe("POST /api/snapshots", () => {
         proyecto_id: "550e8400-e29b-41d4-a716-446655440000",
         temporada_id: "550e8400-e29b-41d4-a716-446655440001",
         nombre: "Test snapshot",
-        snapshot: { banco: [], planes: [], trabajaderas: [] },
+        trabajadera_id: 1,
+        snapshot: { plan_data: { id: 1, nombres: [], tramos: [], plan: null }, plan_summary: { status: "ok" } },
       }),
     });
     const res = await POST(req);
@@ -238,7 +239,8 @@ describe("POST /api/snapshots", () => {
         proyecto_id: "550e8400-e29b-41d4-a716-446655440000",
         temporada_id: "550e8400-e29b-41d4-a716-446655440001",
         nombre: "Trabajadera 1 — 11/06/2026",
-        snapshot: { banco: [], planes: [], trabajaderas: [] },
+        trabajadera_id: 1,
+        snapshot: { plan_data: { id: 1, nombres: [], tramos: [], plan: null }, plan_summary: { status: "ok" } },
       }),
     });
     const res = await POST(req);

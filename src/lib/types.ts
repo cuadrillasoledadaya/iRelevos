@@ -135,24 +135,22 @@ export interface PasoDB {
   user_id?: string
 }
 
-// ── Plan History Types ────────────────────────────────────────────
+// ── Plan History Types ───────────────────────────────────────────
 
 export interface PlanSnapshot {
   id: string
   proyecto_id: string
   temporada_id: string
   user_id: string
+  trabajadera_id: number           // single trabajadera this snapshot belongs to
   nombre: string
   descripcion?: string
   created_at: string
-  plan_data: DatosPerfil          // full Trabajadera[] — same shape as S.trabajaderas
-  trabajadera_count: number
-  trabajadera_ids: number[]
-  trabajadera_nombres: { tid: number; nombres: string[] }[]
+  plan_data: Trabajadera           // single Trabajadera — not the full array
   plan_summary: {
     status: 'ok' | 'incomplete' | 'error'
-    salidas_por_trab: number[]
-    tramos_por_trab: number[]
+    salidas: number
+    tramos: number
   }
 }
 
@@ -160,7 +158,7 @@ export interface PlanSnapshotSummary {
   id: string
   nombre: string
   created_at: string
-  trabajadera_count: number
+  trabajadera_id: number
   plan_summary: PlanSnapshot['plan_summary']
   proyecto_nombre?: string
   temporada_nombre?: string
