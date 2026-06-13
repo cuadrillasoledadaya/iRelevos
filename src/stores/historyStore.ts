@@ -18,6 +18,7 @@ import type {
 export interface HistoryStore {
   snapshots: PlanSnapshotSummary[];
   currentSnapshot: PlanSnapshot | null;
+  selectedTrabajaderaId: number | null;
   isLoading: boolean;
   error: string | null;
   restorePreview: {
@@ -26,6 +27,7 @@ export interface HistoryStore {
     currentHash: string;
   } | null;
   // Actions
+  setSelectedTrabajaderaId: (id: number) => void;
   listSnapshots: (trabajaderaId: number) => Promise<void>;
   saveSnapshot: (
     proyectoId: string,
@@ -86,9 +88,14 @@ function defaultRecalcAnalisis(t: Trabajadera) {
 export const historyStore = create<HistoryStore>()(() => ({
   snapshots: [],
   currentSnapshot: null,
+  selectedTrabajaderaId: null,
   isLoading: false,
   error: null,
   restorePreview: null,
+
+  setSelectedTrabajaderaId: (id: number) => {
+    historyStore.setState({ selectedTrabajaderaId: id });
+  },
 
   listSnapshots: async (trabajaderaId: number) => {
     historyStore.setState({ isLoading: true, error: null });

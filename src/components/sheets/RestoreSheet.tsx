@@ -21,9 +21,14 @@ export default function RestoreSheet() {
           <div className="bs-handle" />
           <div className="bs-hdr">
             <span className="bs-title">Restaurar Instantánea</span>
-            <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
-              ✕
-            </button>
+            <div className="flex gap-2">
+              <button className="btn btn-ghost btn-sm" onClick={() => uiStore.getState().openSheet("history")}>
+                ← Volver
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
+                ✕
+              </button>
+            </div>
           </div>
           <div className="bs-body">
             <div className="p4 text-center text-muted">
@@ -50,9 +55,14 @@ export default function RestoreSheet() {
         <div className="bs-handle" />
         <div className="bs-hdr">
           <span className="bs-title">Restaurar: {snapshotName}</span>
-          <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
-            ✕
-          </button>
+          <div className="flex gap-2">
+            <button className="btn btn-ghost btn-sm" onClick={() => uiStore.getState().openSheet("history")}>
+              ← Volver
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
+              ✕
+            </button>
+          </div>
         </div>
         <div className="bs-body">
           {error && (

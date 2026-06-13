@@ -52,12 +52,14 @@ const mockTemporadaStore = vi.fn((selector?: (s: any) => any) => {
 
 const mockHistoryStore = vi.fn((selector?: (s: any) => any) => {
   if (typeof selector === "function") {
-    return selector({ ...mockSnapshots, ...mockLoading, ...mockError });
+    return selector({ ...mockSnapshots, ...mockLoading, ...mockError, selectedTrabajaderaId: null });
   }
   return {
     snapshots: mockSnapshots.snapshots,
     isLoading: mockLoading.isLoading,
     error: mockError.error,
+    selectedTrabajaderaId: null,
+    setSelectedTrabajaderaId: vi.fn(),
     listSnapshots: vi.fn(),
     saveSnapshot: vi.fn(),
     getSnapshot: vi.fn(),
@@ -70,6 +72,8 @@ mockHistoryStore.getState = () => ({
   snapshots: mockSnapshots.snapshots,
   isLoading: mockLoading.isLoading,
   error: mockError.error,
+  selectedTrabajaderaId: null,
+  setSelectedTrabajaderaId: vi.fn(),
   listSnapshots: vi.fn(),
   saveSnapshot: vi.fn(),
   getSnapshot: vi.fn(),

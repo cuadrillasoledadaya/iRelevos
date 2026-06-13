@@ -31,9 +31,9 @@ export default function HistorySheet() {
   const [snapshotName, setSnapshotName] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedTrabajaderaId, setSelectedTrabajaderaId] = useState<number>(
-    S.trabajaderas[0]?.id ?? 1,
-  );
+  const storeSelectedId = historyStore((s: { selectedTrabajaderaId: number | null }) => s.selectedTrabajaderaId);
+  const setSelectedTrabajaderaId = historyStore.getState().setSelectedTrabajaderaId;
+  const selectedTrabajaderaId = storeSelectedId ?? S.trabajaderas[0]?.id ?? 1;
 
   // Update selected trabajadera when S changes
   useEffect(() => {

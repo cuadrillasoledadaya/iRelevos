@@ -17,9 +17,14 @@ export default function SnapshotDetailSheet() {
           <div className="bs-handle" />
           <div className="bs-hdr">
             <span className="bs-title">Detalle</span>
-            <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
-              ✕
-            </button>
+            <div className="flex gap-2">
+              <button className="btn btn-ghost btn-sm" onClick={() => uiStore.getState().openSheet("history")}>
+                ← Volver
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
+                ✕
+              </button>
+            </div>
           </div>
           <div className="bs-body">
             <div className="p4 text-center text-muted">
@@ -41,6 +46,9 @@ export default function SnapshotDetailSheet() {
         <div className="bs-hdr">
           <span className="bs-title">{nombre}</span>
           <div className="flex gap-2">
+            <button className="btn btn-ghost btn-sm" onClick={() => uiStore.getState().openSheet("history")}>
+              ← Volver
+            </button>
             <span className="text-muted text-xs">{formatDate(created_at)}</span>
             <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
               ✕

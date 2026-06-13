@@ -30,6 +30,7 @@ describe("historyStore", () => {
     historyStore.setState({
       snapshots: [],
       currentSnapshot: null,
+      selectedTrabajaderaId: null,
       isLoading: false,
       error: null,
     });
