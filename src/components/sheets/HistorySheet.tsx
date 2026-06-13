@@ -243,10 +243,10 @@ export default function HistorySheet() {
 
       {/* Save Dialog */}
       {showSaveDialog && (
-        <div className="bso open" onClick={handleCloseSaveDialog}>
+        <div className="bso open" style={{ zIndex: 300 }} onClick={handleCloseSaveDialog}>
           <div
             className="bss open"
-            style={{ maxHeight: "50vh" }}
+            style={{ maxHeight: "50vh", zIndex: 301 }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bs-handle" />
