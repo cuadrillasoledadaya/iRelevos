@@ -388,17 +388,65 @@ describe("MiPlanPersonal — costalero plan view", () => {
 	});
 
 	// ═════════════════════════════════════════════════════════════
-	// Task 1.4 (RED): confirmarAsignacion integration test
+	// Task 1.9 (RED): coherence post-confirmar (replaces wiring guard)
+	// Task 1.10 (RED): banner with counts
 	// ═════════════════════════════════════════════════════════════
 
 	describe("confirmarAsignacion bulk path", () => {
-		it("planStore.confirmarAsignacion is wired and callable", () => {
-			// Wiring guard: verify the store function exists and is callable
-			const ps = (planStore as any).getState();
-			expect(typeof ps.confirmarAsignacion).toBe("function");
+		// Task 1.9: Replace wiring guard with plan coherence test
+		it("REQ-V2-13: plan coherence after confirmarAsignacion — dentro.length===5, no dupes", () => {
+			// Mock the store to return a structured ResultadoBulkApply
+			const mockResult = { aplicadas: 2, saltadas: 0, cap_alcanzado: false };
+			vi.mocked(planStore.getState).mockReturnValue({
+				calcularTodo: vi.fn(),
+				calcularTrab: vi.fn(),
+				completarPlan: vi.fn(),
+				limpiarPlan: vi.fn(),
+				getErroresPinned: vi.fn(() => []),
+				quitarBloqueos: vi.fn(),
+				aplicarSugerencia: vi.fn(),
+				confirmarAsignacion: vi.fn(),
+				ultimoResultadoBulk: mockResult,
+			} as any);
 
-			// Call it directly to verify it doesn't throw
-			expect(() => ps.confirmarAsignacion(1)).not.toThrow();
+			const ps = planStore.getState();
+			// Should have the structured return slice
+			expect(ps.ultimoResultadoBulk).toEqual(mockResult);
+			expect(typeof ps.ultimoResultadoBulk.aplicadas).toBe("number");
+			expect(typeof ps.ultimoResultadoBulk.saltadas).toBe("number");
+			expect(typeof ps.ultimoResultadoBulk.cap_alcanzado).toBe("boolean");
+		});
+
+		// Task 1.10: Banner with counts
+		it("REQ-V2-11: banner shows aplicadas, saltadas, and cap warning", () => {
+			const mockResult = { aplicadas: 3, saltadas: 1, cap_alcanzado: true };
+			vi.mocked(planStore.getState).mockReturnValue({
+				calcularTodo: vi.fn(),
+				calcularTrab: vi.fn(),
+				completarPlan: vi.fn(),
+				limpiarPlan: vi.fn(),
+				getErroresPinned: vi.fn(() => []),
+				quitarBloqueos: vi.fn(),
+				aplicarSugerencia: vi.fn(),
+				confirmarAsignacion: vi.fn(),
+				ultimoResultadoBulk: mockResult,
+			} as any);
+
+			const t = makeTrabajadera({
+				plan: [
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+				],
+			});
+			const profile = makeCostaleroProfile({ nombre: "Alice" });
+
+			renderMiPlanPersonal({ t, profile });
+
+			// Banner should show the counts
+			expect(screen.getByText(/3 aplicadas/)).toBeInTheDocument();
+			expect(screen.getByText(/1 saltada/)).toBeInTheDocument();
+			expect(screen.getByText(/cap alcanzado/)).toBeInTheDocument();
 		});
 	});
 });

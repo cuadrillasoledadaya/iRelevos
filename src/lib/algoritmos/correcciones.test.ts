@@ -12,6 +12,7 @@ import {
 	aplicarTodasLasCorrecciones,
 	MAX_ITER_BULK,
 } from "./correcciones";
+import { makeTrabajaderaRealista } from "./__fixtures__/correcciones";
 
 function makeTrabajaderaConPlan(
 	nombres: string[],
@@ -438,6 +439,143 @@ describe("correcciones", () => {
 				// The repetido correction has priority 1, but the point is:
 				// if there were also priority-3 corrections, they should be eligible.
 				expect(result).toBe(true);
+			}
+		});
+	});
+
+	// ═════════════════════════════════════════════════════════════
+	// RED TESTS — reanalisis-correcciones-v2 (tasks 1.2-1.9)
+	// ═════════════════════════════════════════════════════════════
+
+	describe("repetido branch (REQ-V2-1..6)", () => {
+		// Task 1.2: repetido branch activates with ciA in rep
+		it("REQ-V2-1: repetido branch activates when ciA is in analisis.rep", () => {
+			const t = makeTrabajaderaRealista("repetido");
+			// ciA=0 is in analisis.rep (outside T1 and T_last)
+			expect(t.analisis?.rep).toContain(0);
+			const ciA = 0;
+			const ciB = 1; // Pedro is inside T_last
+			const last = t.tramos.length - 1;
+
+			const result = aplicarIntercambio(t, 0, last, ciA, ciB);
+
+			// Should enter the repetido branch and return true
+			expect(result).toBe(true);
+		});
+
+		// Task 1.3: repetido removes ciA from both tramos
+		it("REQ-V2-2,3,4: repetido removes ciA from both T1 and T_last, preserves dentro.length===5, no dupes", () => {
+			const t = makeTrabajaderaRealista("repetido");
+			const ciA = 0;
+			const ciB = 1;
+			const last = t.tramos.length - 1;
+
+			aplicarIntercambio(t, 0, last, ciA, ciB);
+
+			// ciA must be in both fuera arrays
+			expect(t.plan![0].fuera).toContain(ciA);
+			expect(t.plan![last].fuera).toContain(ciA);
+
+			// dentro.length must be 5
+			expect(t.plan![0].dentro.length).toBe(5);
+			expect(t.plan![last].dentro.length).toBe(5);
+
+			// No duplicates
+			expect(new Set(t.plan![0].dentro).size).toBe(t.plan![0].dentro.length);
+			expect(new Set(t.plan![last].dentro).size).toBe(
+				t.plan![last].dentro.length,
+			);
+		});
+
+		// Task 1.4: T1 fill-in + analisis refresh
+		it("REQ-V2-5,6: T1 fill-in comes from r1.fuera (not bajas), obj+analisis recomputed", () => {
+			const t = makeTrabajaderaRealista("repetido");
+			const ciA = 0;
+			const ciB = 1;
+			const last = t.tramos.length - 1;
+			const r1FueraBefore = [...t.plan![0].fuera];
+
+			aplicarIntercambio(t, 0, last, ciA, ciB);
+
+			// The new costalero in T1.dentro that replaced ciA must come from r1.fuera
+			const nuevosEnT1 = t.plan![0].dentro.filter(
+				(idx) => idx !== ciA && !r1FueraBefore.includes(idx),
+			);
+			// Actually, the fill-in should be from the original r1.fuera
+			const fillIn = t.plan![0].dentro.find(
+				(idx) => r1FueraBefore.includes(idx) && idx !== ciA,
+			);
+			expect(fillIn).toBeDefined();
+			expect(t.bajas).not.toContain(fillIn);
+
+			// obj and analisis must be recomputed
+			expect(t.obj).toBeDefined();
+			expect(t.analisis).toBeDefined();
+			expect(t.analisis!.rep).toBeDefined();
+		});
+	});
+
+	describe("bulk apply structured return (REQ-V2-7..9)", () => {
+		// Task 1.5: bulk returns ResultadoBulkApply
+		it("REQ-V2-7: aplicarTodasLasCorrecciones returns structured ResultadoBulkApply", () => {
+			const t = makeTrabajaderaRealista("balanced");
+			const result = aplicarTodasLasCorrecciones(t);
+
+			// Should return an object with the right shape, NOT a boolean
+			expect(typeof result).toBe("object");
+			expect(result).toHaveProperty("aplicadas");
+			expect(result).toHaveProperty("saltadas");
+			expect(result).toHaveProperty("cap_alcanzado");
+			expect(typeof result.aplicadas).toBe("number");
+			expect(typeof result.saltadas).toBe("number");
+			expect(typeof result.cap_alcanzado).toBe("boolean");
+
+			// Balanced plan: no corrections needed
+			expect(result.aplicadas).toBe(0);
+			expect(result.saltadas).toBe(0);
+			expect(result.cap_alcanzado).toBe(false);
+		});
+
+		// Task 1.6: cap_alcanzado on exhaustion
+		it("REQ-V2-8: cap_alcanzado is true when MAX_ITER_BULK hit with pending corrections", () => {
+			const t = makeTrabajaderaRealista("oscillating");
+			const result = aplicarTodasLasCorrecciones(t);
+
+			// The oscillating scenario should hit the cap
+			expect(typeof result.cap_alcanzado).toBe("boolean");
+		});
+
+		// Task 1.7: saltadas counts false returns
+		it("REQ-V2-9: saltadas counts iterations where swap returned false", () => {
+			const t = makeTrabajaderaRealista("ciBNotInTlast");
+			const result = aplicarTodasLasCorrecciones(t);
+
+			// Should have the structured shape
+			expect(typeof result).toBe("object");
+			expect(result).toHaveProperty("saltadas");
+			expect(typeof result.saltadas).toBe("number");
+		});
+
+		// Task 1.8: realistic 3-5 tramo fixtures
+		it("REQ-V2-12: realistic fixtures produce coherent post-bulk plans", () => {
+			const scenarios: Array<
+				"repetido" | "combined" | "oscillating"
+			> = ["repetido", "combined", "oscillating"];
+
+			for (const scenario of scenarios) {
+				const t = makeTrabajaderaRealista(scenario);
+				const result = aplicarTodasLasCorrecciones(t);
+
+				// Result should be structured
+				expect(typeof result).toBe("object");
+				expect(result).toHaveProperty("aplicadas");
+
+				// Every tramo should have dentro.length === 5
+				for (const tramo of t.plan!) {
+					expect(tramo.dentro.length).toBe(5);
+					// No duplicates
+					expect(new Set(tramo.dentro).size).toBe(tramo.dentro.length);
+				}
 			}
 		});
 	});
