@@ -21,6 +21,13 @@ export type Prioridad = 1 | 2 | 3;
 /** Maximum iterations of the bulk-correction loop, as anti-oscillation cap. */
 export const MAX_ITER_BULK = 20;
 
+/** Structured result from bulk correction apply. */
+export interface ResultadoBulkApply {
+	aplicadas: number;
+	saltadas: number;
+	cap_alcanzado: boolean;
+}
+
 export interface AnalisisCorrecciones {
 	correcciones: CorreccionSugerida[];
 	erroresSaldo: {
@@ -299,41 +306,42 @@ export function aplicarIntercambio(
 	);
 
 	// Caso "repetido": ti1=0 (primer tramo) y ti2 es el último tramo
-	// ADICIONALMENTE: ciA debe estar DENTRO en ti1 (no fuera)
+	// ciA está FUERA en T1 (in analisis.rep = intersection of T1.fuera ∩ T_last.fuera)
 	const esRepetido =
 		ti1 === 0 &&
 		ti2 === t.tramos.length - 1 &&
-		t.plan[ti1]?.dentro.includes(ciA);
+		t.plan[ti1]?.fuera.includes(ciA);
 
 	if (esRepetido) {
 		const r1 = t.plan[ti1];
 		const r2 = t.plan[ti2];
 
-		// Verificar que ciA está dentro en ambos tramos
-		if (!r1.dentro.includes(ciA) || !r2.dentro.includes(ciA)) {
+		// Verify ciA is outside both T1 and T_last
+		if (!r1.fuera.includes(ciA) || !r2.fuera.includes(ciA)) {
 			return false;
 		}
-		// Verificar que ciB está dentro en ti2
+		// Verify ciB is inside T_last
 		if (!r2.dentro.includes(ciB)) {
 			return false;
 		}
 
-		// En ti1 (primer tramo): ciA pasa de dentro a fuera, intercambiamos con alguien
-		const idxCiAenT1 = r1.dentro.indexOf(ciA);
-		const alguienEnT1 = r1.dentro.find((idx) => idx !== ciA);
-		if (alguienEnT1 === undefined) return false;
+		// T1: ciA is already outside. Bring a fill-in candidate from r1.fuera
+		// into r1.dentro to improve plan balance.
+		const candidatoT1 = r1.fuera
+			.filter((i) => i !== ciA && !t.bajas?.includes(i))
+			.sort((a, b) => a - b)[0];
+		if (candidatoT1 === undefined) return false;
 
-		r1.dentro[idxCiAenT1] = alguienEnT1;
+		// Replace first element of r1.dentro with the candidate
+		r1.dentro[0] = candidatoT1;
 		r1.fuera = todos
 			.filter((i) => !r1.dentro.includes(i))
 			.sort((a, b) => a - b);
 
-		// En ti2 (último tramo): ciA pasa de dentro a fuera, ciB pasa de dentro a dentro
-		const idxCiAenT2 = r2.dentro.indexOf(ciA);
+		// T_last: swap ciA (fuera) with ciB (dentro)
 		const idxCiBenT2 = r2.dentro.indexOf(ciB);
-		if (idxCiAenT2 === -1 || idxCiBenT2 === -1) return false;
-
-		r2.dentro[idxCiAenT2] = ciB;
+		if (idxCiBenT2 === -1) return false;
+		r2.dentro[idxCiBenT2] = ciA;
 		r2.fuera = todos
 			.filter((i) => !r2.dentro.includes(i))
 			.sort((a, b) => a - b);
@@ -391,12 +399,18 @@ export function aplicarIntercambio(
  * Re-generates the suggestion list on every iteration (capped at MAX_ITER_BULK)
  * so the bulk path does not operate on a stale snapshot.
  * Modifies the Trabajadera in-place.
- * @returns true if at least one correction was applied
+ * @returns structured result with aplicadas, saltadas, and cap_alcanzado
  */
-export function aplicarTodasLasCorrecciones(t: Trabajadera): boolean {
-	if (!t.plan || !t.analisis) return false;
+export function aplicarTodasLasCorrecciones(
+	t: Trabajadera,
+): ResultadoBulkApply {
+	if (!t.plan || !t.analisis)
+		return { aplicadas: 0, saltadas: 0, cap_alcanzado: false };
 
 	let aplicadas = 0;
+	let saltadas = 0;
+	let cap_alcanzado = false;
+
 	for (let i = 0; i < MAX_ITER_BULK; i++) {
 		const sugerencias = generarSugerenciasCorreccion(t);
 		if (sugerencias.correcciones.length === 0) break;
@@ -415,7 +429,14 @@ export function aplicarTodasLasCorrecciones(t: Trabajadera): boolean {
 			corr.costaleroB.idx,
 		);
 		if (ok) aplicadas++;
+		else saltadas++;
+
+		// Check cap_alcanzado: last iteration AND still have pending corrections
+		if (i === MAX_ITER_BULK - 1) {
+			const next = generarSugerenciasCorreccion(t);
+			if (next.correcciones.length > 0) cap_alcanzado = true;
+		}
 	}
 
-	return aplicadas > 0;
+	return { aplicadas, saltadas, cap_alcanzado };
 }

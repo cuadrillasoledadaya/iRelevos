@@ -13,6 +13,7 @@ import {
 	aplicarIntercambio,
 	aplicarTodasLasCorrecciones,
 	aplicarSugerenciaLatente,
+	type ResultadoBulkApply,
 } from "@/lib/algoritmos";
 import { ordenarDentroFisico } from "@/lib/roles";
 import type {
@@ -48,6 +49,7 @@ export interface PlanStore {
 	delPlan: (id: string) => void;
 	cargarPlanEnTrabajadera: (tid: number, planId: string) => void;
 	aplicarSugerenciaLatente: (tid: number) => boolean;
+	ultimoResultadoBulk: ResultadoBulkApply | null;
 }
 
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void;
@@ -64,7 +66,8 @@ export function setPlanDeps(m: MutarFn, gt: GetTrabFn, gs: GetSFn) {
 	_getS = gs;
 }
 
-export const planStore = create<PlanStore>()(() => ({
+export const planStore = create<PlanStore>()((set) => ({
+		ultimoResultadoBulk: null as ResultadoBulkApply | null,
 		calcularTodo: () => {
 			_mutar((d) => {
 				d.trabajaderas.forEach((t) => {
@@ -167,13 +170,17 @@ export const planStore = create<PlanStore>()(() => ({
 		confirmarAsignacion: (tid) => {
 			_mutar((d) => {
 				const t = _getTrab(d, tid);
-				if (!t.plan) return;
+				if (!t.plan) {
+					set({ ultimoResultadoBulk: { aplicadas: 0, saltadas: 0, cap_alcanzado: false } });
+					return;
+				}
 
 			// Aplicar todas las correcciones sugeridas
 			// aplicarTodasLasCorrecciones re-generates the suggestion list on every
 			// iteration (capped at MAX_ITER_BULK = 20) so the bulk path does not
 			// operate on a stale snapshot.
-			aplicarTodasLasCorrecciones(t);
+			const result = aplicarTodasLasCorrecciones(t);
+			set({ ultimoResultadoBulk: result });
 
 				// NO fijar pinned automáticamente — solo se respetan los que el
 				// usuario marcó a mano. El sistema debe poder re-asignar libremente.

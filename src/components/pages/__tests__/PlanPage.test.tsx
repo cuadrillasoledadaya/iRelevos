@@ -19,6 +19,20 @@ const { useAuth } = await import("@/hooks/useAuth");
 
 // ── Mock stores ──────────────────────────────────────────────────
 
+import ConfirmarAsignacionBanner from "../../feedback/ConfirmarAsignacionBanner";
+
+let currentPlanStoreState = {
+	calcularTodo: vi.fn(),
+	calcularTrab: vi.fn(),
+	completarPlan: vi.fn(),
+	limpiarPlan: vi.fn(),
+	getErroresPinned: vi.fn(() => []),
+	quitarBloqueos: vi.fn(),
+	aplicarSugerencia: vi.fn(),
+	confirmarAsignacion: vi.fn(),
+	ultimoResultadoBulk: null as { aplicadas: number; saltadas: number; cap_alcanzado: boolean } | null,
+};
+
 vi.mock("@/stores", () => ({
 	uiStore: { getState: vi.fn(() => ({ openSheet: vi.fn() })) },
 	projectStore: vi.fn((selector) =>
@@ -28,19 +42,23 @@ vi.mock("@/stores", () => ({
 		}),
 	),
 	trabajaderaStore: { getState: vi.fn(() => ({})) },
-	planStore: {
-		getState: vi.fn(() => ({
-			calcularTodo: vi.fn(),
-			calcularTrab: vi.fn(),
-			completarPlan: vi.fn(),
-			limpiarPlan: vi.fn(),
-			getErroresPinned: vi.fn(() => []),
-			quitarBloqueos: vi.fn(),
-			aplicarSugerencia: vi.fn(),
-			confirmarAsignacion: vi.fn(),
-		})),
-	},
+	planStore: Object.assign(
+		vi.fn((selector: any) => selector(currentPlanStoreState)),
+		{ getState: vi.fn(() => currentPlanStoreState) },
+	),
 }));
+
+// Helper to update mock state
+function setPlanStoreState(overrides: Partial<typeof currentPlanStoreState>) {
+	currentPlanStoreState = { ...currentPlanStoreState, ...overrides };
+	// Re-setup the mock to return the new state
+	vi.mocked(planStore).mockImplementation(
+		Object.assign(
+			vi.fn((selector: any) => selector(currentPlanStoreState)),
+			{ getState: vi.fn(() => currentPlanStoreState) },
+		) as any,
+	);
+}
 
 const { projectStore, planStore } = await import("@/stores");
 
@@ -393,60 +411,44 @@ describe("MiPlanPersonal — costalero plan view", () => {
 	// ═════════════════════════════════════════════════════════════
 
 	describe("confirmarAsignacion bulk path", () => {
+		beforeEach(() => {
+			// Reset mock state
+			currentPlanStoreState = {
+				...currentPlanStoreState,
+				ultimoResultadoBulk: null,
+			};
+		});
+
 		// Task 1.9: Replace wiring guard with plan coherence test
 		it("REQ-V2-13: plan coherence after confirmarAsignacion — dentro.length===5, no dupes", () => {
 			// Mock the store to return a structured ResultadoBulkApply
 			const mockResult = { aplicadas: 2, saltadas: 0, cap_alcanzado: false };
-			vi.mocked(planStore.getState).mockReturnValue({
-				calcularTodo: vi.fn(),
-				calcularTrab: vi.fn(),
-				completarPlan: vi.fn(),
-				limpiarPlan: vi.fn(),
-				getErroresPinned: vi.fn(() => []),
-				quitarBloqueos: vi.fn(),
-				aplicarSugerencia: vi.fn(),
-				confirmarAsignacion: vi.fn(),
-				ultimoResultadoBulk: mockResult,
-			} as any);
+			setPlanStoreState({ ultimoResultadoBulk: mockResult });
 
 			const ps = planStore.getState();
 			// Should have the structured return slice
 			expect(ps.ultimoResultadoBulk).toEqual(mockResult);
-			expect(typeof ps.ultimoResultadoBulk.aplicadas).toBe("number");
-			expect(typeof ps.ultimoResultadoBulk.saltadas).toBe("number");
-			expect(typeof ps.ultimoResultadoBulk.cap_alcanzado).toBe("boolean");
+			expect(ps.ultimoResultadoBulk!).toBeDefined();
+			expect(typeof ps.ultimoResultadoBulk!.aplicadas).toBe("number");
+			expect(typeof ps.ultimoResultadoBulk!.saltadas).toBe("number");
+			expect(typeof ps.ultimoResultadoBulk!.cap_alcanzado).toBe("boolean");
 		});
 
 		// Task 1.10: Banner with counts
 		it("REQ-V2-11: banner shows aplicadas, saltadas, and cap warning", () => {
 			const mockResult = { aplicadas: 3, saltadas: 1, cap_alcanzado: true };
-			vi.mocked(planStore.getState).mockReturnValue({
-				calcularTodo: vi.fn(),
-				calcularTrab: vi.fn(),
-				completarPlan: vi.fn(),
-				limpiarPlan: vi.fn(),
-				getErroresPinned: vi.fn(() => []),
-				quitarBloqueos: vi.fn(),
-				aplicarSugerencia: vi.fn(),
-				confirmarAsignacion: vi.fn(),
-				ultimoResultadoBulk: mockResult,
-			} as any);
+			const onDismiss = vi.fn();
 
-			const t = makeTrabajadera({
-				plan: [
-					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
-					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
-					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
-				],
-			});
-			const profile = makeCostaleroProfile({ nombre: "Alice" });
-
-			renderMiPlanPersonal({ t, profile });
+			render(<ConfirmarAsignacionBanner result={mockResult} onDismiss={onDismiss} />);
 
 			// Banner should show the counts
 			expect(screen.getByText(/3 aplicadas/)).toBeInTheDocument();
 			expect(screen.getByText(/1 saltada/)).toBeInTheDocument();
 			expect(screen.getByText(/cap alcanzado/)).toBeInTheDocument();
+
+			// Dismiss button works
+			fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+			expect(onDismiss).toHaveBeenCalled();
 		});
 	});
 });

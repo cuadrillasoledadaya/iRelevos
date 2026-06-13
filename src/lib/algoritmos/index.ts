@@ -27,8 +27,9 @@ export {
 	generarSugerenciasCorreccion,
 	aplicarIntercambio,
 	aplicarTodasLasCorrecciones,
+	MAX_ITER_BULK,
 } from "./correcciones";
-export type { CorreccionSugerida, Prioridad, AnalisisCorrecciones } from "./correcciones";
+export type { CorreccionSugerida, Prioridad, AnalisisCorrecciones, ResultadoBulkApply } from "./correcciones";
 
 // Utils
 export { isGenericTramo } from "./utils";

@@ -13,6 +13,7 @@ import { getDentroFisico, estructuraPaso, rolLabel, rolBase } from "@/lib/roles"
 import type { Trabajadera, RolCode } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import BoquillaView from "./BoquillaView";
+import ConfirmarAsignacionBanner from "../feedback/ConfirmarAsignacionBanner";
 
 export default function PlanPage() {
 	const S = projectStore((s) => s.S);
@@ -421,6 +422,9 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 	const quitarBloqueos = planStore.getState().quitarBloqueos;
 	const aplicarSugerencia = planStore.getState().aplicarSugerencia;
 	const confirmarAsignacion = planStore.getState().confirmarAsignacion;
+	const ultimoResultadoBulk = planStore((s) => s.ultimoResultadoBulk);
+	const [bannerDismissed, setBannerDismissed] = useState(false);
+	const bannerResult = bannerDismissed ? null : ultimoResultadoBulk;
 	const setBancoTargetLocal = uiStore.getState().setBancoTarget;
 	const openSheetLocal = uiStore.getState().openSheet;
 	const { profile } = useAuth();
@@ -896,12 +900,20 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 												}}
 												onClick={() => {
 													confirmarAsignacion(t.id);
+													setBannerDismissed(false);
 												}}
 												title="Aplica todas las sugerencias y fija la asignación actual"
 											>
 												✅ Confirmar asignación
 											</button>
 										</div>
+									)}
+									{/* Banner feedback after Confirmar */}
+									{bannerResult && (
+										<ConfirmarAsignacionBanner
+											result={bannerResult}
+											onDismiss={() => setBannerDismissed(true)}
+										/>
 									)}
 								</>
 							);

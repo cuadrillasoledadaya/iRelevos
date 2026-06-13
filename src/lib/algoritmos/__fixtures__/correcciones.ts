@@ -3,7 +3,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { analizar } from "../rotacion";
-import type { Trabajadera, TramoSlot } from "../types";
+import type { Trabajadera, TramoSlot } from "../../types";
 
 const NOMS_6 = ["Juan", "Pedro", "Luis", "Ana", "María", "Sofía"];
 const NOMS_10 = [
@@ -38,17 +38,28 @@ function baseT(
 
 /**
  * Scenario: "repetido" — ciA=0 is outside in T1 AND T_last (in analisis.rep).
- * 3 tramos, 6 costaleros.
- * ciA=0 (Juan) is in rep. ciB=1 (Pedro) is inside T_last.
+ * 3 tramos, 10 costaleros (so there are fill-in candidates).
+ * ciA=0 (A) is in rep. ciB=1 (B) is inside T_last.
  */
 export function makeRepetidoScenario(): Trabajadera {
 	const plan: TramoSlot[] = [
-		{ dentro: [1, 2, 3, 4, 5], fuera: [0] }, // T1: Juan fuera
-		{ dentro: [0, 2, 3, 4, 5], fuera: [1] }, // T2
-		{ dentro: [0, 2, 3, 4, 5], fuera: [1] }, // T_last: Juan fuera → rep
+		{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] }, // T1: A fuera, many others
+		{ dentro: [0, 2, 3, 4, 5], fuera: [1, 6, 7, 8, 9] }, // T2
+		{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] }, // T_last: A fuera → rep, B(1) dentro
 	];
-	const obj: Record<number, number> = { 0: 2, 1: 1, 2: 0, 3: 0, 4: 0, 5: 0 };
-	return baseT(NOMS_6, ["T1", "T2", "T3"], plan, obj);
+	const obj: Record<number, number> = {
+		0: 2,
+		1: 0,
+		2: 0,
+		3: 0,
+		4: 0,
+		5: 0,
+		6: 3,
+		7: 3,
+		8: 3,
+		9: 3,
+	};
+	return baseT(NOMS_10, ["T1", "T2", "T3"], plan, obj);
 }
 
 /**
