@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { uiStore, projectStore, historyStore } from "@/stores";
+import { uiStore, projectStore, historyStore, temporadaStore } from "@/stores";
 import { useAuth } from "@/hooks/useAuth";
 import type { PlanSnapshotSummary, DatosPerfil } from "@/lib/types";
 
@@ -18,6 +18,7 @@ export default function HistorySheet() {
   const error = historyStore((s: { error: string | null }) => s.error);
   const S = projectStore((s: { S: DatosPerfil }) => s.S);
   const pid = projectStore((s) => s.pid);
+  const activeTemporadaId = temporadaStore((s) => s.activeTemporadaId);
   const { profile } = useAuth();
 
   const esMando =
@@ -28,6 +29,8 @@ export default function HistorySheet() {
   const isOpen = activeSheet === "history";
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [snapshotName, setSnapshotName] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedTrabajaderaId, setSelectedTrabajaderaId] = useState<number>(
     S.trabajaderas[0]?.id ?? 1,
   );
@@ -53,13 +56,28 @@ export default function HistorySheet() {
 
   function handleOpenSave() {
     setSnapshotName(defaultName);
+    setSaveError(null);
     setShowSaveDialog(true);
+  }
+
+  function handleCloseSaveDialog() {
+    if (isSaving) return;
+    setShowSaveDialog(false);
+    setSaveError(null);
   }
 
   async function handleSave() {
     if (!pid || !snapshotName.trim() || !selectedTrabajaderaId) return;
-    await saveSnapshot(pid, selectedTrabajaderaId, snapshotName.trim());
-    setShowSaveDialog(false);
+    setIsSaving(true);
+    setSaveError(null);
+    historyStore.setState({ error: null });
+    const result = await saveSnapshot(pid, selectedTrabajaderaId, snapshotName.trim());
+    setIsSaving(false);
+    if (result.ok) {
+      setShowSaveDialog(false);
+    } else {
+      setSaveError(result.error);
+    }
   }
 
   async function handleView(id: string) {
@@ -117,8 +135,14 @@ export default function HistorySheet() {
             <button
               className="btn btn-oro btn-sm"
               onClick={handleOpenSave}
-              disabled={!selectedTrab?.analisis?.okObj}
-              title="Guardar plan de esta trabajadera como instantánea"
+              disabled={!selectedTrab?.analisis?.okObj || !pid || !activeTemporadaId}
+              title={
+                !activeTemporadaId
+                  ? "Selecciona una temporada activa antes de guardar"
+                  : !pid
+                    ? "No hay proyecto activo"
+                    : "Guardar plan de esta trabajadera como instantánea"
+              }
             >
               + Guardar
             </button>
@@ -219,7 +243,7 @@ export default function HistorySheet() {
 
       {/* Save Dialog */}
       {showSaveDialog && (
-        <div className="bso open" onClick={() => setShowSaveDialog(false)}>
+        <div className="bso open" onClick={handleCloseSaveDialog}>
           <div
             className="bss open"
             style={{ maxHeight: "50vh" }}
@@ -230,31 +254,35 @@ export default function HistorySheet() {
               <span className="bs-title">Guardar Instantánea</span>
               <button
                 className="btn btn-ghost btn-sm"
-                onClick={() => setShowSaveDialog(false)}
+                onClick={handleCloseSaveDialog}
               >
                 ✕
               </button>
             </div>
             <div className="bs-body">
-              <label className="form-label">Nombre</label>
+              <label className="form-label" htmlFor="snapshot-name">Nombre</label>
               <input
+                id="snapshot-name"
                 className="form-input"
                 type="text"
                 value={snapshotName}
                 onChange={(e) => setSnapshotName(e.target.value)}
                 placeholder="Trabajadera X — DD/MM/YYYY"
               />
+              {saveError && (
+                <div className="alert warn mt3" role="alert">{saveError}</div>
+              )}
               <div className="flex gap-2 mt3">
                 <button
                   className="btn btn-oro f1"
                   onClick={handleSave}
-                  disabled={!snapshotName.trim() || isLoading}
+                  disabled={!snapshotName.trim() || isSaving}
                 >
-                  {isLoading ? "Guardando..." : "Guardar"}
+                  {isSaving ? "Guardando..." : "Guardar"}
                 </button>
                 <button
                   className="btn btn-ghost f1"
-                  onClick={() => setShowSaveDialog(false)}
+                  onClick={handleCloseSaveDialog}
                 >
                   Cancelar
                 </button>

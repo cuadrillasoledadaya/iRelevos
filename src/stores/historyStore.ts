@@ -32,7 +32,7 @@ export interface HistoryStore {
     trabajaderaId: number,
     nombre: string,
     descripcion?: string,
-  ) => Promise<void>;
+  ) => Promise<{ ok: true } | { ok: false; error: string }>;
   getSnapshot: (id: string) => Promise<PlanSnapshot | null>;
   deleteSnapshot: (id: string) => Promise<void>;
   previewRestore: (snapshotId: string) => Promise<{ snapshotData: Trabajadera } | null>;
@@ -162,73 +162,87 @@ export const historyStore = create<HistoryStore>()(() => ({
     trabajaderaId: number,
     nombre: string,
     descripcion?: string,
-  ) => {
+  ): Promise<{ ok: true } | { ok: false; error: string }> => {
     historyStore.setState({ isLoading: true, error: null });
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.user) {
-      historyStore.setState({
-        isLoading: false,
-        error: "No autenticado",
-      });
-      return;
-    }
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) {
+        historyStore.setState({
+          isLoading: false,
+          error: "No autenticado",
+        });
+        return { ok: false, error: "No autenticado" };
+      }
 
-    const S = _getS();
-    const trabajadera = S.trabajaderas.find((t) => t.id === trabajaderaId);
+      const S = _getS();
+      const trabajadera = S.trabajaderas.find((t) => t.id === trabajaderaId);
 
-    if (!trabajadera) {
-      historyStore.setState({
-        isLoading: false,
-        error: `Trabajadera ${trabajaderaId} no encontrada`,
-      });
-      return;
-    }
+      if (!trabajadera) {
+        const msg = `Trabajadera ${trabajaderaId} no encontrada`;
+        historyStore.setState({ isLoading: false, error: msg });
+        return { ok: false, error: msg };
+      }
 
-    const planSummary = computePlanSummary(trabajadera);
+      const activeTemporadaId = temporadaStore.getState().activeTemporadaId;
+      if (!activeTemporadaId) {
+        const msg = "No hay temporada activa. Selecciona una temporada antes de guardar.";
+        historyStore.setState({ isLoading: false, error: msg });
+        return { ok: false, error: msg };
+      }
 
-    const snapshotPayload = {
-      plan_data: trabajadera,
-      trabajadera_id: trabajaderaId,
-      plan_summary: planSummary,
-    };
+      const planSummary = computePlanSummary(trabajadera);
 
-    const { data, error } = await supabase
-      .from("plan_snapshots")
-      .insert({
-        proyecto_id: proyectoId,
-        temporada_id: temporadaStore.getState().activeTemporadaId || null,
-        user_id: session.user.id,
+      const snapshotPayload = {
+        plan_data: trabajadera,
         trabajadera_id: trabajaderaId,
-        nombre,
-        descripcion: descripcion ?? null,
-        snapshot: snapshotPayload,
-        creado_por: session.user.id,
-      })
-      .select()
-      .single();
+        plan_summary: planSummary,
+      };
 
-    if (error) {
-      historyStore.setState({ isLoading: false, error: error.message });
-      return;
+      const { data, error } = await supabase
+        .from("plan_snapshots")
+        .insert({
+          proyecto_id: proyectoId,
+          temporada_id: activeTemporadaId,
+          user_id: session.user.id,
+          trabajadera_id: trabajaderaId,
+          nombre,
+          descripcion: descripcion ?? null,
+          snapshot: snapshotPayload,
+          creado_por: session.user.id,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        historyStore.setState({ isLoading: false, error: error.message });
+        return { ok: false, error: error.message };
+      }
+
+      // Prepend to local list
+      const row = data as Record<string, unknown>;
+      const newSummary: PlanSnapshotSummary = {
+        id: row.id as string,
+        nombre: row.nombre as string,
+        created_at: row.creado_en as string,
+        trabajadera_id: trabajaderaId,
+        plan_summary: planSummary,
+      };
+
+      historyStore.setState((state: HistoryStore) => ({
+        snapshots: [newSummary, ...state.snapshots],
+        isLoading: false,
+        error: null,
+      }));
+
+      return { ok: true };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido al guardar";
+      historyStore.setState({ isLoading: false, error: msg });
+      return { ok: false, error: msg };
     }
-
-    // Prepend to local list
-    const row = data as Record<string, unknown>;
-    const newSummary: PlanSnapshotSummary = {
-      id: row.id as string,
-      nombre: row.nombre as string,
-      created_at: row.creado_en as string,
-      trabajadera_id: trabajaderaId,
-      plan_summary: planSummary,
-    };
-
-    historyStore.setState((state: HistoryStore) => ({
-      snapshots: [newSummary, ...state.snapshots],
-      isLoading: false,
-    }));
   },
 
   getSnapshot: async (id: string) => {

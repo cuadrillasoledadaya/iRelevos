@@ -18,6 +18,7 @@ const mockLoading = { isLoading: false };
 const mockError = { error: null as string | null };
 const mockTrabajaderas = { trabajaderas: [] as { id: number; analisis: { okObj: boolean } | null }[] };
 const mockPid = { pid: "proj-1" };
+const mockActiveTemporadaId = { activeTemporadaId: "temp-1" };
 const mockProfile = { profile: { role: "capataz" } };
 
 const mockUIStore = vi.fn((selector?: (s: any) => any) => {
@@ -40,6 +41,13 @@ const mockProjectStore = vi.fn((selector?: (s: any) => any) => {
     });
   }
   return { S: { trabajaderas: mockTrabajaderas.trabajaderas }, pid: mockPid.pid };
+}) as any;
+
+const mockTemporadaStore = vi.fn((selector?: (s: any) => any) => {
+  if (typeof selector === "function") {
+    return selector({ activeTemporadaId: mockActiveTemporadaId.activeTemporadaId });
+  }
+  return { activeTemporadaId: mockActiveTemporadaId.activeTemporadaId };
 }) as any;
 
 const mockHistoryStore = vi.fn((selector?: (s: any) => any) => {
@@ -74,6 +82,7 @@ vi.mock("@/stores", () => ({
   get uiStore() { return mockUIStore; },
   get historyStore() { return mockHistoryStore; },
   get projectStore() { return mockProjectStore; },
+  get temporadaStore() { return mockTemporadaStore; },
 }));
 
 vi.mock("@/hooks/useAuth", () => ({
@@ -89,6 +98,7 @@ describe("HistorySheet", () => {
     mockLoading.isLoading = false;
     mockError.error = null;
     mockTrabajaderas.trabajaderas = [];
+    mockActiveTemporadaId.activeTemporadaId = "temp-1";
     mockProfile.profile = { role: "capataz" };
   });
 
