@@ -169,9 +169,11 @@ export const planStore = create<PlanStore>()(() => ({
 				const t = _getTrab(d, tid);
 				if (!t.plan) return;
 
-				// Aplicar todas las correcciones sugeridas
-				// (cada aplicarIntercambio ya recalcula obj + analisis internamente)
-				aplicarTodasLasCorrecciones(t);
+			// Aplicar todas las correcciones sugeridas
+			// aplicarTodasLasCorrecciones re-generates the suggestion list on every
+			// iteration (capped at MAX_ITER_BULK = 20) so the bulk path does not
+			// operate on a stale snapshot.
+			aplicarTodasLasCorrecciones(t);
 
 				// NO fijar pinned automáticamente — solo se respetan los que el
 				// usuario marcó a mano. El sistema debe poder re-asignar libremente.
