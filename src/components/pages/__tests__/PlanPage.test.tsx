@@ -42,7 +42,7 @@ vi.mock("@/stores", () => ({
 	},
 }));
 
-const { projectStore } = await import("@/stores");
+const { projectStore, planStore } = await import("@/stores");
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -384,6 +384,21 @@ describe("MiPlanPersonal — costalero plan view", () => {
 			const posChip = getPosChipInRow(row);
 			expect(posChip).toHaveTextContent("1");
 			expect(getRoleLabelInRow(row)).toHaveTextContent("Costero Izq");
+		});
+	});
+
+	// ═════════════════════════════════════════════════════════════
+	// Task 1.4 (RED): confirmarAsignacion integration test
+	// ═════════════════════════════════════════════════════════════
+
+	describe("confirmarAsignacion bulk path", () => {
+		it("planStore.confirmarAsignacion is wired and callable", () => {
+			// Wiring guard: verify the store function exists and is callable
+			const ps = (planStore as any).getState();
+			expect(typeof ps.confirmarAsignacion).toBe("function");
+
+			// Call it directly to verify it doesn't throw
+			expect(() => ps.confirmarAsignacion(1)).not.toThrow();
 		});
 	});
 });
