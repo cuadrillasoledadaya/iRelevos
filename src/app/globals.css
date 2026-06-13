@@ -2821,6 +2821,10 @@ html.light .swap-card.COR {
 	background: #3498db;
 }
 
+.dot-legend.mapped {
+	background: #9b59b6;
+}
+
 .compare-columns-header {
 	padding: 0.25rem 0;
 }
@@ -2854,6 +2858,11 @@ html.light .swap-card.COR {
 
 .compare-cell.compare-neutral {
 	opacity: 0.7;
+}
+
+.compare-cell.compare-mapped {
+	outline: 2px solid #9b59b6;
+	outline-offset: -1px;
 }
 
 /* Badge styles for snapshot items */
