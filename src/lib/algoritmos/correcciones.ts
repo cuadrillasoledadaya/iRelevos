@@ -18,6 +18,9 @@ export interface CorreccionSugerida {
 /** Prioridad de corrección: 1=crítica, 2=alta, 3=media */
 export type Prioridad = 1 | 2 | 3;
 
+/** Maximum iterations of the bulk-correction loop, as anti-oscillation cap. */
+export const MAX_ITER_BULK = 20;
+
 export interface AnalisisCorrecciones {
 	correcciones: CorreccionSugerida[];
 	erroresSaldo: {
@@ -385,22 +388,25 @@ export function aplicarIntercambio(
 
 /**
  * Aplica todas las sugerencias de corrección disponibles en orden de prioridad.
- * Modifica la Trabajadera in-place.
- * @returns true si al menos una corrección fue aplicada
+ * Re-generates the suggestion list on every iteration (capped at MAX_ITER_BULK)
+ * so the bulk path does not operate on a stale snapshot.
+ * Modifies the Trabajadera in-place.
+ * @returns true if at least one correction was applied
  */
 export function aplicarTodasLasCorrecciones(t: Trabajadera): boolean {
 	if (!t.plan || !t.analisis) return false;
 
-	const sugerencias = generarSugerenciasCorreccion(t);
-	if (sugerencias.correcciones.length === 0) return false;
-
-	// Sort by priority (1 = crítica first)
-	const ordenadas = [...sugerencias.correcciones].sort(
-		(a, b) => (a.prioridad ?? 3) - (b.prioridad ?? 3),
-	);
-
 	let aplicadas = 0;
-	for (const corr of ordenadas) {
+	for (let i = 0; i < MAX_ITER_BULK; i++) {
+		const sugerencias = generarSugerenciasCorreccion(t);
+		if (sugerencias.correcciones.length === 0) break;
+
+		// Highest priority first (1 = crítica, 3 = media)
+		const ordenadas = [...sugerencias.correcciones].sort(
+			(a, b) => (a.prioridad ?? 3) - (b.prioridad ?? 3),
+		);
+		const corr = ordenadas[0];
+
 		const ok = aplicarIntercambio(
 			t,
 			corr.tramoOrigen,
