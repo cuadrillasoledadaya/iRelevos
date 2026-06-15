@@ -134,6 +134,32 @@ export function makeCiBNotInTlastScenario(): Trabajadera {
 }
 
 /**
+ * Scenario: "saldo-duplicado" — plan with severe imbalance that would
+ * trigger the duplicate-index bug without the v3 guard.
+ * 4 tramos, 10 costaleros.
+ *
+ * The imbalance causes multiple bulk iterations. After the first iteration
+ * moves ciA into r2.dentro at position p, the re-analysis may produce
+ * another correction that would write ciA into the same r2.dentro at
+ * position q ≠ p. The v3 guard prevents this.
+ */
+export function makeSaldoDuplicadoScenario(): Trabajadera {
+	const plan: TramoSlot[] = [
+		{ dentro: [5, 6, 7, 8, 9], fuera: [0, 1, 2, 3, 4] },  // T1: 0-4 fuera
+		{ dentro: [5, 6, 7, 8, 9], fuera: [0, 1, 2, 3, 4] },  // T2: 0-4 fuera
+		{ dentro: [5, 6, 7, 8, 9], fuera: [0, 1, 2, 3, 4] },  // T3: 0-4 fuera
+		{ dentro: [5, 6, 7, 8, 9], fuera: [0, 1, 2, 3, 4] },  // T4: 0-4 fuera
+	];
+	// Extreme imbalance: 0-4 have 0 outs (need 2), 5-9 have 4 outs (need 2).
+	// Bulk apply will try to swap 0-4 into tramos where 5-9 are inside.
+	const obj: Record<number, number> = {
+		0: 2, 1: 2, 2: 2, 3: 2, 4: 2,
+		5: 2, 6: 2, 7: 2, 8: 2, 9: 2,
+	};
+	return baseT(NOMS_10, ["T1", "T2", "T3", "T4"], plan, obj);
+}
+
+/**
  * Helper: create a generic realistic Trabajadera with 3-5 tramos.
  */
 export function makeTrabajaderaRealista(

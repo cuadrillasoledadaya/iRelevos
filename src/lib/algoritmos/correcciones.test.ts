@@ -13,6 +13,7 @@ import {
 	MAX_ITER_BULK,
 } from "./correcciones";
 import { makeTrabajaderaRealista } from "./__fixtures__/correcciones";
+import { makeSaldoDuplicadoScenario } from "./__fixtures__/correcciones";
 
 function makeTrabajaderaConPlan(
 	nombres: string[],
@@ -166,7 +167,7 @@ describe("correcciones", () => {
 				regla5costaleros: false,
 				plan: [
 					{ dentro: [1, 2, 3, 4, 5], fuera: [0] },
-					{ dentro: [0, 1, 3, 4, 5], fuera: [2] },
+					{ dentro: [2, 1, 3, 4, 5], fuera: [0] },
 					{ dentro: [0, 2, 3, 4, 5], fuera: [1] },
 				],
 				obj: { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0 },
@@ -176,6 +177,8 @@ describe("correcciones", () => {
 				tramosClaves: [],
 			};
 			// Use ti2=1 (not the last tramo) so it goes to the saldo branch
+			// ciA=0 is fuera in T1, ciB=1 is dentro in T2 at index 1
+			// ciA=0 is NOT in T2.dentro → guard should not fire
 			const resultado = aplicarIntercambio(t, 0, 1, 0, 1);
 			expect(resultado).toBe(true);
 			expect(t.plan![1].fuera).toContain(1);
@@ -489,8 +492,110 @@ describe("correcciones", () => {
 	});
 
 	// ═════════════════════════════════════════════════════════════
-	// RED TESTS — reanalisis-correcciones-v2 (tasks 1.2-1.9)
+	// RED TESTS — reanalisis-correcciones-v3 (tasks 1.2-1.3)
 	// ═════════════════════════════════════════════════════════════
+
+	describe("duplicate guard in saldo/consecutivo branch (REQ-CORR-V3-1)", () => {
+		// Task 1.2a: guard fires when ciA already in r2.dentro at different position
+		it("REQ-CORR-V3-1: returns false when ciA ∈ r2.dentro at different position, no duplicate created", () => {
+			// Build a plan where ciA=0 is outside in T1 (ti1=0),
+			// and ciA=0 is ALREADY inside T2.dentro at position 0.
+			// We try to swap ciA=0 into T2.dentro at position 2 (where ciB=2 sits).
+			// The guard should detect ciA is already in r2.dentro at a different index.
+			const t: Trabajadera = {
+				id: 10,
+				nombres: ["A", "B", "C", "D", "E", "F"],
+				roles: [{ pri: "COR" as const, sec: "FIJ_I" as const }],
+				salidas: 3,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: [
+					{ dentro: [1, 2, 3, 4, 5], fuera: [0] },     // T1: ciA=0 fuera
+					{ dentro: [0, 1, 3, 4, 5], fuera: [2] },     // T2: ciA=0 ya dentro en pos 0, ciB=2 fuera
+					{ dentro: [0, 1, 2, 3, 4], fuera: [5] },     // T3
+				],
+				obj: { 0: 2, 1: 0, 2: 1, 3: 0, 4: 0, 5: 1 },
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			};
+			// ciA=0 is fuera in T1, ciB=1 is dentro in T2 at index 1
+			// But ciA=0 is ALSO already in T2.dentro at index 0
+			// If we call aplicarIntercambio(t, 0, 1, 0, 1):
+			//   - ciA=0 is fuera in T1 ✓
+			//   - ciB=1 is dentro in T2 ✓ (at index 1)
+			//   - Without guard: r2.dentro[1] = 0 → duplicate 0 at positions 0 and 1
+			const before = t.plan![1].dentro.map(Number);
+			const result = aplicarIntercambio(t, 0, 1, 0, 1);
+
+			// Guard should fire: ciA=0 is already in r2.dentro at index 0,
+			// and we'd write it at index 1 (idxCiBenT2)
+			expect(result).toBe(false);
+			// r2.dentro must be unchanged
+			expect(t.plan![1].dentro).toEqual(before);
+			expect(t.plan![1].dentro.length).toBe(5);
+			expect(new Set(t.plan![1].dentro).size).toBe(5);
+		});
+
+		// Task 1.2b: guard does NOT fire when ciA is not in r2.dentro
+		it("REQ-CORR-V3-1: normal swap executes when ciA ∉ r2.dentro", () => {
+			// Standard saldo scenario: ciA=0 is fuera in T1, NOT in T2.dentro
+			const t: Trabajadera = {
+				id: 11,
+				nombres: ["A", "B", "C", "D", "E", "F"],
+				roles: [{ pri: "COR" as const, sec: "FIJ_I" as const }],
+				salidas: 3,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: [
+					{ dentro: [1, 2, 3, 4, 5], fuera: [0] },     // T1: ciA=0 fuera
+					{ dentro: [2, 3, 4, 5, 1], fuera: [0] },     // T2: ciA=0 NO está dentro
+					{ dentro: [0, 1, 2, 3, 4], fuera: [5] },     // T3
+				],
+				obj: { 0: 2, 1: 0, 2: 0, 3: 0, 4: 0, 5: 1 },
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			};
+			// ciA=0 is fuera in T1, ciB=1 is dentro in T2 at index 4
+			// ciA=0 is NOT in T2.dentro → guard should NOT fire
+			const result = aplicarIntercambio(t, 0, 1, 0, 1);
+
+			expect(result).toBe(true);
+			// ciA=0 should now be in T2.dentro where ciB=1 was
+			expect(t.plan![1].dentro).toContain(0);
+			expect(t.plan![1].fuera).toContain(1);
+			expect(t.plan![1].dentro.length).toBe(5);
+			expect(new Set(t.plan![1].dentro).size).toBe(5);
+		});
+	});
+
+	describe("saldo duplicado fixture (REQ-CORR-V3-2)", () => {
+		// Task 1.3: fixture triggers duplicate on iteration N>1, guard prevents it
+		it("REQ-CORR-V3-2: makeSaldoDuplicadoScenario — post-bulk plan has no duplicates in any tramo", () => {
+			const t = makeSaldoDuplicadoScenario();
+
+			// Should have 3-5 tramos
+			expect(t.plan).not.toBeNull();
+			expect(t.plan!.length).toBeGreaterThanOrEqual(3);
+			expect(t.plan!.length).toBeLessThanOrEqual(5);
+
+			const result = aplicarTodasLasCorrecciones(t);
+
+			// At least some corrections attempted
+			expect(result.aplicadas + result.saltadas).toBeGreaterThan(0);
+
+			// Every tramo must have exactly 5 inside, no duplicates
+			for (const tramo of t.plan!) {
+				expect(tramo.dentro.length).toBe(5);
+				expect(new Set(tramo.dentro).size).toBe(5);
+			}
+		});
+	});
 
 	describe("repetido branch (REQ-V2-1..6)", () => {
 		// Task 1.2: repetido branch activates with ciA in rep

@@ -28,6 +28,12 @@ export interface ResultadoBulkApply {
 	cap_alcanzado: boolean;
 }
 
+/** Preview of bulk corrections before applying — non-mutating. */
+export interface BulkCorreccionesPreview {
+	correcciones: CorreccionSugerida[];
+	summary: Record<string, number>;
+}
+
 export interface AnalisisCorrecciones {
 	correcciones: CorreccionSugerida[];
 	erroresSaldo: {
@@ -376,6 +382,13 @@ export function aplicarIntercambio(
 	// Intercambio en ti2: ciB pasa de dentro a fuera, ciA pasa de fuera a dentro
 	const idxCiBenT2 = r2.dentro.indexOf(ciB);
 	if (idxCiBenT2 === -1) return false;
+
+	// ── REQ-CORR-V3-1: duplicate guard ───────────────────────────
+	// A previous bulk iteration may have already written ciA into r2.dentro
+	// at a different position. Re-writing it would create a duplicate.
+	if (r2.dentro.includes(ciA) && r2.dentro.indexOf(ciA) !== idxCiBenT2) {
+		return false;
+	}
 
 	r2.dentro[idxCiBenT2] = ciA;
 	r2.fuera = todos.filter((i) => !r2.dentro.includes(i)).sort((a, b) => a - b);
