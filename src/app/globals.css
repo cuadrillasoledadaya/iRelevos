@@ -37,6 +37,11 @@
 	--warn-oro: #f5c842;
 	--warn-oro-bg: rgba(180, 100, 0, 0.18);
 	--warn-oro-bd: rgba(230, 140, 20, 0.45);
+	/* Preview — violeta highlight for bulk corrections */
+	--preview: #a855f7;
+	--preview-bg: rgba(168, 85, 247, 0.12);
+	--preview-bd: #a855f7;
+	--preview-tx: #d8b4fe;
 	--txt-body: var(--cre);
 }
 /* ── TEMA CLARO ── */
@@ -57,6 +62,9 @@ html.light {
 	--err-tx: #9b2020;
 	--warn-bg: rgba(180, 130, 0, 0.1);
 	--warn-bd: rgba(180, 130, 0, 0.4);
+	--preview-bg: rgba(168, 85, 247, 0.08);
+	--preview-tx: #581c87;
+	--preview-bd: #7e22ce;
 }
 
 /* ── OVERRIDES TEMA CLARO ── */
@@ -1108,6 +1116,25 @@ body {
 	background: var(--warn-bg);
 	border: 1px solid var(--warn-bd);
 	color: var(--oro-c);
+}
+.preview-row {
+	position: relative;
+	display: flex;
+	gap: 0.6rem;
+	align-items: flex-start;
+	padding: 0.55rem 0.75rem 0.55rem 0.85rem;
+	background: var(--preview-bg);
+	border: 1px solid var(--preview-bd);
+	border-left-width: 3px;
+	border-radius: 6px;
+	color: var(--preview-tx);
+}
+.preview-bar {
+	width: 3px;
+	background: var(--preview-bd);
+	border-radius: 2px;
+	align-self: stretch;
+	flex-shrink: 0;
 }
 .sal-chips {
 	display: flex;

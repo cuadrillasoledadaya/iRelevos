@@ -14,6 +14,7 @@ import type { Trabajadera, RolCode } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import BoquillaView from "./BoquillaView";
 import ConfirmarAsignacionBanner from "../feedback/ConfirmarAsignacionBanner";
+import PreviewCorreccionesSheet from "../sheets/PreviewCorreccionesSheet";
 
 export default function PlanPage() {
 	const S = projectStore((s) => s.S);
@@ -421,9 +422,9 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 	const getErroresPinned = planStore.getState().getErroresPinned;
 	const quitarBloqueos = planStore.getState().quitarBloqueos;
 	const aplicarSugerencia = planStore.getState().aplicarSugerencia;
-	const confirmarAsignacion = planStore.getState().confirmarAsignacion;
 	const ultimoResultadoBulk = planStore((s) => s.ultimoResultadoBulk);
 	const [bannerDismissed, setBannerDismissed] = useState(false);
+	const [previewOpen, setPreviewOpen] = useState(false);
 	const bannerResult = bannerDismissed ? null : ultimoResultadoBulk;
 	const setBancoTargetLocal = uiStore.getState().setBancoTarget;
 	const openSheetLocal = uiStore.getState().openSheet;
@@ -899,7 +900,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 													fontWeight: 600,
 												}}
 												onClick={() => {
-													confirmarAsignacion(t.id);
+													setPreviewOpen(true);
 													setBannerDismissed(false);
 												}}
 												title="Aplica todas las sugerencias y fija la asignación actual"
@@ -915,6 +916,11 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											onDismiss={() => setBannerDismissed(true)}
 										/>
 									)}
+									<PreviewCorreccionesSheet
+										tid={t.id}
+										open={previewOpen}
+										onClose={() => setPreviewOpen(false)}
+									/>
 								</>
 							);
 						})()}
