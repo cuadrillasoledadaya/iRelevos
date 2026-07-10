@@ -30,11 +30,19 @@ let currentPlanStoreState = {
 	quitarBloqueos: vi.fn(),
 	aplicarSugerencia: vi.fn(),
 	confirmarAsignacion: vi.fn(),
+	previsualizarCorreccionesBulk: vi.fn(),
+	confirmarCorreccionesBulk: vi.fn(),
 	ultimoResultadoBulk: null as { aplicadas: number; saltadas: number; cap_alcanzado: boolean } | null,
 };
 
-vi.mock("@/stores", () => ({
-	uiStore: { getState: vi.fn(() => ({ openSheet: vi.fn() })) },
+	vi.mock("@/stores", () => ({
+		uiStore: {
+			getState: vi.fn(() => ({
+				openSheet: vi.fn(),
+				setCellTarget: vi.fn(),
+				setBancoTarget: vi.fn(),
+			})),
+		},
 	projectStore: vi.fn((selector) =>
 		selector({
 			S: {} as DatosPerfil,
@@ -449,6 +457,99 @@ describe("MiPlanPersonal — costalero plan view", () => {
 			// Dismiss button works
 			fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
 			expect(onDismiss).toHaveBeenCalled();
+		});
+	});
+
+	// ═════════════════════════════════════════════════════════════
+	// W1 fixup: Task 3.3 — PlanPage Confirmar button → preview sheet
+	// ═════════════════════════════════════════════════════════════
+
+	describe("Confirmar asignación → preview sheet wiring (Task 3.3)", () => {
+		it("REQ-V3-5: clicking Confirmar asignación opens preview sheet with corrections", async () => {
+			// Mock previsualizarCorreccionesBulk to return corrections
+			const mockPreview = {
+				correcciones: [
+					{
+						tipo: "repetido" as const,
+						costaleroA: { nombre: "Alice", idx: 0, problema: "Repite" },
+						costaleroB: { nombre: "Bob", idx: 1, solucion: "Intercambiar" },
+						tramoOrigen: 0,
+						tramoDestino: 2,
+						impacto: "Eliminar repetición",
+						prioridad: 1 as const,
+					},
+					{
+						tipo: "saldo" as const,
+						costaleroA: { nombre: "Charlie", idx: 2, problema: "Saldo" },
+						costaleroB: { nombre: "Dana", idx: 3, solucion: "Intercambiar" },
+						tramoOrigen: 0,
+						tramoDestino: 1,
+						impacto: "Equilibrar",
+						prioridad: 2 as const,
+					},
+					{
+						tipo: "consecutivo" as const,
+						costaleroA: { nombre: "Eve", idx: 4, problema: "Consecutivo" },
+						costaleroB: { nombre: "Alice", idx: 0, solucion: "Intercambiar" },
+						tramoOrigen: 1,
+						tramoDestino: 2,
+						impacto: "Separar",
+						prioridad: 2 as const,
+					},
+				],
+				summary: { repetido: 1, saldo: 1, consecutivo: 1 },
+			};
+
+			setPlanStoreState({
+				previsualizarCorreccionesBulk: vi.fn(() => mockPreview),
+				confirmarCorreccionesBulk: vi.fn(() => ({ aplicadas: 3, saltadas: 0, cap_alcanzado: false })),
+				ultimoResultadoBulk: null,
+			});
+
+			// Use a trabajadera with a real plan (not null) and valid analisis
+			// that produces suggestions via generarSugerenciasCorreccion
+			const t = makeTrabajadera({
+				id: 2,
+				nombres: ["Alice", "Bob", "Charlie", "Dana", "Eve"],
+				plan: [
+					{ dentro: [1, 2, 3, 4], fuera: [0], dentroFisico: [1, 2, 3, 4, null] },
+					{ dentro: [0, 2, 3, 4], fuera: [1], dentroFisico: [0, 2, 3, 4, null] },
+					{ dentro: [1, 2, 3, 4], fuera: [0], dentroFisico: [1, 2, 3, 4, null] },
+				],
+				obj: { 0: 2, 1: 1, 2: 0, 3: 0, 4: 0 },
+				// rep: [0] means Alice is outside in T1 and T3 → produces repetido correction
+				analisis: {
+					conteo: { 0: 2, 1: 1, 2: 0, 3: 0, 4: 0 },
+					okObj: false,
+					dentro5: true,
+					primer: [0],
+					ultimo: [0],
+					rep: [0],
+					cons: 0,
+				},
+			});
+			// Render as capataz so PlanPage renders PlanTrabajadera (which owns the button)
+			const profile = makeCostaleroProfile({
+				nombre: "Alice",
+				apellidos: "",
+				trabajadera: 2,
+				role: "capataz",
+			});
+
+			renderMiPlanPersonal({ t, profile });
+
+			// Find the "Confirmar asignación" button by text content
+			const confirmarBtn = screen.getByText(/Confirmar asignación/);
+			expect(confirmarBtn).toBeInTheDocument();
+
+			fireEvent.click(confirmarBtn);
+
+			// Preview sheet should appear with correction rows
+			const previewRows = await screen.findAllByTestId("preview-row");
+			expect(previewRows).toHaveLength(3);
+
+			// Summary should show
+			expect(screen.getByTestId("preview-summary")).toBeInTheDocument();
 		});
 	});
 });
