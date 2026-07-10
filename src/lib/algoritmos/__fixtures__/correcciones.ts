@@ -142,6 +142,17 @@ export function makeCiBNotInTlastScenario(): Trabajadera {
  * moves ciA into r2.dentro at position p, the re-analysis may produce
  * another correction that would write ciA into the same r2.dentro at
  * position q ≠ p. The v3 guard prevents this.
+ *
+ * Design: idx 0 is outside in ALL tramos (in rep). idx 5-9 are inside
+ * in ALL tramos. This produces repetido corrections for idx 0 that cycle
+ * through the repetido branch. The fixture validates that bulk-apply
+ * produces a coherent plan with no duplicates.
+ *
+ * NOTE: The guard at correcciones.ts:389 lives in the saldo/consecutivo
+ * branch. This fixture primarily exercises the repetido branch because
+ * idx 0 is outside in both T1 and T_last (in rep). The guard is verified
+ * directly by the unit test "bulk-apply exercises v3 guard through
+ * saldo/consecutivo branch" in correcciones.test.ts.
  */
 export function makeSaldoDuplicadoScenario(): Trabajadera {
 	const plan: TramoSlot[] = [

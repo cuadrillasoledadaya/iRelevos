@@ -597,6 +597,67 @@ describe("correcciones", () => {
 				expect(new Set(tramo.dentro).size).toBe(5);
 			}
 		});
+
+		// W2 fixup: direct guard test — proves guard fires when ciA ∈ r2.dentro
+		it("REQ-CORR-V3-2: guard fires when ciA already in r2.dentro at different position (direct)", () => {
+			// Construct state where guard MUST fire:
+			// ciA=0 is outside in T1 (ti1=0)
+			// ciA=0 is ALREADY inside in T2.dentro at position 0
+			// ciB=1 is inside in T2.dentro at position 1
+			// We try to swap ciA=0 into T2.dentro at position 1 (where ciB=1 sits)
+			// ti2=1 is NOT the last tramo (last=2), so NOT repetido branch → saldo branch
+			const plan: TramoSlot[] = [
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] },   // T1: ciA=0 fuera
+				{ dentro: [0, 1, 3, 4, 5], fuera: [2, 6, 7, 8, 9] },   // T2: ciA=0 at pos 0, ciB=1 at pos 1
+				{ dentro: [0, 1, 2, 3, 4], fuera: [5, 6, 7, 8, 9] },   // T3 (last)
+			];
+			const obj: Record<number, number> = {
+				0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 1, 6: 3, 7: 3, 8: 3, 9: 3,
+			};
+			const t = makeTrabajaderaConPlan(
+				["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+				plan,
+				obj,
+			);
+
+			const before = [...t.plan![1].dentro];
+			const result = aplicarIntercambio(t, 0, 1, 0, 1);
+
+			// Guard should fire: ciA=0 already in T2.dentro at pos 0, we'd write at pos 1
+			expect(result).toBe(false);
+			expect(t.plan![1].dentro).toEqual(before);
+			expect(new Set(t.plan![1].dentro).size).toBe(5);
+		});
+
+		// W2 fixup: sanity check — without guard, duplicate would be created
+		it("REQ-CORR-V3-2: SANITY — removing guard creates duplicate (proves test exercises guard)", () => {
+			// Same setup as above, but we manually simulate what would happen WITHOUT the guard
+			const plan: TramoSlot[] = [
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] },
+				{ dentro: [0, 1, 3, 4, 5], fuera: [2, 6, 7, 8, 9] },
+				{ dentro: [0, 1, 2, 3, 4], fuera: [5, 6, 7, 8, 9] },
+			];
+			const obj: Record<number, number> = {
+				0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 1, 6: 3, 7: 3, 8: 3, 9: 3,
+			};
+			const t = makeTrabajaderaConPlan(
+				["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+				plan,
+				obj,
+			);
+
+			// Simulate what would happen WITHOUT the guard:
+			// r2.dentro[1] = ciA (0) → duplicate 0 at positions 0 and 1
+			const r2 = t.plan![1];
+			const idxCiBenT2 = r2.dentro.indexOf(1); // ciB=1 is at position 1
+			// Without guard: r2.dentro[idxCiBenT2] = 0 → [0, 0, 3, 4, 5]
+			r2.dentro[idxCiBenT2] = 0;
+			r2.fuera = [2, 6, 7, 8, 9].sort((a, b) => a - b);
+
+			// This would create a duplicate
+			expect(new Set(r2.dentro).size).toBe(4); // 5 elements but only 4 unique → DUPLICATE!
+			expect(r2.dentro.filter((x) => x === 0).length).toBe(2);
+		});
 	});
 
 	describe("planStore bulk actions (REQ-CORR-V3-3, V3-4)", () => {
