@@ -13,7 +13,9 @@ import {
 	aplicarIntercambio,
 	aplicarTodasLasCorrecciones,
 	aplicarSugerenciaLatente,
+	generarSugerenciasCorreccion,
 	type ResultadoBulkApply,
+	type BulkCorreccionesPreview,
 } from "@/lib/algoritmos";
 import { ordenarDentroFisico } from "@/lib/roles";
 import type {
@@ -39,6 +41,8 @@ export interface PlanStore {
 		ciA: number,
 		ciB: number,
 	) => boolean;
+	previsualizarCorreccionesBulk: (tid: number) => BulkCorreccionesPreview | null;
+	confirmarCorreccionesBulk: (tid: number) => ResultadoBulkApply;
 	confirmarAsignacion: (tid: number) => void;
 	limpiarPlanificacion: () => void;
 	limpiarTrabajaderas: () => void;
@@ -66,7 +70,7 @@ export function setPlanDeps(m: MutarFn, gt: GetTrabFn, gs: GetSFn) {
 	_getS = gs;
 }
 
-export const planStore = create<PlanStore>()((set) => ({
+export const planStore = create<PlanStore>()((set, get) => ({
 		ultimoResultadoBulk: null as ResultadoBulkApply | null,
 		calcularTodo: () => {
 			_mutar((d) => {
@@ -167,24 +171,36 @@ export const planStore = create<PlanStore>()((set) => ({
 			return result;
 		},
 
-		confirmarAsignacion: (tid) => {
+		previsualizarCorreccionesBulk: (tid) => {
+			const t = _getTrab(_getS(), tid);
+			if (!t.plan || !t.analisis) return null;
+			const s = generarSugerenciasCorreccion(t);
+			if (s.correcciones.length === 0) return null;
+			const summary: Record<string, number> = {};
+			for (const c of s.correcciones) {
+				const key = `T${c.tramoOrigen + 1}\u2194T${c.tramoDestino + 1}`;
+				summary[key] = (summary[key] ?? 0) + 1;
+			}
+			return { correcciones: s.correcciones, summary };
+		},
+
+		confirmarCorreccionesBulk: (tid) => {
+			let result: ResultadoBulkApply = { aplicadas: 0, saltadas: 0, cap_alcanzado: false };
 			_mutar((d) => {
 				const t = _getTrab(d, tid);
 				if (!t.plan) {
-					set({ ultimoResultadoBulk: { aplicadas: 0, saltadas: 0, cap_alcanzado: false } });
+					set({ ultimoResultadoBulk: result });
 					return;
 				}
-
-			// Aplicar todas las correcciones sugeridas
-			// aplicarTodasLasCorrecciones re-generates the suggestion list on every
-			// iteration (capped at MAX_ITER_BULK = 20) so the bulk path does not
-			// operate on a stale snapshot.
-			const result = aplicarTodasLasCorrecciones(t);
-			set({ ultimoResultadoBulk: result });
-
-				// NO fijar pinned automáticamente — solo se respetan los que el
-				// usuario marcó a mano. El sistema debe poder re-asignar libremente.
+				result = aplicarTodasLasCorrecciones(t);
+				set({ ultimoResultadoBulk: result });
 			});
+			return result;
+		},
+
+		confirmarAsignacion: (tid) => {
+			// Thin wrapper for backward compat (D6)
+			get().confirmarCorreccionesBulk(tid);
 		},
 
 		aplicarSugerenciaLatente: (tid) => {

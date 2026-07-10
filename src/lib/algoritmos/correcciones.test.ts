@@ -14,6 +14,8 @@ import {
 } from "./correcciones";
 import { makeTrabajaderaRealista } from "./__fixtures__/correcciones";
 import { makeSaldoDuplicadoScenario } from "./__fixtures__/correcciones";
+import { planStore, setPlanDeps } from "@/stores/planStore";
+import type { DatosPerfil } from "@/lib/types";
 
 function makeTrabajaderaConPlan(
 	nombres: string[],
@@ -594,6 +596,105 @@ describe("correcciones", () => {
 				expect(tramo.dentro.length).toBe(5);
 				expect(new Set(tramo.dentro).size).toBe(5);
 			}
+		});
+	});
+
+	describe("planStore bulk actions (REQ-CORR-V3-3, V3-4)", () => {
+		// Task 2.1: previsualizarCorreccionesBulk — non-mutating preview
+		it("REQ-CORR-V3-3: previsualizarCorreccionesBulk returns preview with corrections and summary", () => {
+			// Set up store deps with a mock profile
+			const mockData: DatosPerfil = {
+				trabajaderas: [makeTrabajaderaRealista("combined")],
+				banco: [],
+				planes: [],
+			};
+			const mockMutate = vi.fn((fn) => fn(mockData));
+			const mockGetTrab = (_d: DatosPerfil, tid: number) =>
+				_d.trabajaderas.find((t) => t.id === tid)!;
+			const mockGetS = () => mockData;
+
+			setPlanDeps(mockMutate, mockGetTrab, mockGetS);
+
+			const t = mockData.trabajaderas[0];
+			const planBefore = JSON.parse(JSON.stringify(t.plan));
+
+			const preview = planStore.getState().previsualizarCorreccionesBulk(t.id);
+
+			// Should return a preview object with correcciones and summary
+			expect(preview).not.toBeNull();
+			expect(preview).toHaveProperty("correcciones");
+			expect(preview).toHaveProperty("summary");
+			expect(Array.isArray(preview!.correcciones)).toBe(true);
+
+			// Plan must NOT be mutated
+			expect(JSON.stringify(t.plan)).toBe(JSON.stringify(planBefore));
+		});
+
+		it("REQ-CORR-V3-3: previsualizarCorreccionesBulk returns null when no corrections", () => {
+			const mockData: DatosPerfil = {
+				trabajaderas: [makeTrabajaderaRealista("balanced")],
+				banco: [],
+				planes: [],
+			};
+			setPlanDeps(vi.fn((fn) => fn(mockData)), (_d, tid) => _d.trabajaderas.find((t) => t.id === tid)!, () => mockData);
+
+			const t = mockData.trabajaderas[0];
+			const preview = planStore.getState().previsualizarCorreccionesBulk(t.id);
+
+			// Balanced plan: no corrections
+			expect(preview).toBeNull();
+		});
+
+		// Task 2.2: confirmarCorreccionesBulk — mutating apply
+		it("REQ-CORR-V3-4: confirmarCorreccionesBulk returns structured result and mutates plan", () => {
+			const mockData: DatosPerfil = {
+				trabajaderas: [makeTrabajaderaRealista("repetido")],
+				banco: [],
+				planes: [],
+			};
+			setPlanDeps(vi.fn((fn) => fn(mockData)), (_d, tid) => _d.trabajaderas.find((t) => t.id === tid)!, () => mockData);
+
+			const t = mockData.trabajaderas[0];
+			const planBefore = JSON.parse(JSON.stringify(t.plan));
+
+			const result = planStore.getState().confirmarCorreccionesBulk(t.id);
+
+			// Should return structured result
+			expect(result).toHaveProperty("aplicadas");
+			expect(result).toHaveProperty("saltadas");
+			expect(result).toHaveProperty("cap_alcanzado");
+			expect(typeof result.aplicadas).toBe("number");
+			expect(typeof result.saltadas).toBe("number");
+			expect(typeof result.cap_alcanzado).toBe("boolean");
+
+			// Plan should be mutated (at least some corrections applied)
+			if (result.aplicadas > 0) {
+				expect(JSON.stringify(t.plan)).not.toBe(JSON.stringify(planBefore));
+			}
+
+			// ultimoResultadoBulk should be set in store
+			const storeState = planStore.getState();
+			expect(storeState.ultimoResultadoBulk).toEqual(result);
+		});
+
+		// Task 2.3: confirmarAsignacion is thin wrapper
+		it("REQ-CORR-V3-4: confirmarAsignacion delegates to confirmarCorreccionesBulk", () => {
+			const mockData: DatosPerfil = {
+				trabajaderas: [makeTrabajaderaRealista("balanced")],
+				banco: [],
+				planes: [],
+			};
+			setPlanDeps(vi.fn((fn) => fn(mockData)), (_d, tid) => _d.trabajaderas.find((t) => t.id === tid)!, () => mockData);
+
+			const t = mockData.trabajaderas[0];
+
+			// Should not throw — delegates to confirmarCorreccionesBulk
+			planStore.getState().confirmarAsignacion(t.id);
+
+			// ultimoResultadoBulk should be set (even with 0 corrections)
+			const storeState = planStore.getState();
+			expect(storeState.ultimoResultadoBulk).not.toBeNull();
+			expect(storeState.ultimoResultadoBulk!.aplicadas).toBe(0);
 		});
 	});
 
