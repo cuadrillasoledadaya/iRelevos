@@ -302,7 +302,7 @@ describe("correcciones", () => {
 				tramosClaves: [],
 			};
 			const result = aplicarTodasLasCorrecciones(t);
-			expect(result).toEqual({ aplicadas: 0, saltadas: 0, cap_alcanzado: false });
+			expect(result).toEqual({ aplicadas: 0, saltadas: 0, cap_alcanzado: false, violations: [] });
 		});
 
 		it("debería retornar zero counts sin correcciones", () => {
@@ -322,6 +322,7 @@ describe("correcciones", () => {
 				aplicadas: 0,
 				saltadas: 0,
 				cap_alcanzado: false,
+				violations: [],
 			});
 		});
 

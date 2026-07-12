@@ -185,7 +185,7 @@ export const planStore = create<PlanStore>()((set, get) => ({
 		},
 
 		confirmarCorreccionesBulk: (tid) => {
-			let result: ResultadoBulkApply = { aplicadas: 0, saltadas: 0, cap_alcanzado: false };
+			let result: ResultadoBulkApply = { aplicadas: 0, saltadas: 0, cap_alcanzado: false, violations: [] };
 			_mutar((d) => {
 				const t = _getTrab(d, tid);
 				if (!t.plan) {

@@ -430,7 +430,7 @@ describe("MiPlanPersonal — costalero plan view", () => {
 		// Task 1.9: Replace wiring guard with plan coherence test
 		it("REQ-V2-13: plan coherence after confirmarAsignacion — dentro.length===5, no dupes", () => {
 			// Mock the store to return a structured ResultadoBulkApply
-			const mockResult = { aplicadas: 2, saltadas: 0, cap_alcanzado: false };
+			const mockResult = { aplicadas: 2, saltadas: 0, cap_alcanzado: false, violations: [] };
 			setPlanStoreState({ ultimoResultadoBulk: mockResult });
 
 			const ps = planStore.getState();
@@ -444,7 +444,7 @@ describe("MiPlanPersonal — costalero plan view", () => {
 
 		// Task 1.10: Banner with counts
 		it("REQ-V2-11: banner shows aplicadas, saltadas, and cap warning", () => {
-			const mockResult = { aplicadas: 3, saltadas: 1, cap_alcanzado: true };
+			const mockResult = { aplicadas: 3, saltadas: 1, cap_alcanzado: true, violations: [] };
 			const onDismiss = vi.fn();
 
 			render(<ConfirmarAsignacionBanner result={mockResult} onDismiss={onDismiss} />);
@@ -502,7 +502,7 @@ describe("MiPlanPersonal — costalero plan view", () => {
 
 			setPlanStoreState({
 				previsualizarCorreccionesBulk: vi.fn(() => mockPreview),
-				confirmarCorreccionesBulk: vi.fn(() => ({ aplicadas: 3, saltadas: 0, cap_alcanzado: false })),
+				confirmarCorreccionesBulk: vi.fn(() => ({ aplicadas: 3, saltadas: 0, cap_alcanzado: false, violations: [] })),
 				ultimoResultadoBulk: null,
 			});
 

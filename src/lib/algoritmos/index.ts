@@ -16,6 +16,7 @@ export {
 	validarPinned,
 	completarAuto,
 	getFueraPorTramo,
+	getF,
 } from "./pinned";
 
 // Sugerencias
@@ -29,7 +30,7 @@ export {
 	aplicarTodasLasCorrecciones,
 	MAX_ITER_BULK,
 } from "./correcciones";
-export type { CorreccionSugerida, Prioridad, AnalisisCorrecciones, ResultadoBulkApply, BulkCorreccionesPreview } from "./correcciones";
+export type { CorreccionSugerida, Prioridad, AnalisisCorrecciones, ResultadoBulkApply, BulkCorreccionesPreview, Violation } from "./correcciones";
 
 // Utils
 export { isGenericTramo } from "./utils";

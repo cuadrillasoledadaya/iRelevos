@@ -45,9 +45,7 @@ export function countPinned(t: Trabajadera): {
 
 export function validarPinned(t: Trabajadera): string[] {
 	const p = getPinned(t);
-	const total = t.nombres.length;
-	const aplicaRegla5 = t.regla5costaleros && total === 5;
-	const F = aplicaRegla5 ? 1 : total - 5;
+	const F = getF(t);
 	const nAct = t.tramos.length;
 	const errs: string[] = [];
 
@@ -83,7 +81,7 @@ export function completarAuto(
 	const p = getPinned(t);
 	const total = t.nombres.length;
 	const aplicaRegla5 = t.regla5costaleros && total === 5;
-	const F = aplicaRegla5 ? 1 : total - 5;
+	const F = getF(t);
 	const nAct = t.tramos.length;
 	const todos = Array.from({ length: total }, (_, i) => i);
 	const salidas = t.salidas ?? 2;
@@ -163,7 +161,11 @@ export function completarAuto(
 	return { plan: planOrdenado, obj, analisis: an };
 }
 
-export function getFueraPorTramo(t: Trabajadera): number {
+export function getF(t: Trabajadera): number {
 	const aplicaRegla5 = t.regla5costaleros && t.nombres.length === 5;
-	return aplicaRegla5 ? 1 : t.nombres.length - 5;
+	return aplicaRegla5 ? 1 : (t.nombres.length - t.bajas.length) - 5;
+}
+
+export function getFueraPorTramo(t: Trabajadera): number {
+	return getF(t);
 }

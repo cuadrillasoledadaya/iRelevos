@@ -9,6 +9,7 @@ import {
 	validarPinned,
 	completarAuto,
 	getFueraPorTramo,
+	getF,
 } from "./pinned";
 import type { Trabajadera, PinState } from "../types";
 
@@ -18,6 +19,7 @@ function makeTrabajadera(
 	pinned: PinState[][] | null = null,
 	salidas = 2,
 	regla5costaleros = false,
+	bajas: number[] = [],
 ): Trabajadera {
 	return {
 		id: 1,
@@ -25,7 +27,7 @@ function makeTrabajadera(
 		roles: nombres.map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const })),
 		salidas,
 		tramos,
-		bajas: [],
+		bajas,
 		regla5costaleros,
 		plan: null,
 		obj: null,
@@ -220,6 +222,143 @@ describe("pinned", () => {
 				["T1"],
 			);
 			expect(getFueraPorTramo(t)).toBe(2);
+		});
+	});
+
+	describe("getF (REQ-PLANPREC-3)", () => {
+		it("debería retornar 0 con 6 nombres y 1 baja", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F"],
+				["T1"],
+				null,
+				2,
+				false,
+				[0],
+			);
+			expect(getF(t)).toBe(0);
+		});
+
+		it("debería retornar 1 con 6 nombres y 0 bajas", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F"],
+				["T1"],
+			);
+			expect(getF(t)).toBe(1);
+		});
+
+		it("debería retornar 1 para regla5 (5 nombres, 0 bajas)", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E"],
+				["T1"],
+				null,
+				1,
+				true,
+			);
+			expect(getF(t)).toBe(1);
+		});
+	});
+
+	describe("bajas-aware scenarios (REQ-PLANPREC-3)", () => {
+		// Audit row 1: validarPinned with bajas=[0], 2 Fs → should error (F=0)
+		it("validarPinned: 2 Fs con 1 baja → error (F=0)", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F"],
+				["T1"],
+				[["F", "F", "L", "L", "L", "L"]],
+				2,
+				false,
+				[0],
+			);
+			const errs = validarPinned(t);
+			expect(errs.length).toBeGreaterThan(0);
+			expect(errs[0]).toContain("fijados fuera");
+			expect(errs[0]).toContain("máx. 0");
+		});
+
+		// Audit row 2: validarPinned with bajas=[0], 1 D → valid (F=0, 0F needed)
+		it("validarPinned: 1 D con 1 baja → válido (F=0)", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F"],
+				["T1"],
+				[["D", "L", "L", "L", "L", "L"]],
+				2,
+				false,
+				[0],
+			);
+			const errs = validarPinned(t);
+			expect(errs).toEqual([]);
+		});
+
+		// Audit row 3: completarAuto with bajas=[0]
+		it("completarAuto: 6 nombres, 1 baja → genera plan válido", () => {
+			const t = makeTrabajadera(
+				["Juan", "Pedro", "Luis", "Ana", "María", "Sofía"],
+				["T1", "T2", "T3"],
+				[
+					["D", "D", "L", "L", "L", "L"],
+					["L", "L", "D", "L", "L", "L"],
+					["L", "L", "L", "D", "D", "L"],
+				],
+				2,
+				false,
+				[0],
+			);
+			const resultado = completarAuto(t);
+			expect("error" in resultado).toBe(false);
+		});
+
+		// Audit row 4: completarAuto sin pinned, con bajas=[0]
+		it("completarAuto: sin pinned, 1 baja → genera plan válido", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F"],
+				["T1", "T2"],
+				null,
+				2,
+				false,
+				[0],
+			);
+			const resultado = completarAuto(t);
+			expect("error" in resultado).toBe(false);
+		});
+
+		// Audit row 5: getFueraPorTramo with 6 nombres, bajas=[0] → F=0
+		it("getFueraPorTramo: 6 nombres, 1 baja → 0", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F"],
+				["T1"],
+				null,
+				2,
+				false,
+				[0],
+			);
+			expect(getFueraPorTramo(t)).toBe(0);
+		});
+
+		// Audit row 6: getFueraPorTramo with 7 nombres, bajas=[0] → F=1
+		it("getFueraPorTramo: 7 nombres, 1 baja → 1", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F", "G"],
+				["T1"],
+				null,
+				2,
+				false,
+				[0],
+			);
+			expect(getFueraPorTramo(t)).toBe(1);
+		});
+
+		// Regla5 regression guard
+		it("regla5 regression: 5 nombres, 0 bajas, regla5=true → F=1", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E"],
+				["T1"],
+				null,
+				1,
+				true,
+				[],
+			);
+			expect(getFueraPorTramo(t)).toBe(1);
+			expect(getF(t)).toBe(1);
 		});
 	});
 });
