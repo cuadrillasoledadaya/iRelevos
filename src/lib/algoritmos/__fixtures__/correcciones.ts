@@ -6,6 +6,7 @@ import { analizar } from "../rotacion";
 import type { Trabajadera, TramoSlot } from "../../types";
 
 const NOMS_6 = ["Juan", "Pedro", "Luis", "Ana", "María", "Sofía"];
+const NOMS_7 = ["A", "B", "C", "D", "E", "F", "G"];
 const NOMS_10 = [
 	"A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
 ];
@@ -38,28 +39,20 @@ function baseT(
 
 /**
  * Scenario: "repetido" — ciA=0 is outside in T1 AND T_last (in analisis.rep).
- * 3 tramos, 10 costaleros (so there are fill-in candidates).
+ * 3 tramos, 7 costaleros (so there are fill-in candidates and guards pass).
  * ciA=0 (A) is in rep. ciB=1 (B) is inside T_last.
+ * Designed so the swap reduces both cons and rep (LENIENT guards pass).
  */
 export function makeRepetidoScenario(): Trabajadera {
 	const plan: TramoSlot[] = [
-		{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] }, // T1: A fuera, many others
-		{ dentro: [0, 2, 3, 4, 5], fuera: [1, 6, 7, 8, 9] }, // T2
-		{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] }, // T_last: A fuera → rep, B(1) dentro
+		{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6] }, // T1: A fuera
+		{ dentro: [0, 1, 3, 4, 5], fuera: [2, 6] }, // T2
+		{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6] }, // T_last: A fuera → rep, B(1) dentro
 	];
 	const obj: Record<number, number> = {
-		0: 2,
-		1: 0,
-		2: 0,
-		3: 0,
-		4: 0,
-		5: 0,
-		6: 3,
-		7: 3,
-		8: 3,
-		9: 3,
+		0: 2, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 6: 3,
 	};
-	return baseT(NOMS_10, ["T1", "T2", "T3"], plan, obj);
+	return baseT(NOMS_7, ["T1", "T2", "T3"], plan, obj);
 }
 
 /**

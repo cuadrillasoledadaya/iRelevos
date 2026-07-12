@@ -14,8 +14,13 @@ import {
 } from "./correcciones";
 import { makeTrabajaderaRealista } from "./__fixtures__/correcciones";
 import { makeSaldoDuplicadoScenario } from "./__fixtures__/correcciones";
+import {
+	makeBajasConsecutivosScenario,
+	makePinBreachScenario,
+	makeRepReintroScenario,
+} from "./__fixtures__/plan-precision";
 import { planStore, setPlanDeps } from "@/stores/planStore";
-import type { DatosPerfil } from "@/lib/types";
+import type { PinState, DatosPerfil } from "@/lib/types";
 
 function makeTrabajaderaConPlan(
 	nombres: string[],
@@ -330,26 +335,17 @@ describe("correcciones", () => {
 		it("re-analyzes between swaps: applies corrections and leaves plan consistent", () => {
 			// Build a plan with a repetition (priority 1) that triggers a correction.
 			// After bulk apply, the plan should be more consistent.
-			// Use 3 tramos with 10 costaleros so there are fill-in candidates.
+			// Use 7 costaleros so the swap doesn't increase cons or rep (guards pass).
 			const plan = [
-				{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] },
-				{ dentro: [0, 2, 3, 4, 5], fuera: [1, 6, 7, 8, 9] },
-				{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] },
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6] },
+				{ dentro: [0, 1, 3, 4, 5], fuera: [2, 6] },
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6] },
 			];
 			const obj = {
-				0: 2,
-				1: 0,
-				2: 0,
-				3: 0,
-				4: 0,
-				5: 0,
-				6: 3,
-				7: 3,
-				8: 3,
-				9: 3,
+				0: 2, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 6: 3,
 			};
 			const t = makeTrabajaderaConPlan(
-				["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+				["A", "B", "C", "D", "E", "F", "G"],
 				plan,
 				obj,
 			);
@@ -463,26 +459,17 @@ describe("correcciones", () => {
 				// validates that priority-3 corrections are NOT filtered out.
 				// We create a working scenario with any correction and verify
 				// the function doesn't filter by priority.
-				// Use 3 tramos with 10 costaleros so there are fill-in candidates.
+				// Use 3 tramos with 7 costaleros so guards pass.
 				const plan5 = [
-					{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] },
-					{ dentro: [0, 2, 3, 4, 5], fuera: [1, 6, 7, 8, 9] },
-					{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6, 7, 8, 9] },
+					{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6] },
+					{ dentro: [0, 1, 3, 4, 5], fuera: [2, 6] },
+					{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6] },
 				];
 				const obj5 = {
-					0: 2,
-					1: 0,
-					2: 0,
-					3: 0,
-					4: 0,
-					5: 0,
-					6: 3,
-					7: 3,
-					8: 3,
-					9: 3,
+					0: 2, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0, 6: 3,
 				};
 				const t5 = makeTrabajaderaConPlan(
-					["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+					["A", "B", "C", "D", "E", "F", "G"],
 					plan5,
 					obj5,
 				);
@@ -893,6 +880,196 @@ describe("correcciones", () => {
 					expect(new Set(tramo.dentro).size).toBe(tramo.dentro.length);
 				}
 			}
+		});
+	});
+
+	// ═════════════════════════════════════════════════════════════
+	// RED TESTS — Pre-write guards (REQ-PLANPREC-1, Phase 3)
+	// ═════════════════════════════════════════════════════════════
+
+	describe("pre-write guards in aplicarIntercambio (REQ-PLANPREC-1)", () => {
+		function makePinned(tramos: number, nombres: number, pins: [ti: number, ci: number, state: PinState][]): PinState[][] {
+			const p: PinState[][] = Array.from({ length: tramos }, () =>
+				Array<PinState>(nombres).fill("L"),
+			);
+			pins.forEach(([ti, ci, state]) => { p[ti][ci] = state; });
+			return p;
+		}
+
+		// Guard 1: No new consecutivos (LENIENT — reject only if cons_new > cons_old)
+		// Swap: ciA moves T1.fuera → T2.dentro, ciB moves T2.dentro → T2.fuera.
+		// For cons to increase: ciB must be outside in T3 (creates T2-T3 cons pair),
+		// and ciA must NOT lose a cons pair. ciA must NOT be in T2.dentro (v3 guard).
+		it("guard 1: returns false when swap would increase consecutivos, state unchanged", () => {
+			// 7 people, 3 tramos. 5 inside, 2 outside per tramo.
+			const plan: TramoSlot[] = [
+				{ dentro: [2, 3, 4, 5, 6], fuera: [0, 1] },      // T1: ciA=0, ciB=1 fuera
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0, 6] },      // T2: ciB=1 dentro, ciA=0 fuera
+				{ dentro: [0, 2, 3, 4, 5], fuera: [1, 6] },      // T3: ciB=1 fuera
+			];
+			const obj: Record<number, number> = {
+				0: 2, 1: 1, 2: 0, 3: 0, 4: 0, 5: 0, 6: 3,
+			};
+			const t = makeTrabajaderaConPlan(
+				["A", "B", "C", "D", "E", "F", "G"], plan, obj,
+			);
+			// cons before: T1-T2: 0 in both → 1; T2-T3: 6 in both → 1; total = 2
+			expect(t.analisis!.cons).toBe(2);
+			// ciA=0 is NOT in T2.dentro → v3 guard won't fire
+			expect(t.plan![1].dentro).not.toContain(0);
+
+			// Swap ciA=0 (fuera T1) with ciB=1 (dentro T2)
+			// After: T2.fuera = [1, 6] → ciB=1 outside in T2 AND T3 → new cons pair
+			// ciA=0 no longer in T2.fuera → loses T1-T2 cons pair
+			// Net: -1 (ciA) +2 (ciB: T1-T2 and T2-T3) = +1 → cons goes 2→3
+			const before = {
+				dentro: t.plan![1].dentro.map(Number),
+				fuera: t.plan![1].fuera.map(Number),
+				cons: t.analisis!.cons,
+			};
+
+			const result = aplicarIntercambio(t, 0, 1, 0, 1);
+
+			expect(result).toBe(false);
+			expect(t.plan![1].dentro).toEqual(before.dentro);
+			expect(t.plan![1].fuera).toEqual(before.fuera);
+			expect(t.analisis!.cons).toBe(before.cons);
+		});
+
+		// Guard 2: No rep re-intro (LENIENT — reject only if rep_new.size > rep_old.size)
+		// Uses repetido branch (ti1=0, ti2=last). ciA in T1.fuera ∩ T3.fuera (rep).
+		// ciB in T3.dentro AND T1.fuera. After swap: ciB moves to T3.fuera.
+		// If ciB stays in T1.fuera → ciB ∈ new rep → rep grows.
+		it("guard 2: returns false when swap would re-introduce a rep entry, state unchanged", () => {
+			// 8 people, 3 tramos. ciA=0 in rep (outside T1 and T3).
+			// ciB=2 in T3.dentro AND T1.fuera.
+			const plan: TramoSlot[] = [
+				{ dentro: [3, 4, 5, 6, 7], fuera: [0, 1, 2] },      // T1: ciA=0, ciB=2 fuera
+				{ dentro: [0, 1, 3, 4, 5], fuera: [2, 6, 7] },      // T2
+				{ dentro: [1, 2, 4, 5, 6], fuera: [0, 3, 7] },      // T3: ciA=0 fuera, ciB=2 dentro
+			];
+			const obj: Record<number, number> = {
+				0: 2, 1: 1, 2: 1, 3: 1, 4: 0, 5: 0, 6: 1, 7: 2,
+			};
+			const t = makeTrabajaderaConPlan(
+				["A", "B", "C", "D", "E", "F", "G", "H"], plan, obj,
+			);
+			// rep = T1.fuera ∩ T3.fuera = [0,1,2] ∩ [0,3,7] = [0] → size 1
+			expect(t.analisis!.rep).toEqual([0]);
+
+			// repetido branch: ti1=0, ti2=2 (last), ciA=0 in T1.fuera ✓
+			// ciB=2 is in T3.dentro ✓
+			// After swap (if allowed):
+			//   T1: fill-in candidate = 1 (smallest in T1.fuera except ciA=0)
+			//   T1.dentro[0]=1, T1.fuera loses 1 → [0,2,3]
+			//   T3: ciA=0 replaces ciB=2 → T3.dentro=[0,1,4,5,6], T3.fuera=[2,3,7]
+			//   New rep = [0,2,3] ∩ [2,3,7] = [2,3] → size 2 > 1 → GUARD SHOULD FIRE
+			const before = {
+				dentroT1: t.plan![0].dentro.map(Number),
+				fueraT1: t.plan![0].fuera.map(Number),
+				dentroT3: t.plan![2].dentro.map(Number),
+				fueraT3: t.plan![2].fuera.map(Number),
+				rep: [...t.analisis!.rep],
+			};
+
+			const result = aplicarIntercambio(t, 0, 2, 0, 2);
+
+			expect(result).toBe(false);
+			expect(t.plan![0].dentro).toEqual(before.dentroT1);
+			expect(t.plan![0].fuera).toEqual(before.fueraT1);
+			expect(t.plan![2].dentro).toEqual(before.dentroT3);
+			expect(t.plan![2].fuera).toEqual(before.fueraT3);
+			expect(t.analisis!.rep).toEqual(before.rep);
+		});
+
+		// Guard 3: No D → fuera
+		// ciB moves from dentro → fuera in ti2. If ciB is pinned D in ti2, reject.
+		it("guard 3: returns false when pinned D would be moved to fuera, state unchanged", () => {
+			const plan: TramoSlot[] = [
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0] },       // T1: ciA=0 fuera
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0] },       // T2: ciB=1 dentro, ciA=0 fuera
+				{ dentro: [0, 1, 2, 3, 4], fuera: [5] },       // T3
+			];
+			const obj: Record<number, number> = { 0: 2, 1: 0, 2: 0, 3: 0, 4: 0, 5: 1 };
+			const t = makeTrabajaderaConPlan(
+				["A", "B", "C", "D", "E", "F"], plan, obj,
+			);
+			// ciB=1 is pinned D in T2 — should NOT be moved to fuera
+			t.pinned = makePinned(3, 6, [[1, 1, "D"]]);
+
+			const before = {
+				dentro: t.plan![1].dentro.map(Number),
+				fuera: t.plan![1].fuera.map(Number),
+			};
+
+			// Swap: ciA=0 (fuera in T1) with ciB=1 (dentro in T2)
+			// ciB=1 is pinned D in T2 — guard should fire
+			const result = aplicarIntercambio(t, 0, 1, 0, 1);
+
+			expect(result).toBe(false);
+			expect(t.plan![1].dentro).toEqual(before.dentro);
+			expect(t.plan![1].fuera).toEqual(before.fuera);
+		});
+
+		// Guard 4: No F → dentro
+		// ciA moves from fuera → dentro in ti2. If ciA is pinned F/LF in ti2, reject.
+		it("guard 4: returns false when pinned F would be moved to dentro, state unchanged", () => {
+			const plan: TramoSlot[] = [
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0] },       // T1: ciA=0 fuera
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0] },       // T2: ciA=0 fuera (not inside)
+				{ dentro: [0, 1, 2, 3, 4], fuera: [5] },       // T3
+			];
+			const obj: Record<number, number> = { 0: 2, 1: 0, 2: 0, 3: 0, 4: 0, 5: 1 };
+			const t = makeTrabajaderaConPlan(
+				["A", "B", "C", "D", "E", "F"], plan, obj,
+			);
+			// ciA=0 is pinned F in T2 — should NOT be moved to dentro
+			t.pinned = makePinned(3, 6, [[1, 0, "F"]]);
+
+			const before = {
+				dentro: t.plan![1].dentro.map(Number),
+				fuera: t.plan![1].fuera.map(Number),
+			};
+
+			// Swap: ciA=0 (fuera in T1) with ciB=1 (dentro in T2)
+			// ciA=0 is pinned F in T2 — guard should fire
+			const result = aplicarIntercambio(t, 0, 1, 0, 1);
+
+			expect(result).toBe(false);
+			expect(t.plan![1].dentro).toEqual(before.dentro);
+			expect(t.plan![1].fuera).toEqual(before.fuera);
+		});
+
+		// Guard 5: dentro.length === 5 (defense-in-depth)
+		it("guard 5: returns false when swap would result in dentro.length !== 5, state unchanged", () => {
+			const plan: TramoSlot[] = [
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0] },       // T1: ciA=0 fuera
+				{ dentro: [1, 2, 3, 4, 5, 6], fuera: [0] },    // T2: 6 dentro (corrupted), ciA=0 NOT inside
+				{ dentro: [0, 1, 2, 3, 4], fuera: [5] },       // T3 (last)
+			];
+			const obj: Record<number, number> = { 0: 2, 1: 0, 2: 0, 3: 0, 4: 0, 5: 1, 6: 0 };
+			const t = makeTrabajaderaConPlan(
+				["A", "B", "C", "D", "E", "F", "G"], plan, obj,
+			);
+			// ciA=0 is NOT in T2.dentro → v3 guard won't fire
+			expect(t.plan![1].dentro).not.toContain(0);
+			// T2.dentro has 6 elements (corrupted state)
+			expect(t.plan![1].dentro.length).toBe(6);
+			// 3 tramos, ti2=1 !== last=2 → saldo branch
+			expect(t.tramos.length).toBe(3);
+
+			const before = {
+				dentro: [...t.plan![1].dentro],
+				fuera: [...t.plan![1].fuera],
+			};
+
+			// Swap: ciA=0 (fuera in T1) with ciB=1 (dentro in T2)
+			// T2.dentro has 6 elements → guard should fire
+			const result = aplicarIntercambio(t, 0, 1, 0, 1);
+
+			expect(result).toBe(false);
+			expect(t.plan![1].dentro).toEqual(before.dentro);
+			expect(t.plan![1].fuera).toEqual(before.fuera);
 		});
 	});
 });
