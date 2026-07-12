@@ -21,11 +21,20 @@ export type Prioridad = 1 | 2 | 3;
 /** Maximum iterations of the bulk-correction loop, as anti-oscillation cap. */
 export const MAX_ITER_BULK = 20;
 
+/** Discriminated union for hard-rule violations found after bulk apply. */
+export type Violation =
+	| { kind: "dentro5"; ti: number; actual: number }
+	| { kind: "pin"; ti: number; message: string }
+	| { kind: "consecutivos"; ti: number; count: number }
+	| { kind: "repeticion"; ti1: number; ti2: number; idx: number }
+	| { kind: "fueramax"; ti: number; pinned: number; max: number };
+
 /** Structured result from bulk correction apply. */
 export interface ResultadoBulkApply {
 	aplicadas: number;
 	saltadas: number;
 	cap_alcanzado: boolean;
+	violations: Violation[];
 }
 
 /** Preview of bulk corrections before applying — non-mutating. */
@@ -418,7 +427,7 @@ export function aplicarTodasLasCorrecciones(
 	t: Trabajadera,
 ): ResultadoBulkApply {
 	if (!t.plan || !t.analisis)
-		return { aplicadas: 0, saltadas: 0, cap_alcanzado: false };
+		return { aplicadas: 0, saltadas: 0, cap_alcanzado: false, violations: [] };
 
 	let aplicadas = 0;
 	let saltadas = 0;
@@ -451,5 +460,5 @@ export function aplicarTodasLasCorrecciones(
 		}
 	}
 
-	return { aplicadas, saltadas, cap_alcanzado };
+	return { aplicadas, saltadas, cap_alcanzado, violations: [] };
 }
