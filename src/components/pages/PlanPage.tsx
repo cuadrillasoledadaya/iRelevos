@@ -14,6 +14,7 @@ import type { Trabajadera, RolCode } from "@/lib/types";
 import { useAuth } from "@/hooks/useAuth";
 import BoquillaView from "./BoquillaView";
 import ConfirmarAsignacionBanner from "../feedback/ConfirmarAsignacionBanner";
+import ViolationsBanner from "../feedback/ViolationsBanner";
 import PreviewCorreccionesSheet from "../sheets/PreviewCorreccionesSheet";
 
 export default function PlanPage() {
@@ -915,6 +916,9 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											result={bannerResult}
 											onDismiss={() => setBannerDismissed(true)}
 										/>
+									)}
+									{bannerResult && bannerResult.violations.length > 0 && (
+										<ViolationsBanner violations={bannerResult.violations} />
 									)}
 									<PreviewCorreccionesSheet
 										tid={t.id}
