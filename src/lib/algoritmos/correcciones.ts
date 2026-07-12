@@ -2,7 +2,7 @@
 // CORRECCIONES — sugerencias de corrección e intercambios
 // ══════════════════════════════════════════════════════════════════
 
-import type { Trabajadera } from "../types";
+import type { Trabajadera, TramoSlot } from "../types";
 import { analizar } from "./rotacion";
 
 export interface CorreccionSugerida {
@@ -307,6 +307,84 @@ export function generarSugerenciasCorreccion(
  * @param ciA - Índice del costalero con problema
  * @param ciB - Índice del costalero candidato
  */
+
+/**
+ * Predict consecutive count after a saldo/consecutivo swap.
+ * ciA moves ti1.fuera → ti2.dentro, ciB moves ti2.dentro → ti2.fuera.
+ */
+function countConsAfterSwap(
+	t: Trabajadera,
+	ti1: number,
+	ti2: number,
+	ciA: number,
+	ciB: number,
+): number {
+	const plan = t.plan!;
+	let cons = 0;
+	for (let ti = 1; ti < plan.length; ti++) {
+		const prevFuera = new Set(
+			ti === ti2
+				? [...plan[ti - 1].fuera]
+				: ti - 1 === ti2
+					? [...plan[ti - 1].fuera, ciB].filter((c) => c !== ciA)
+					: plan[ti - 1].fuera,
+		);
+		const currFuera = new Set(
+			ti === ti2
+				? [...plan[ti].fuera, ciB].filter((c) => c !== ciA)
+				: plan[ti].fuera,
+		);
+		currFuera.forEach((c) => {
+			if (prevFuera.has(c)) cons++;
+		});
+	}
+	return cons;
+}
+
+/** Compute current cons count from plan (fallback when t.analisis is null). */
+function computeCons(plan: TramoSlot[]): number {
+	let cons = 0;
+	for (let ti = 1; ti < plan.length; ti++) {
+		plan[ti].fuera.forEach((c) => {
+			if (plan[ti - 1].fuera.includes(c)) cons++;
+		});
+	}
+	return cons;
+}
+
+/** Compute current rep count from plan (fallback when t.analisis is null). */
+function computeRep(plan: TramoSlot[]): number[] {
+	const primer = plan[0]?.fuera ?? [];
+	const ultimo = plan[plan.length - 1]?.fuera ?? [];
+	return primer.filter((c) => ultimo.includes(c));
+}
+
+/**
+ * Predict rep count after a swap.
+ * For saldo: only ti2.fuera changes (ciB added, ciA removed).
+ * For repetido: both T1.fuera and T_last.fuera change.
+ */
+function countRepAfterSwap(
+	t: Trabajadera,
+	ti1: number,
+	ti2: number,
+	ciA: number,
+	ciB: number,
+	candidatoT1?: number,
+): number[] {
+	const plan = t.plan!;
+	const last = plan.length - 1;
+	const primerFuera =
+		ti1 === 0 && candidatoT1 !== undefined
+			? plan[0].fuera.filter((c) => c !== candidatoT1)
+			: plan[0].fuera;
+	const ultimoFuera =
+		ti2 === last
+			? [...plan[last].fuera, ciB].filter((c) => c !== ciA)
+			: plan[last].fuera;
+	return primerFuera.filter((c) => ultimoFuera.includes(c));
+}
+
 export function aplicarIntercambio(
 	t: Trabajadera,
 	ti1: number,
@@ -346,6 +424,30 @@ export function aplicarIntercambio(
 			.filter((i) => i !== ciA && !t.bajas?.includes(i))
 			.sort((a, b) => a - b)[0];
 		if (candidatoT1 === undefined) return false;
+
+		// ── REQ-PLANPREC-1: Pre-write guards (repetido branch) ──
+		// Guard 5: dentro.length must be 5 before swap
+		if (r2.dentro.length !== 5) return false;
+
+		// Guard 3: ciB pinned D in ti2 → cannot move to fuera
+		if (t.pinned?.[ti2]?.[ciB] === "D") return false;
+
+		// Guard 4: ciA pinned F/LF in ti2 → cannot move to dentro
+		if (
+			t.pinned?.[ti2]?.[ciA] === "F" ||
+			t.pinned?.[ti2]?.[ciA] === "LF"
+		)
+			return false;
+
+		// Guard 1: cons would increase → reject (LENIENT)
+		const currentCons = t.analisis?.cons ?? computeCons(t.plan!);
+		const consAfterRep = countConsAfterSwap(t, ti1, ti2, ciA, ciB);
+		if (consAfterRep > currentCons) return false;
+
+		// Guard 2: rep would gain entries → reject (LENIENT)
+		const currentRep = t.analisis?.rep ?? computeRep(t.plan!);
+		const repAfterRep = countRepAfterSwap(t, ti1, ti2, ciA, ciB, candidatoT1);
+		if (repAfterRep.length > currentRep.length) return false;
 
 		// Replace first element of r1.dentro with the candidate
 		r1.dentro[0] = candidatoT1;
@@ -398,6 +500,30 @@ export function aplicarIntercambio(
 	if (r2.dentro.includes(ciA) && r2.dentro.indexOf(ciA) !== idxCiBenT2) {
 		return false;
 	}
+
+	// ── REQ-PLANPREC-1: Pre-write guards (saldo/consecutivo branch) ──
+	// Guard 5: dentro.length must be 5 before swap
+	if (r2.dentro.length !== 5) return false;
+
+	// Guard 3: ciB pinned D in ti2 → cannot move to fuera
+	if (t.pinned?.[ti2]?.[ciB] === "D") return false;
+
+	// Guard 4: ciA pinned F/LF in ti2 → cannot move to dentro
+	if (
+		t.pinned?.[ti2]?.[ciA] === "F" ||
+		t.pinned?.[ti2]?.[ciA] === "LF"
+	)
+		return false;
+
+	// Guard 1: cons would increase → reject (LENIENT)
+	const currentCons = t.analisis?.cons ?? computeCons(t.plan!);
+	const consAfter = countConsAfterSwap(t, ti1, ti2, ciA, ciB);
+	if (consAfter > currentCons) return false;
+
+	// Guard 2: rep would gain entries → reject (LENIENT)
+	const currentRep = t.analisis?.rep ?? computeRep(t.plan!);
+	const repAfter = countRepAfterSwap(t, ti1, ti2, ciA, ciB);
+	if (repAfter.length > currentRep.length) return false;
 
 	r2.dentro[idxCiBenT2] = ciA;
 	r2.fuera = todos.filter((i) => !r2.dentro.includes(i)).sort((a, b) => a - b);
