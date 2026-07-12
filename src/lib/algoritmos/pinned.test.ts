@@ -9,6 +9,7 @@ import {
 	validarPinned,
 	completarAuto,
 	getFueraPorTramo,
+	getF,
 } from "./pinned";
 import type { Trabajadera, PinState } from "../types";
 
@@ -220,6 +221,39 @@ describe("pinned", () => {
 				["T1"],
 			);
 			expect(getFueraPorTramo(t)).toBe(2);
+		});
+	});
+
+	describe("getF (REQ-PLANPREC-3)", () => {
+		it("debería retornar 0 con 6 nombres y 1 baja", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F"],
+				["T1"],
+				null,
+				2,
+				false,
+			);
+			t.bajas = [0];
+			expect(getF(t)).toBe(0);
+		});
+
+		it("debería retornar 1 con 6 nombres y 0 bajas", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F"],
+				["T1"],
+			);
+			expect(getF(t)).toBe(1);
+		});
+
+		it("debería retornar 1 para regla5 (5 nombres, 0 bajas)", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E"],
+				["T1"],
+				null,
+				1,
+				true,
+			);
+			expect(getF(t)).toBe(1);
 		});
 	});
 });

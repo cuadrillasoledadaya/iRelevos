@@ -16,6 +16,7 @@ export {
 	validarPinned,
 	completarAuto,
 	getFueraPorTramo,
+	getF,
 } from "./pinned";
 
 // Sugerencias
