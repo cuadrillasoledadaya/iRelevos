@@ -45,7 +45,6 @@ export function countPinned(t: Trabajadera): {
 
 export function validarPinned(t: Trabajadera): string[] {
 	const p = getPinned(t);
-	const total = t.nombres.length;
 	const F = getF(t);
 	const nAct = t.tramos.length;
 	const errs: string[] = [];
