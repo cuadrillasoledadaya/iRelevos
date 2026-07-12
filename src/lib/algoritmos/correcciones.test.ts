@@ -745,6 +745,28 @@ describe("correcciones", () => {
 			expect(storeState.ultimoResultadoBulk).not.toBeNull();
 			expect(storeState.ultimoResultadoBulk!.aplicadas).toBe(0);
 		});
+
+		// Task 5.1: violations field propagates through store (Decision 9)
+		it("REQ-PLANPREC-4: confirmarCorreccionesBulk propagates violations field", () => {
+			const mockData: DatosPerfil = {
+				trabajaderas: [makeTrabajaderaRealista("balanced")],
+				banco: [],
+				planes: [],
+			};
+			setPlanDeps(vi.fn((fn) => fn(mockData)), (_d, tid) => _d.trabajaderas.find((t) => t.id === tid)!, () => mockData);
+
+			const t = mockData.trabajaderas[0];
+			const result = planStore.getState().confirmarCorreccionesBulk(t.id);
+
+			// violations field must exist and be an array (type propagates, Decision 9)
+			expect(result).toHaveProperty("violations");
+			expect(Array.isArray(result.violations)).toBe(true);
+			// Balanced plan → no violations
+			expect(result.violations).toEqual([]);
+			// Store state also has violations
+			const storeState = planStore.getState();
+			expect(storeState.ultimoResultadoBulk!.violations).toEqual([]);
+		});
 	});
 
 	describe("repetido branch (REQ-V2-1..6)", () => {
@@ -1070,6 +1092,67 @@ describe("correcciones", () => {
 			expect(result).toBe(false);
 			expect(t.plan![1].dentro).toEqual(before.dentro);
 			expect(t.plan![1].fuera).toEqual(before.fuera);
+		});
+	});
+
+	// ═════════════════════════════════════════════════════════════
+	// RED TESTS — Post-bulk re-validation (REQ-PLANPREC-2, Phase 4)
+	// ═════════════════════════════════════════════════════════════
+
+	describe("post-bulk re-validation (REQ-PLANPREC-2)", () => {
+		function makePinned(tramos: number, nombres: number, pins: [ti: number, ci: number, state: PinState][]): PinState[][] {
+			const p: PinState[][] = Array.from({ length: tramos }, () =>
+				Array<PinState>(nombres).fill("L"),
+			);
+			pins.forEach(([ti, ci, state]) => { p[ti][ci] = state; });
+			return p;
+		}
+
+		// Task 4.1: Clean plan → violations: []
+		it("REQ-PLANPREC-2: balanced plan returns violations: [] after bulk apply", () => {
+			const plan: TramoSlot[] = [
+				{ dentro: [1, 2, 3, 4, 5], fuera: [0] },
+				{ dentro: [0, 1, 3, 4, 5], fuera: [2] },
+			];
+			const obj: Record<number, number> = { 0: 1, 1: 0, 2: 1, 3: 0, 4: 0, 5: 0 };
+			const t = makeTrabajaderaConPlan(
+				["A", "B", "C", "D", "E", "F"], plan, obj,
+			);
+
+			const result = aplicarTodasLasCorrecciones(t);
+
+			// No corrections needed, plan is clean
+			expect(result.aplicadas).toBe(0);
+			expect(result.violations).toEqual([]);
+		});
+
+		// Task 4.2: Guard miss / pin violation → violations filled
+		it("REQ-PLANPREC-2: plan with pin violation returns non-empty violations after bulk apply", () => {
+			// 6 people, 2 tramos. F = 6 - 0 - 5 = 1 (only 1 allowed outside).
+			// Pin 2 people as F in T1 → forzFuera=2 > F=1 → violation.
+			// Bulk loop won't fix pins → violations should be populated.
+			const plan: TramoSlot[] = [
+				{ dentro: [2, 3, 4, 5, 0], fuera: [1] },
+				{ dentro: [0, 1, 2, 3, 4], fuera: [5] },
+			];
+			const obj: Record<number, number> = { 0: 1, 1: 1, 2: 0, 3: 0, 4: 0, 5: 1 };
+			const t = makeTrabajaderaConPlan(
+				["A", "B", "C", "D", "E", "F"], plan, obj,
+			);
+			// Pin idx 1 and idx 5 as F (forced outside) in T1
+			t.pinned = makePinned(2, 6, [
+				[0, 1, "F"],
+				[0, 5, "F"],
+			]);
+
+			const result = aplicarTodasLasCorrecciones(t);
+
+			// Bulk loop may or may not apply corrections, but violations MUST be populated
+			expect(Array.isArray(result.violations)).toBe(true);
+			expect(result.violations.length).toBeGreaterThan(0);
+			// At least one violation should be 'fueramax' (2 pinned F > max 1)
+			const fueramax = result.violations.find((v) => v.kind === "fueramax");
+			expect(fueramax).toBeDefined();
 		});
 	});
 });

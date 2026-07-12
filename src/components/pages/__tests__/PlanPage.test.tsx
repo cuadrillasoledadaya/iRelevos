@@ -552,4 +552,85 @@ describe("MiPlanPersonal — costalero plan view", () => {
 			expect(screen.getByTestId("preview-summary")).toBeInTheDocument();
 		});
 	});
+
+	// ═════════════════════════════════════════════════════════════
+	// Task 5.3: ViolationsBanner integration (REQ-PLANPREC-7)
+	// ═════════════════════════════════════════════════════════════
+
+	describe("ViolationsBanner integration (REQ-PLANPREC-7)", () => {
+		it("REQ-PLANPREC-7: banner NOT rendered when violations empty", () => {
+			const mockResult = { aplicadas: 2, saltadas: 0, cap_alcanzado: false, violations: [] };
+			setPlanStoreState({
+				ultimoResultadoBulk: mockResult,
+				previsualizarCorreccionesBulk: vi.fn(() => null),
+			});
+
+			const t = makeTrabajadera({
+				plan: [
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+				],
+				analisis: {
+					conteo: { 0: 3, 1: 0, 2: 0, 3: 0, 4: 0 },
+					okObj: false,
+					dentro5: true,
+					primer: [],
+					ultimo: [],
+					rep: [],
+					cons: 0,
+				},
+			});
+			const profile = makeCostaleroProfile({ nombre: "Alice", role: "capataz" });
+
+			renderMiPlanPersonal({ t, profile });
+
+			// ViolationsBanner should NOT be in the DOM
+			expect(screen.queryByTestId("violations-banner")).not.toBeInTheDocument();
+			// But ConfirmarAsignacionBanner should render
+			expect(screen.getByText(/2 aplicadas/)).toBeInTheDocument();
+		});
+
+		it("REQ-PLANPREC-7: banner rendered when violations present", () => {
+			const mockResult = {
+				aplicadas: 1,
+				saltadas: 0,
+				cap_alcanzado: false,
+				violations: [
+					{ kind: "fueramax" as const, ti: 0, pinned: 3, max: 2 },
+				],
+			};
+			setPlanStoreState({
+				ultimoResultadoBulk: mockResult,
+				previsualizarCorreccionesBulk: vi.fn(() => null),
+			});
+
+			const t = makeTrabajadera({
+				plan: [
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+				],
+				analisis: {
+					conteo: { 0: 3, 1: 0, 2: 0, 3: 0, 4: 0 },
+					okObj: false,
+					dentro5: true,
+					primer: [],
+					ultimo: [],
+					rep: [],
+					cons: 0,
+				},
+			});
+			const profile = makeCostaleroProfile({ nombre: "Alice", role: "capataz" });
+
+			renderMiPlanPersonal({ t, profile });
+
+			// ViolationsBanner should be in the DOM
+			expect(screen.getByTestId("violations-banner")).toBeInTheDocument();
+			// Kind label visible
+			expect(screen.getByText("F máxima excedida")).toBeInTheDocument();
+			// ConfirmarAsignacionBanner also renders
+			expect(screen.getByText(/1 aplicadas/)).toBeInTheDocument();
+		});
+	});
 });

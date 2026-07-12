@@ -4,6 +4,8 @@
 
 import type { Trabajadera, TramoSlot } from "../types";
 import { analizar } from "./rotacion";
+import { validarPinned } from "./pinned";
+import { ordenarDentroFisico } from "../roles";
 
 export interface CorreccionSugerida {
 	tipo: "saldo" | "repetido" | "consecutivo";
@@ -586,5 +588,58 @@ export function aplicarTodasLasCorrecciones(
 		}
 	}
 
-	return { aplicadas, saltadas, cap_alcanzado, violations: [] };
+	// ── REQ-PLANPREC-2: Post-bulk re-validation (once, not per iteration) ──
+	ordenarDentroFisico(t, t.plan);
+	const pinErrors = validarPinned(t);
+	const violations: Violation[] = [];
+
+	// Collect pin validation errors as typed violations
+	for (const err of pinErrors) {
+		const tiMatch = err.match(/Tramo (\d+)/);
+		const ti = tiMatch ? parseInt(tiMatch[1], 10) - 1 : 0;
+		if (err.includes("fijados fuera")) {
+			const pinnedMatch = err.match(/(\d+) fijados fuera \(máx\. (\d+)\)/);
+			violations.push({
+				kind: "fueramax",
+				ti,
+				pinned: pinnedMatch ? parseInt(pinnedMatch[1], 10) : 0,
+				max: pinnedMatch ? parseInt(pinnedMatch[2], 10) : 0,
+			});
+		} else {
+			violations.push({ kind: "pin", ti, message: err });
+		}
+	}
+
+	// Re-analyze for cons/rep violations
+	t.analisis = analizar(t.plan, t.nombres.length, t.obj!, t);
+	if (t.analisis.cons > 0) {
+		violations.push({
+			kind: "consecutivos",
+			ti: 0,
+			count: t.analisis.cons,
+		});
+	}
+	if (t.analisis.rep.length > 0) {
+		for (const idx of t.analisis.rep) {
+			violations.push({
+				kind: "repeticion",
+				ti1: 0,
+				ti2: t.tramos.length - 1,
+				idx,
+			});
+		}
+	}
+
+	// Check dentro.length for each tramo
+	for (let ti = 0; ti < t.plan.length; ti++) {
+		if (t.plan[ti].dentro.length !== 5) {
+			violations.push({
+				kind: "dentro5",
+				ti,
+				actual: t.plan[ti].dentro.length,
+			});
+		}
+	}
+
+	return { aplicadas, saltadas, cap_alcanzado, violations };
 }
