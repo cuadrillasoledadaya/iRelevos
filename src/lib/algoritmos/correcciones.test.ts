@@ -745,6 +745,28 @@ describe("correcciones", () => {
 			expect(storeState.ultimoResultadoBulk).not.toBeNull();
 			expect(storeState.ultimoResultadoBulk!.aplicadas).toBe(0);
 		});
+
+		// Task 5.1: violations field propagates through store (Decision 9)
+		it("REQ-PLANPREC-4: confirmarCorreccionesBulk propagates violations field", () => {
+			const mockData: DatosPerfil = {
+				trabajaderas: [makeTrabajaderaRealista("balanced")],
+				banco: [],
+				planes: [],
+			};
+			setPlanDeps(vi.fn((fn) => fn(mockData)), (_d, tid) => _d.trabajaderas.find((t) => t.id === tid)!, () => mockData);
+
+			const t = mockData.trabajaderas[0];
+			const result = planStore.getState().confirmarCorreccionesBulk(t.id);
+
+			// violations field must exist and be an array (type propagates, Decision 9)
+			expect(result).toHaveProperty("violations");
+			expect(Array.isArray(result.violations)).toBe(true);
+			// Balanced plan → no violations
+			expect(result.violations).toEqual([]);
+			// Store state also has violations
+			const storeState = planStore.getState();
+			expect(storeState.ultimoResultadoBulk!.violations).toEqual([]);
+		});
 	});
 
 	describe("repetido branch (REQ-V2-1..6)", () => {
