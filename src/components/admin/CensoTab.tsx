@@ -1,5 +1,6 @@
 'use client'
 
+import { formatDateShort } from '@/lib/format/date'
 import type { PasoDB } from '@/lib/types'
 import type {
   CensusEntry, ImportEntry,
@@ -317,7 +318,7 @@ function ViewEntry({ entry, pasos, onEdit, onDelete, onToggleBoquilla }: {
             {pasos.find(p => p.id === entry.proyecto_id)?.nombre_paso || 'Desconocido'}
           </span>
         </div>
-        <span>{new Date(entry.created_at).toLocaleDateString()}</span>
+        <span>{formatDateShort(entry.created_at)}</span>
       </div>
     </>
   )

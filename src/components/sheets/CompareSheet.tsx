@@ -2,6 +2,7 @@
 
 import { uiStore, historyStore, projectStore } from "@/stores";
 import { comparePlans, type CellComparison } from "@/lib/comparePlans";
+import { formatDateShort } from "@/lib/format/date";
 import type { Trabajadera, PlanSnapshot, DatosPerfil } from "@/lib/types";
 
 export default function CompareSheet() {
@@ -256,12 +257,4 @@ function shortName(full: string): string {
   const parts = full.trim().split(/\s+/);
   if (parts.length <= 2) return full;
   return `${parts[0]} ${parts[parts.length - 1]}`;
-}
-
-function formatDateShort(iso: string): string {
-  const d = new Date(iso);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
 }
