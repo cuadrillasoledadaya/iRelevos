@@ -114,7 +114,7 @@ export default function SugerenciaSheet() {
 
 						{opciones.length === 0 && (
 							<div className="sug-card actual" style={{ cursor: "default" }}>
-								<div className="sug-title">Ya es el configuración óptima</div>
+								<div className="sug-title">Ya es la configuración óptima</div>
 								<div className="sug-detail">
 									Los {actual} tramos son el número ideal para {nActivos}{" "}
 									costaleros.

@@ -40,7 +40,7 @@ export default function HistorySheet() {
     if (S.trabajaderas.length > 0 && !S.trabajaderas.find((t) => t.id === selectedTrabajaderaId)) {
       setSelectedTrabajaderaId(S.trabajaderas[0].id);
     }
-  }, [S.trabajaderas, selectedTrabajaderaId]);
+  }, [S.trabajaderas, selectedTrabajaderaId, setSelectedTrabajaderaId]);
 
   // Load snapshots when sheet opens or trabajadera changes
   useEffect(() => {
