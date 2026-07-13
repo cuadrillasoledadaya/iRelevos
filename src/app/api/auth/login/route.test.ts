@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// Mock the supabase module before importing the route
+// Mock the supabase module — should NOT be called by the route
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     auth: {
@@ -114,20 +114,26 @@ describe('POST /api/auth/login', () => {
     expect(response.status).toBe(400)
   })
 
-  it('returns generic error message on auth failure (never reveals specific error)', async () => {
+  it('returns 200 with ok:true on valid body (pure rate-limit gate, no Supabase call)', async () => {
     mockRateLimit.mockReturnValue({ success: true, remaining: 4, resetAt: Date.now() + 900000 })
 
-    const { supabase } = await import('@/lib/supabase')
-    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-      data: { user: null, session: null },
-      error: { message: 'Invalid login credentials' } as any,
-    })
+    const response = await callLogin({ email: 'test@example.com', password: 'pass' })
 
-    const response = await callLogin({ email: 'test@example.com', password: 'wrong' })
-
-    expect(response.status).toBe(200) // Route returns 200 with error message in body
+    expect(response.status).toBe(200)
     const body = await response.json()
-    // Should NOT reveal the specific error
-    expect(body.error).not.toBe('Invalid login credentials')
+    expect(body.ok).toBe(true)
+    expect(body.remaining).toBe(4)
+    expect(body.session).toBeUndefined()
+  })
+
+  it('does NOT call Supabase auth — route is a pure rate-limit gate', async () => {
+    mockRateLimit.mockReturnValue({ success: true, remaining: 3, resetAt: Date.now() + 900000 })
+
+    const { supabase } = await import('@/lib/supabase')
+
+    await callLogin({ email: 'test@example.com', password: 'pass' })
+
+    // The route should NOT call signInWithPassword — the browser client does that
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled()
   })
 })
