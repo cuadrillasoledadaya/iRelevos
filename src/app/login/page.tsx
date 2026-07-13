@@ -22,6 +22,7 @@ export default function LoginPage() {
     setError(null)
 
     try {
+      // Step 1: Check rate limit via API route
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,12 +40,19 @@ export default function LoginPage() {
         return
       }
 
-      // Success — save session to client storage and redirect
-      if (data.session) {
-        await supabase.auth.setSession(data.session)
-        router.push('/')
-        router.refresh()
+      // Step 2: Sign in directly — browser client writes cookies automatically
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+
+      if (signInError) {
+        setError('Credenciales incorrectas')
+        return
       }
+
+      router.push('/')
+      router.refresh()
     } catch {
       setError('Ocurrió un error. Intentá de nuevo.')
     } finally {
