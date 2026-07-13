@@ -176,17 +176,34 @@ The current CSP allows `'unsafe-inline'` and `'unsafe-eval'` for compatibility w
 
 ### Middleware (`src/middleware.ts`)
 
-The middleware checks for the Supabase auth token cookie and redirects unauthenticated users to `/login`.
+The middleware uses `@supabase/ssr` `createServerClient` to perform a server-side auth check via `getUser()`, which re-validates the JWT against Supabase (defends against tampered cookies). Unauthenticated users on protected routes are redirected to `/login` with a `?redirect=` parameter.
+
+**Authentication mechanism**: HTTP cookies managed by `@supabase/ssr` (not localStorage). The browser client (`createBrowserClient`) writes cookies automatically on auth state changes. The server client (`createServerClient` in `src/lib/supabase/server.ts`) reads and propagates cookies via `getAll`/`setAll`.
 
 **Public routes** (no auth required): `/login`, `/register`
 
 **Protected routes** (auth required): `/`, `/admin/*`, `/plan/*`, `/equipo/*`, `/dashboard/*`
 
+**Static asset bypass**: `_next/*`, `/api/*`, `/favicon*`, `/sw.js`, `/manifest.json`, `/workbox-*.js`, and files with static extensions (`.ico`, `.png`, `.jpg`, `.jpeg`, `.svg`, `.css`, `.js`, `.woff2`) skip auth checks.
+
 ### Adding New Routes
 
 - **Public route**: Add to `PUBLIC_PATHS` array in `src/middleware.ts`
 - **Protected route**: Add prefix to `PROTECTED_PREFIXES` array
+- **Static asset**: Extend `isStaticAsset()` if needed (PWA assets already covered)
 - **API route**: API routes are passed through by the middleware but should implement their own auth checks (see API hardening)
+
+### Login Flow
+
+1. User submits credentials on `/login`
+2. Rate limit check via `/api/auth/login` (5 attempts per 15 minutes)
+3. `supabase.auth.signInWithPassword` called directly — browser client writes session cookies automatically
+4. No `setSession` call needed (localStorage migration complete)
+5. Redirect to `/` with `router.refresh()` to trigger middleware re-evaluation
+
+### SignOut Cleanup
+
+`useAuth.signOut()` defensively removes all `sb-*` keys from localStorage (pre-migration residue) wrapped in try/catch. The Supabase SDK clears cookies automatically on `signOut({ scope: 'global' })`.
 
 ---
 
