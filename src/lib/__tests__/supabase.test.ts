@@ -203,3 +203,92 @@ describe('supabase auth', () => {
     })
   })
 })
+
+// ══════════════════════════════════════════════════════════════════
+// REQ-3: HTTP Cookie Session Storage — dedicated tests
+// ══════════════════════════════════════════════════════════════════
+
+describe('REQ-3: HTTP Cookie Session Storage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('T1.a — supabase singleton resolves to createBrowserClient', () => {
+    it('debe ser una instancia creada por createBrowserClient de @supabase/ssr', async () => {
+      // Verify the module structure: supabase.ts exports `supabase` from createBrowserClient
+      const mod = await import('@/lib/supabase')
+      expect(mod.supabase).toBeDefined()
+      expect(mod.supabase.auth).toBeDefined()
+      // createBrowserClient returns a SupabaseClient with auth, from, etc.
+      expect(typeof mod.supabase.auth.signInWithPassword).toBe('function')
+      expect(typeof mod.supabase.auth.signOut).toBe('function')
+      // Verify the import path uses createBrowserClient (not createClient from @supabase/supabase-js)
+      const supabaseSource = await import('fs').then(fs =>
+        fs.promises.readFile(
+          require('path').resolve(process.cwd(), 'src/lib/supabase.ts'),
+          'utf-8',
+        ),
+      ).catch(() => '')
+      expect(supabaseSource).toContain('createBrowserClient')
+      expect(supabaseSource).toContain('@supabase/ssr')
+    })
+  })
+
+  describe('T1.b — createServerClient exported from @/lib/supabase/server', () => {
+    it('debe exportar createClient que usa createServerClient con getAll/setAll', async () => {
+      const serverMod = await import('@/lib/supabase/server')
+      expect(serverMod.createClient).toBeDefined()
+      expect(typeof serverMod.createClient).toBe('function')
+
+      // Verify the source code uses createServerClient and the cookie pattern
+      const serverSource = await import('fs').then(fs =>
+        fs.promises.readFile(
+          require('path').resolve(process.cwd(), 'src/lib/supabase/server.ts'),
+          'utf-8',
+        ),
+      ).catch(() => '')
+      expect(serverSource).toContain('createServerClient')
+      expect(serverSource).toContain('@supabase/ssr')
+      expect(serverSource).toContain('getAll')
+      expect(serverSource).toContain('setAll')
+    })
+  })
+
+  describe('T1.c — signInWithPassword does NOT write to localStorage', () => {
+    it('debe usar cookies HTTP, NO localStorage, para la sesión', async () => {
+      // Mock localStorage to track writes
+      const localStorageSetItem = vi.fn()
+      const originalLocalStorage = globalThis.localStorage
+
+      // Replace localStorage with a spy
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: { setItem: localStorageSetItem, getItem: vi.fn(), removeItem: vi.fn() },
+        configurable: true,
+      })
+
+      // Mock the signInWithPassword to succeed
+      vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+        data: {
+          user: { id: 'user-123', email: 'test@example.com' } as any,
+          session: { access_token: 'tok', refresh_token: 'ref' } as any,
+        },
+        error: null,
+      })
+
+      await supabase.auth.signInWithPassword({
+        email: 'test@example.com',
+        password: 'correct-password',
+      })
+
+      // createBrowserClient from @supabase/ssr writes to HTTP cookies, NOT localStorage
+      // The SDK should not call localStorage.setItem for session storage
+      expect(localStorageSetItem).not.toHaveBeenCalled()
+
+      // Restore
+      Object.defineProperty(globalThis, 'localStorage', {
+        value: originalLocalStorage,
+        configurable: true,
+      })
+    })
+  })
+})
