@@ -87,6 +87,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('SignOut error:', err)
     } finally {
+      // Defensive cleanup of pre-migration localStorage residue
+      try {
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key?.startsWith('sb-')) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach((key) => localStorage.removeItem(key))
+      } catch {
+        // localStorage may be unavailable (SSR, private browsing) — ignore
+      }
       setSession(null)
       setUser(null)
       setProfile(null)

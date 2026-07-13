@@ -99,4 +99,34 @@ describe('useAuth signOut', () => {
 
     consoleSpy.mockRestore()
   })
+
+  it('defensively removes sb-* keys from localStorage on signOut', async () => {
+    vi.mocked(supabase.auth.signOut).mockResolvedValue({ error: null })
+
+    // Mock localStorage for jsdom
+    const store: Record<string, string> = {
+      'sb-project-auth-token': '{"fake":"token"}',
+      'sb-project-db': '{"fake":"data"}',
+    }
+    const mockLocalStorage = {
+      getItem: vi.fn((key: string) => store[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => { store[key] = value }),
+      removeItem: vi.fn((key: string) => { delete store[key] }),
+      clear: vi.fn(() => { for (const k in store) delete store[k] }),
+      get length() { return Object.keys(store).length },
+      key: vi.fn((i: number) => Object.keys(store)[i] ?? null),
+    }
+    Object.defineProperty(window, 'localStorage', { value: mockLocalStorage, configurable: true })
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+
+    await act(async () => {
+      await result.current.signOut()
+    })
+
+    // Should have called removeItem for each sb-* key
+    expect(mockLocalStorage.removeItem).toHaveBeenCalled()
+    const removedKeys = mockLocalStorage.removeItem.mock.calls.map((call) => call[0])
+    expect(removedKeys.some((k: string) => k.startsWith('sb-'))).toBe(true)
+  })
 })
