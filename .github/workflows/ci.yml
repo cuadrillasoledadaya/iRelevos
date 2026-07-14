@@ -46,7 +46,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
       - name: Middleware bundle size guard
         run: |
-          SIZE=$(stat -c%s .next/server/middleware.js)
+          # Next.js 14 emits middleware to .next/server/src/middleware.js (not .next/server/middleware.js).
+          # Confirmed via `find .next/server -name "middleware*"` and middleware-manifest.json after build.
+          SIZE=$(stat -c%s .next/server/src/middleware.js)
           echo "Middleware bundle size: ${SIZE} bytes"
           test "$SIZE" -lt 1048576 || { echo "Middleware bundle exceeds 1 MiB limit"; exit 1; }
 
