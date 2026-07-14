@@ -1,6 +1,7 @@
 "use client";
 
 import { uiStore, historyStore } from "@/stores";
+import { formatDateTime } from "@/lib/format/date";
 import type { Trabajadera, PlanSnapshot } from "@/lib/types";
 
 export default function SnapshotDetailSheet() {
@@ -49,7 +50,7 @@ export default function SnapshotDetailSheet() {
             <button className="btn btn-ghost btn-sm" onClick={() => uiStore.getState().openSheet("history")}>
               ← Volver
             </button>
-            <span className="text-muted text-xs">{formatDate(created_at)}</span>
+            <span className="text-muted text-xs">{formatDateTime(created_at)}</span>
             <button className="btn btn-ghost btn-sm" onClick={closeSheet}>
               ✕
             </button>
@@ -143,14 +144,4 @@ function shortName(full: string): string {
   const parts = full.trim().split(/\s+/);
   if (parts.length <= 2) return full;
   return `${parts[0]} ${parts[parts.length - 1]}`;
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
 }

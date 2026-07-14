@@ -36,7 +36,7 @@ export default function ConfirmarAsignacionBanner({
 			<button
 				onClick={onDismiss}
 				className="ml-2 text-lg leading-none opacity-60 hover:opacity-100"
-				aria-label="Dismiss"
+				aria-label="Cerrar"
 				title="Cerrar"
 			>
 				×

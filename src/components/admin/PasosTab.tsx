@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateShort } from "@/lib/format/date";
 import type { PasoDB } from "@/lib/types";
 
 interface PasosTabProps {
@@ -114,7 +115,7 @@ export default function PasosTab({
 								<span className="bg-[var(--oro)] text-black px-2 py-0.5 rounded font-black uppercase">
 									{p.num_trabajaderas} TRABAJADERAS
 								</span>
-								<span>{new Date(p.created_at).toLocaleDateString()}</span>
+								<span>{formatDateShort(p.created_at)}</span>
 							</div>
 							<div className="flex flex-col gap-1 mt-1">
 								<button

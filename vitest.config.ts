@@ -12,7 +12,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
-      include: ['src/lib/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}', 'src/services/**/*.{ts,tsx}'],
+      include: ['src/lib/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}', 'src/services/**/*.{ts,tsx}', 'src/stores/**/*.ts', 'src/components/sheets/**/*.tsx'],
       exclude: ['**/*.test.{ts,tsx}', '**/*.d.ts', 'src/test/**'],
       thresholds: {
         lines: 50,

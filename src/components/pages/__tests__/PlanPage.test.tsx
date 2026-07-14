@@ -455,7 +455,7 @@ describe("MiPlanPersonal — costalero plan view", () => {
 			expect(screen.getByText(/cap alcanzado/)).toBeInTheDocument();
 
 			// Dismiss button works
-			fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+			fireEvent.click(screen.getByRole("button", { name: /cerrar/i }));
 			expect(onDismiss).toHaveBeenCalled();
 		});
 	});

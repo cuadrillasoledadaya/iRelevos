@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { uiStore, projectStore, historyStore, temporadaStore } from "@/stores";
 import { useAuth } from "@/hooks/useAuth";
+import { formatDateTime, formatDateShort } from "@/lib/format/date";
 import type { PlanSnapshotSummary, DatosPerfil } from "@/lib/types";
 
 export default function HistorySheet() {
@@ -40,7 +41,7 @@ export default function HistorySheet() {
     if (S.trabajaderas.length > 0 && !S.trabajaderas.find((t) => t.id === selectedTrabajaderaId)) {
       setSelectedTrabajaderaId(S.trabajaderas[0].id);
     }
-  }, [S.trabajaderas, selectedTrabajaderaId]);
+  }, [S.trabajaderas, selectedTrabajaderaId, setSelectedTrabajaderaId]);
 
   // Load snapshots when sheet opens or trabajadera changes
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function HistorySheet() {
 
   const selectedTrab = S.trabajaderas.find((t) => t.id === selectedTrabajaderaId);
   const defaultName = selectedTrab
-    ? `Trabajadera ${selectedTrab.id} — ${formatDateShort(new Date())}`
+    ? `Trabajadera ${selectedTrab.id} — ${formatDateShort(new Date().toISOString())}`
     : "";
 
   function handleOpenSave() {
@@ -195,7 +196,7 @@ export default function HistorySheet() {
               <div className="snapshot-item-info">
                 <div className="snapshot-item-name">{snap.nombre}</div>
                 <div className="snapshot-item-meta">
-                  {formatDate(snap.created_at)}
+                  {formatDateTime(snap.created_at)}
                   {snap.proyecto_nombre && ` · ${snap.proyecto_nombre}`}
                   {snap.temporada_nombre && ` · ${snap.temporada_nombre}`}
                   {snap.plan_summary.status === "ok" && (
@@ -299,23 +300,4 @@ export default function HistorySheet() {
       return;
     await historyStore.getState().deleteSnapshot(id);
   }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const hh = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
-}
-
-function formatDateShort(d: Date): string {
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
 }

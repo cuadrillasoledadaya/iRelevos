@@ -12,12 +12,20 @@ describe('nombres', () => {
   describe('esc', () => {
     it('debería escapar caracteres HTML peligrosos', () => {
       expect(esc('<script>alert("xss")</script>')).toBe(
-        '&lt;script>alert(&quot;xss&quot;)&lt;/script>'
+        '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
       )
     })
 
     it('debería escapar ampersand', () => {
       expect(esc('A & B')).toBe('A &amp; B')
+    })
+
+    it('debería escapar single quotes', () => {
+      expect(esc("can't")).toBe('can&#x27;t')
+    })
+
+    it('debería escapar greater-than sign', () => {
+      expect(esc('a > b')).toBe('a &gt; b')
     })
 
     it('debería retornar string vacío para undefined', () => {

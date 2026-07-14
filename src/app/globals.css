@@ -44,6 +44,12 @@
 	--preview-tx: #d8b4fe;
 	--txt-body: var(--cre);
 }
+
+/* ── ACCESSIBILITY: focus-visible for keyboard navigation ── */
+*:focus-visible {
+	outline: 2px solid var(--oro);
+	outline-offset: 2px;
+}
 /* ── TEMA CLARO ── */
 html.light {
 	--neg: #f5f0e8;
@@ -785,7 +791,6 @@ body {
 	color: var(--cre);
 	font-family: "Lato", sans-serif;
 	font-size: 1rem;
-	outline: none;
 	width: 100%;
 	height: var(--tap);
 	transition: border-color 0.2s;
