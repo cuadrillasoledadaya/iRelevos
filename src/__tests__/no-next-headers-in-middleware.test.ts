@@ -10,11 +10,16 @@ describe('middleware.ts: no next/headers import (REQ-16)', () => {
 
     const offendingLines: number[] = []
     for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+      // Skip comment-only lines (//, /*, *)
+      if (line.startsWith('//') || line.startsWith('/*') || line.startsWith('*')) {
+        continue
+      }
       if (/from\s+['"]next\/headers['"]/.test(lines[i])) {
         offendingLines.push(i + 1) // 1-indexed
       }
     }
 
-    expect(offendingLines).toEqual([])
+    expect(offendingLines, `Found 'next/headers' import at lines: ${JSON.stringify(offendingLines)}`).toEqual([])
   })
 })
