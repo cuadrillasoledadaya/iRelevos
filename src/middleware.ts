@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createMiddlewareClient } from '@/lib/supabase/middleware'
 
 // Public routes that do NOT require authentication
 const PUBLIC_PATHS = ['/login', '/register']
@@ -25,60 +26,52 @@ export function isStaticAsset(pathname: string): boolean {
   )
 }
 
-/**
- * Find the Supabase auth token cookie.
- * Supabase sets cookies as `sb-<project-ref>-auth-token`.
- * We search for any cookie matching that pattern.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function getSupabaseAuthToken(request: NextRequest): string | undefined {
-  const cookies = request.cookies.getAll()
-  for (const cookie of cookies) {
-    if (cookie.name.startsWith('sb-') && cookie.name.endsWith('-auth-token') && cookie.value) {
-      return cookie.value
+export async function middleware(request: NextRequest) {
+  const response = NextResponse.next({ request })
+  const supabase = createMiddlewareClient(request, response)
+
+  let user: { id: string } | null = null
+  try {
+    const {
+      data: { user: fetchedUser },
+    } = await supabase.auth.getUser()
+    user = fetchedUser
+  } catch (error) {
+    // If getUser() throws (network error, not a structured error),
+    // treat as unauthenticated — redirect to /login, no 500.
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[middleware] getUser() failed:', error)
     }
+    user = null
   }
-  return undefined
-}
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function middleware(_request: NextRequest) {
-  // TEMPORARY DISABLED: Middleware auth check is incompatible with LocalStorage session.
-  // Re-enable once @supabase/ssr is integrated for cookie-based auth.
-  return NextResponse.next()
-
-  /* 
-  const { pathname } = _request.nextUrl
+  const { pathname } = request.nextUrl
 
   // Pass through static assets and API routes without auth check
   if (isStaticAsset(pathname)) {
-    return NextResponse.next()
+    return response
   }
-
-  const token = getSupabaseAuthToken(_request)
-  const isAuthenticated = !!token
 
   // Public routes: if authenticated, redirect to home
   if (isPublicRoute(pathname)) {
-    if (isAuthenticated) {
-      return NextResponse.redirect(new URL('/', _request.url))
+    if (user) {
+      return NextResponse.redirect(new URL('/', request.url))
     }
-    return NextResponse.next()
+    return response
   }
 
   // Protected routes: require authentication
   if (isProtectedRoute(pathname)) {
-    if (!isAuthenticated) {
-      const loginUrl = new URL('/login', _request.url)
+    if (!user) {
+      const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', pathname)
       return NextResponse.redirect(loginUrl)
     }
-    return NextResponse.next()
+    return response
   }
 
-  // All other routes: pass through
-  return NextResponse.next()
-  */
+  // All other routes: pass through (with refreshed Set-Cookie)
+  return response
 }
 
 export const config = {

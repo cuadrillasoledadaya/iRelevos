@@ -83,6 +83,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      // Defensive cleanup: remove any stale sb-*-auth-token keys from localStorage
+      // before the network call, ensuring no leftover tokens survive signOut.
+      try {
+        const keysToRemove: string[] = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && /^sb-.*-auth-token$/.test(key)) {
+            keysToRemove.push(key)
+          }
+        }
+        for (const key of keysToRemove) {
+          localStorage.removeItem(key)
+        }
+      } catch {
+        // localStorage may be unavailable (SSR, blocked by browser) — skip silently
+      }
+
       await supabase.auth.signOut({ scope: 'global' })
     } catch (err) {
       console.error('SignOut error:', err)
