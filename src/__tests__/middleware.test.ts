@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { isProtectedRoute, isPublicRoute, isStaticAsset } from '@/middleware'
+import { NextRequest, NextResponse } from 'next/server'
 
 describe('isProtectedRoute', () => {
   it('returns true for home path', () => {
@@ -84,5 +85,111 @@ describe('isStaticAsset', () => {
     expect(isStaticAsset('/')).toBe(false)
     expect(isStaticAsset('/login')).toBe(false)
     expect(isStaticAsset('/admin/users')).toBe(false)
+  })
+
+  it('returns true for PWA static assets', () => {
+    expect(isStaticAsset('/sw.js')).toBe(true)
+    expect(isStaticAsset('/workbox-abcdef123.js')).toBe(true)
+    expect(isStaticAsset('/manifest.json')).toBe(true)
+  })
+})
+
+describe('middleware', () => {
+  const mockUrl = 'http://localhost:3000'
+
+  function createMockRequest(pathname: string): NextRequest {
+    const url = new URL(pathname, mockUrl)
+    return {
+      nextUrl: url,
+      url: url.toString(),
+      cookies: {
+        getAll: () => [],
+      },
+    } as unknown as NextRequest
+  }
+
+  function mockServerClient(user: unknown) {
+    vi.doMock('@/lib/supabase/server', () => ({
+      createClient: () => ({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
+        },
+      }),
+    }))
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('redirects to /login when user is null on protected route /', async () => {
+    mockServerClient(null)
+
+    const { middleware } = await import('@/middleware')
+    const request = createMockRequest('/')
+    const response = await middleware(request)
+
+    expect(response).toBeInstanceOf(NextResponse)
+    const location = response.headers.get('location')
+    expect(location).toContain('/login')
+    expect(location).toContain('redirect=%2F')
+
+    vi.doUnmock('@/lib/supabase/server')
+  })
+
+  it('passes through when user is authenticated on protected route /', async () => {
+    mockServerClient({ id: 'user-123' })
+
+    const { middleware } = await import('@/middleware')
+    const request = createMockRequest('/')
+    const response = await middleware(request)
+
+    expect(response).toBeInstanceOf(NextResponse)
+    // next() response has status 200, not a redirect
+    expect((response as NextResponse).status).toBe(200)
+
+    vi.doUnmock('@/lib/supabase/server')
+  })
+
+  it('passes through public routes without auth check', async () => {
+    mockServerClient(null)
+
+    const { middleware } = await import('@/middleware')
+    const request = createMockRequest('/login')
+    const response = await middleware(request)
+
+    // Should NOT redirect — login is public
+    expect((response as NextResponse).status).toBe(200)
+
+    vi.doUnmock('@/lib/supabase/server')
+  })
+
+  it('redirects authenticated user away from /login to /', async () => {
+    mockServerClient({ id: 'user-123' })
+
+    const { middleware } = await import('@/middleware')
+    const request = createMockRequest('/login')
+    const response = await middleware(request)
+
+    expect(response).toBeInstanceOf(NextResponse)
+    const location = response.headers.get('location')
+    expect(location).toMatch(/\/$/)
+
+    vi.doUnmock('@/lib/supabase/server')
+  })
+
+  it('redirects unauthenticated user from /admin to /login with redirect param', async () => {
+    mockServerClient(null)
+
+    const { middleware } = await import('@/middleware')
+    const request = createMockRequest('/admin/users')
+    const response = await middleware(request)
+
+    expect(response).toBeInstanceOf(NextResponse)
+    const location = response.headers.get('location')
+    expect(location).toContain('/login')
+    expect(location).toContain('redirect=%2Fadmin%2Fusers')
+
+    vi.doUnmock('@/lib/supabase/server')
   })
 })

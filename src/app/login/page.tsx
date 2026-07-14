@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
+import { Suspense } from 'react'
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -13,7 +14,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
+  const redirect = searchParams.get('redirect') || '/'
   const isRateLimited = remainingAttempts === 0
 
   async function handleLogin(e: React.FormEvent) {
@@ -22,6 +25,7 @@ export default function LoginPage() {
     setError(null)
 
     try {
+      // Step 1: Check rate limit via API route
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -39,12 +43,21 @@ export default function LoginPage() {
         return
       }
 
-      // Success — save session to client storage and redirect
-      if (data.session) {
-        await supabase.auth.setSession(data.session)
-        router.push('/')
-        router.refresh()
+      // Step 2: Sign in directly — browser client writes cookies automatically
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+
+      if (signInError) {
+        setError('Credenciales incorrectas')
+        return
       }
+
+      // Honor the redirect param, with anti-loop guard
+      const target = redirect === '/login' ? '/' : redirect
+      router.push(target)
+      router.refresh()
     } catch {
       setError('Ocurrió un error. Intentá de nuevo.')
     } finally {
@@ -130,5 +143,23 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--bg)] p-4">
+        <div className="w-full max-w-sm p-8 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-xl">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-black cinzel text-[var(--oro)]">i-Relevos</h1>
+            <p className="text-[var(--cre-o)] text-sm uppercase tracking-[0.2em] mt-1 font-semibold">Gestión de Costaleros</p>
+          </div>
+          <p className="text-center text-[var(--cre-o)]">Cargando...</p>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
