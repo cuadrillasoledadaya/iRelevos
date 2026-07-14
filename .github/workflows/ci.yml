@@ -22,6 +22,8 @@ jobs:
         run: npm run lint
       - name: Run tests
         run: npm run test -- --run
+      - name: Run integration tests
+        run: npm run test:integration
       - name: Type check
         run: npm run type-check
 
@@ -42,3 +44,32 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+      - name: Middleware bundle size guard
+        run: |
+          SIZE=$(stat -c%s .next/server/middleware.js)
+          echo "Middleware bundle size: ${SIZE} bytes"
+          test "$SIZE" -lt 1048576 || { echo "Middleware bundle exceeds 1 MiB limit"; exit 1; }
+
+  preview-smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Deploy to Vercel preview
+        run: |
+          PREVIEW_URL=$(npx vercel deploy --token "$VERCEL_TOKEN" --yes)
+          echo "Preview URL: $PREVIEW_URL"
+          echo "PREVIEW_URL=$PREVIEW_URL" >> "$GITHUB_ENV"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Smoke test — home
+        run: |
+          curl --retry 5 --retry-delay 10 --retry-connrefused -s -o /dev/null -w "%{http_code}" "$PREVIEW_URL/" | grep -E "^(200|307)$"
+      - name: Smoke test — login
+        run: |
+          curl --retry 5 --retry-delay 10 --retry-connrefused -s -o /dev/null -w "%{http_code}" "$PREVIEW_URL/login" | grep -E "^(200|307)$"
+      - name: Smoke test — admin
+        run: |
+          curl --retry 5 --retry-delay 10 --retry-connrefused -s -o /dev/null -w "%{http_code}" "$PREVIEW_URL/admin" | grep -E "^(200|307)$"
