@@ -20,8 +20,8 @@ const VALID_SESSION = {
  * Used by the middleware integration test.
  */
 export const handlers = [
-  // POST /auth/v1/user — getUser() endpoint
-  http.post('https://test-project.supabase.co/auth/v1/user', ({ request }) => {
+  // GET /auth/v1/user — getUser() endpoint (Supabase Auth JS calls GET, not POST)
+  http.get('https://test-project.supabase.co/auth/v1/user', ({ request }) => {
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return HttpResponse.json({ code: 401, msg: 'Invalid token' }, { status: 401 })
@@ -53,7 +53,7 @@ export const handlers = [
 
 // Handler for simulating Supabase 5xx
 export function createServerErrorHandler() {
-  return http.post('https://test-project.supabase.co/auth/v1/user', () => {
+  return http.get('https://test-project.supabase.co/auth/v1/user', () => {
     return HttpResponse.json({ code: 500, msg: 'Internal server error' }, { status: 500 })
   })
 }
