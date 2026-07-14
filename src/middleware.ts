@@ -29,9 +29,21 @@ export function isStaticAsset(pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({ request })
   const supabase = createMiddlewareClient(request, response)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+
+  let user: { id: string } | null = null
+  try {
+    const {
+      data: { user: fetchedUser },
+    } = await supabase.auth.getUser()
+    user = fetchedUser
+  } catch (error) {
+    // If getUser() throws (network error, not a structured error),
+    // treat as unauthenticated — redirect to /login, no 500.
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[middleware] getUser() failed:', error)
+    }
+    user = null
+  }
 
   const { pathname } = request.nextUrl
 

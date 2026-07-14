@@ -6,6 +6,10 @@ import { cookies } from 'next/headers'
  *
  * Uses `cookies()` from `next/headers` — valid in RSC/Route Handler runtime,
  * NOT in Edge middleware.
+ *
+ * Must be called within a request scope (RSC, Route Handler, Server Action).
+ * Calling at module load time will throw because `next/headers.cookies()`
+ * requires a request context.
  */
 export function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
