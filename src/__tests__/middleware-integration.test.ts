@@ -1,8 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from 'vitest'
 import { setupServer } from 'msw/node'
-import { http, HttpResponse } from 'msw'
-import { middleware, isProtectedRoute, isPublicRoute, isStaticAsset } from '@/middleware'
+import { middleware } from '@/middleware'
 import { handlers, createServerErrorHandler } from './mocks/handlers'
 
 // Set required env vars
@@ -36,39 +35,6 @@ function createMockRequest(url: string, cookies: Record<string, string> = {}) {
       cookie: cookieHeader,
     }),
   } as unknown as Parameters<typeof middleware>[0]
-}
-
-function createMockResponse() {
-  const cookieSets: Array<Record<string, unknown>> = []
-  let redirectUrl: string | null = null
-  let redirectStatus: number | null = null
-
-  return {
-    cookies: {
-      set: ({ name, value, ...options }: Record<string, unknown>) => {
-        cookieSets.push({ name, value, ...options })
-      },
-    },
-    status: 200,
-    headers: new Headers(),
-    get cookieSets() {
-      return cookieSets
-    },
-    get redirectUrl() {
-      return redirectUrl
-    },
-    get isRedirect() {
-      return redirectUrl !== null
-    },
-    _redirect: (url: string, status: number) => {
-      redirectUrl = url
-      redirectStatus = status
-    },
-  } as unknown as Parameters<typeof middleware>[1] & {
-    cookieSets: typeof cookieSets
-    redirectUrl: string | null
-    isRedirect: boolean
-  }
 }
 
 describe('middleware() integration (REQ-15)', () => {
