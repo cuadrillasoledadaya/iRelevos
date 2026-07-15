@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { uiStore } from "@/stores";
+import type { ActivePage } from "@/lib/types";
 import packageJson from "../../../package.json";
 
 // Rotating brotherhood quotes — pick one by day-of-year so it changes daily
@@ -29,7 +30,7 @@ interface AttentionAlert {
 	emoji: string;
 	message: string;
 	action?: string;
-	targetPage?: string;
+	targetPage?: ActivePage;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
