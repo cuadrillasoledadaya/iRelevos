@@ -341,20 +341,20 @@ function ImportModal({
 }) {
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="bg-[var(--cre)] w-full max-w-2xl rounded-2xl border-2 border-[var(--oro)]/40 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh]">
+      <div className="bg-[var(--neg-m)] w-full max-w-2xl rounded-2xl border-2 border-[var(--oro)]/40 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col max-h-[90vh]">
 
         <div className="bg-[var(--oro)]/10 p-6 border-b border-[var(--oro)]/20 flex justify-between items-center">
           <div>
-            <h3 className="text-black cinzel text-xl font-bold flex items-center gap-3">
+            <h3 className="text-[var(--cre)] cinzel text-xl font-bold flex items-center gap-3">
               <span className="text-2xl">📥</span> IMPORTAR DESDE ICUADRILLA
             </h3>
-            <p className="text-gray-600 text-[10px] uppercase tracking-widest font-black mt-1">
+            <p className="text-[var(--cre-o)] text-[10px] uppercase tracking-widest font-black mt-1">
               {preview.filter(c => c._status === 'new').length} nuevos • {preview.filter(c => c._status === 'exists').length} a actualizar
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--oro)]/20 text-gray-700 transition-colors"
+            className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-[var(--oro)]/20 text-[var(--cre-o)] hover:text-[var(--cre)] transition-colors"
           >
             ✕
           </button>
@@ -362,7 +362,7 @@ function ImportModal({
 
         <div className="p-6 space-y-6 flex-1 overflow-y-auto">
           <div className="space-y-2">
-            <label className="text-gray-700 text-[10px] uppercase font-black tracking-widest">
+            <label className="text-[var(--cre-o)] text-[10px] uppercase font-black tracking-widest">
               Asignar a Cuadrilla / Paso Destino:
             </label>
             <select
@@ -379,12 +379,12 @@ function ImportModal({
 
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <label className="text-gray-700 text-[10px] uppercase font-black tracking-widest">
+              <label className="text-[var(--cre-o)] text-[10px] uppercase font-black tracking-widest">
                 Previsualización de datos:
               </label>
               <button
                 onClick={onToggleAllSelected}
-                className="text-[10px] text-gray-700 uppercase font-bold border border-gray-400/50 px-2 py-1 rounded hover:bg-gray-200/50"
+                className="text-[10px] text-[var(--cre-o)] uppercase font-bold border border-[var(--oro)]/30 px-2 py-1 rounded hover:bg-[var(--oro)]/10 transition-colors"
               >
                 {preview.every(c => c.selected) ? 'Deseleccionar todos' : 'Seleccionar todos'}
               </button>
@@ -392,14 +392,14 @@ function ImportModal({
 
             <div className="grid grid-cols-1 gap-2">
               {preview.length === 0 && (
-                <div className="text-center p-12 text-gray-500 italic cinzel">
+                <div className="text-center p-12 text-[var(--cre-o)] italic cinzel">
                   No se encontraron costaleros.
                 </div>
               )}
               {preview.map((c, i) => (
                 <div
                   key={i}
-                  className={`bg-white/50 border ${c.selected ? 'border-[var(--oro)]/50 bg-[var(--oro)]/5' : 'border-[var(--oro)]/10'} p-4 rounded-xl flex items-center justify-between hover:border-[var(--oro)]/30 transition-all group`}
+                  className={`bg-[var(--neg-s)] border ${c.selected ? 'border-[var(--oro)] shadow-[0_0_12px_var(--shadow-oro)] bg-[var(--oro)]/10' : 'border-[var(--oro)]/20'} p-4 rounded-xl flex items-center justify-between hover:border-[var(--oro)]/50 transition-all group`}
                 >
                   <div className="flex items-center gap-4">
                     <input
@@ -409,10 +409,10 @@ function ImportModal({
                       className="w-5 h-5 accent-[var(--oro)] cursor-pointer"
                     />
                     <div className="flex flex-col">
-                      <span className={`font-bold text-base leading-tight transition-colors ${c.selected ? 'text-gray-900' : 'text-gray-500'}`}>
+                      <span className={`font-bold text-base leading-tight transition-colors ${c.selected ? 'text-[var(--cre)]' : 'text-[var(--cre-o)]'}`}>
                         {c.nombre} {c.apellidos}
                       </span>
-                      <span className="text-gray-500 text-[10px] font-mono">
+                      <span className="text-[var(--cre-o)]/70 text-[10px] font-mono">
                         {c.email || 'Sin email'}
                       </span>
                     </div>
@@ -420,15 +420,15 @@ function ImportModal({
 
                   <div className="flex items-center gap-3">
                       {c.trabajadera && (
-                        <div className="flex flex-col items-center justify-center bg-gray-100 px-3 py-1 rounded-lg border border-gray-300">
-                          <span className="text-[8px] text-gray-600 uppercase font-black">Trab</span>
-                          <span className="text-sm font-black text-gray-900">T{c.trabajadera}</span>
+                        <div className="flex flex-col items-center justify-center bg-[var(--oro)]/10 px-3 py-1 rounded-lg border border-[var(--oro)]/30">
+                          <span className="text-[8px] text-[var(--oro-o)] uppercase font-black">Trab</span>
+                          <span className="text-sm font-black text-[var(--oro)]">T{c.trabajadera}</span>
                         </div>
                       )}
                       <span className={`text-[10px] px-3 py-1.5 rounded-full font-black uppercase tracking-wider ${
                         c._status === 'new'
-                          ? 'bg-emerald-500/20 text-emerald-700 border border-emerald-500/30'
-                          : 'bg-amber-500/20 text-amber-700 border border-amber-500/30'
+                          ? 'bg-[var(--ok-bg)] text-[var(--ok-tx)] border border-[var(--ok-bd)]'
+                          : 'bg-[var(--warn-oro-bg)] text-[var(--warn-oro)] border border-[var(--warn-oro-bd)]'
                       }`}>
                         {c._status === 'new' ? 'NUEVO' : 'EXISTE'}
                       </span>
@@ -455,7 +455,7 @@ function ImportModal({
             )}
           </button>
           {!importPid && (
-            <p className="text-center text-gray-600 text-[10px] mt-3 font-bold uppercase">
+            <p className="text-center text-[var(--cre-o)] text-[10px] mt-3 font-bold uppercase">
               ️               ️ Seleccioná un paso para habilitar la importación
             </p>
           )}

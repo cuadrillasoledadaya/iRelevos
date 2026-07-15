@@ -959,7 +959,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 								padding: "6px 12px",
 								fontSize: "0.8rem",
 								backgroundColor: "var(--verde)",
-								color: "#fff",
+								color: "#000",
 							}}
 							onClick={() => openSheet("relevos")}
 							title="Generar y descargar relevos en PDF"
