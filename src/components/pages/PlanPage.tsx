@@ -16,6 +16,7 @@ import BoquillaView from "./BoquillaView";
 import ConfirmarAsignacionBanner from "../feedback/ConfirmarAsignacionBanner";
 import ViolationsBanner from "../feedback/ViolationsBanner";
 import PreviewCorreccionesSheet from "../sheets/PreviewCorreccionesSheet";
+import ConflictResolverSheet from "../sheets/ConflictResolverSheet";
 
 export default function PlanPage() {
 	const S = projectStore((s) => s.S);
@@ -27,6 +28,7 @@ export default function PlanPage() {
 		profile?.role === "capataz" ||
 		profile?.role === "auxiliar";
 	const [showBoquilla, setShowBoquilla] = useState(false);
+	const [conflictSheetOpen, setConflictSheetOpen] = useState(false);
 
 	// Count boquilleros
 	const boquillaCount = useMemo(() => {
@@ -77,12 +79,19 @@ export default function PlanPage() {
 				<PlanTrabajadera key={t.id} t={t} censusBoquilla={censusBoquilla} />
 			))}
 
-			{showBoquilla && boquillaCount > 0 && (
-				<BoquillaView
-					trabajaderas={S.trabajaderas}
-					censusBoquilla={censusBoquilla}
-				/>
-			)}
+		{showBoquilla && boquillaCount > 0 && (
+			<BoquillaView
+				trabajaderas={S.trabajaderas}
+				censusBoquilla={censusBoquilla}
+				onOpenConflicts={() => setConflictSheetOpen(true)}
+			/>
+		)}
+
+		<ConflictResolverSheet
+			open={conflictSheetOpen}
+			onClose={() => setConflictSheetOpen(false)}
+			content={S}
+		/>
 		</>
 	);
 }

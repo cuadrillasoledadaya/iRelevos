@@ -22,9 +22,11 @@ function extractTramoNum(nombre: string): number {
 const BoquillaView = memo(function BoquillaView({
 	trabajaderas,
 	censusBoquilla,
+	onOpenConflicts,
 }: {
 	trabajaderas: Trabajadera[];
 	censusBoquilla: Record<string, boolean>;
+	onOpenConflicts?: () => void;
 }) {
 	const openSheet = uiStore.getState().openSheet;
 	const setCellTarget = uiStore.getState().setCellTarget;
@@ -220,6 +222,23 @@ const BoquillaView = memo(function BoquillaView({
 	const maxFuera = Math.max(...coincidencias.map((c) => c.fuera.length), 0);
 	const hasAnyPlan = trabConBoquilla.some((t) => t.plan !== null);
 
+	// Count real plan conflicts: same nombreIdx in both dentro and fuera
+	const conflictCount = useMemo(() => {
+		let count = 0;
+		for (const t of trabajaderas) {
+			if (!t.plan) continue;
+			for (let ti = 0; ti < t.tramos.length; ti++) {
+				const slot = t.plan[ti];
+				if (!slot) continue;
+				const dentroSet = new Set(slot.dentro);
+				for (const fIdx of slot.fuera) {
+					if (dentroSet.has(fIdx)) count++;
+				}
+			}
+		}
+		return count;
+	}, [trabajaderas]);
+
 	if (boquilleros.length === 0) return null;
 
 	return (
@@ -247,6 +266,23 @@ const BoquillaView = memo(function BoquillaView({
 						)}
 					</div>
 				</div>
+				{conflictCount > 0 && onOpenConflicts && (
+					<button
+						className="btn btn-sm ml-2"
+						style={{
+							backgroundColor: "var(--err-bg)",
+							borderColor: "var(--err-bd)",
+							color: "var(--err-tx)",
+						}}
+						onClick={(e) => {
+							e.stopPropagation();
+							onOpenConflicts();
+						}}
+						title="Resolver conflictos de boquilla"
+					>
+						⚠ Resolver ({conflictCount})
+					</button>
+				)}
 				<button
 					className="btn btn-oro btn-sm ml-auto"
 					onClick={(e) => {
