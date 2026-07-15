@@ -33,6 +33,8 @@ interface AttentionAlert {
 	targetPage?: ActivePage;
 }
 
+type DashboardTab = "activity" | "attention";
+
 // ── Helpers ────────────────────────────────────────────────────────
 
 /** Returns "hace 5 min", "hace 2 h", "hace 3 d", etc. */
@@ -61,6 +63,86 @@ function formatSection(section: string): { label: string; emoji: string } {
 	return map[section] ?? { label: section, emoji: "📝" };
 }
 
+// ── Sub-components ─────────────────────────────────────────────────
+
+function ActivityList({
+	items,
+	loading,
+}: {
+	items: LastChange[];
+	loading: boolean;
+}) {
+	if (loading) {
+		return <p className="text-[var(--cre-o)] text-sm">Cargando...</p>;
+	}
+	if (items.length === 0) {
+		return (
+			<p className="text-[var(--cre-o)] text-sm italic">
+				Aún no hay cambios registrados
+			</p>
+		);
+	}
+	return (
+		<div className="flex flex-col gap-2">
+			{items.map((item, i) => {
+				const { emoji } = formatSection(item.section);
+				return (
+					<div key={i} className="flex items-center gap-3 text-sm">
+						<span className="text-lg">{emoji}</span>
+						<div className="flex flex-col min-w-0">
+							<span className="text-[var(--cre)] font-medium truncate">
+								{item.action}
+							</span>
+							<span className="text-[var(--cre-o)] text-xs">
+								por {item.user_name} · {timeAgo(item.changed_at)}
+							</span>
+						</div>
+					</div>
+				);
+			})}
+		</div>
+	);
+}
+
+function AttentionList({
+	items,
+	onNavigate,
+}: {
+	items: AttentionAlert[];
+	onNavigate: (page: ActivePage) => void;
+}) {
+	if (items.length === 0) {
+		return (
+			<p className="text-[var(--ok-tx)] text-sm italic">
+				✅ Todo en orden — no hay alertas pendientes
+			</p>
+		);
+	}
+	return (
+		<div className="flex flex-col gap-2">
+			{items.map((alert) => (
+				<div
+					key={alert.id}
+					className="bg-[var(--warn-oro-bg)] border border-[var(--warn-oro-bd)] rounded-xl p-4 flex items-center gap-3"
+				>
+					<span className="text-lg">{alert.emoji}</span>
+					<span className="text-[var(--cre)] text-sm flex-1">
+						{alert.message}
+					</span>
+					{alert.action && alert.targetPage && (
+						<button
+							onClick={() => onNavigate(alert.targetPage!)}
+							className="text-xs font-bold text-[var(--warn-oro)] hover:underline whitespace-nowrap"
+						>
+							{alert.action}
+						</button>
+					)}
+				</div>
+			))}
+		</div>
+	);
+}
+
 // ── Component ──────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -74,9 +156,10 @@ export default function DashboardPage() {
 	});
 	const [loading, setLoading] = useState(true);
 
-	// New state for audit widgets
-	const [lastChange, setLastChange] = useState<LastChange | null>(null);
-	const [lastChangeLoading, setLastChangeLoading] = useState(true);
+	// Tabs state
+	const [tab, setTab] = useState<DashboardTab>("activity");
+	const [activity, setActivity] = useState<LastChange[]>([]);
+	const [activityLoading, setActivityLoading] = useState(true);
 	const [attention, setAttention] = useState<AttentionAlert[]>([]);
 
 	useEffect(() => {
@@ -101,31 +184,33 @@ export default function DashboardPage() {
 			}
 		}
 
-		async function fetchLastChange() {
+		async function fetchActivity() {
 			try {
-				const { data, error } = await supabase.rpc("get_last_change");
+				const { data, error } = await supabase.rpc("get_last_change", {
+					limit_n: 5,
+				});
 				if (!error && data && data.length > 0) {
-					setLastChange(data[0] as LastChange);
+					setActivity(data as LastChange[]);
 				}
 			} catch (e) {
-				console.error("Error fetching last change:", e);
+				console.error("Error fetching activity:", e);
 			} finally {
-				setLastChangeLoading(false);
+				setActivityLoading(false);
 			}
 		}
 
 		async function fetchAttention() {
 			const alerts: AttentionAlert[] = [];
 			try {
-				// Check if census hasn't been updated in 30+ days
-				const { data, error } = await supabase
+				// 1. Census staleness > 30 days
+				const { data: censusData, error: censusErr } = await supabase
 					.from("census")
 					.select("updated_at")
 					.order("updated_at", { ascending: false })
 					.limit(1);
 
-				if (!error && data && data.length > 0 && data[0].updated_at) {
-					const lastUpdate = new Date(data[0].updated_at).getTime();
+				if (!censusErr && censusData && censusData.length > 0 && censusData[0].updated_at) {
+					const lastUpdate = new Date(censusData[0].updated_at).getTime();
 					const daysSince = Math.floor(
 						(Date.now() - lastUpdate) / (1000 * 60 * 60 * 24),
 					);
@@ -138,8 +223,7 @@ export default function DashboardPage() {
 							targetPage: "carga",
 						});
 					}
-				} else if (!error && (!data || data.length === 0)) {
-					// No updated_at means census was never touched with audit trail
+				} else if (!censusErr && (!censusData || censusData.length === 0)) {
 					alerts.push({
 						id: "census-never",
 						emoji: "📋",
@@ -148,14 +232,53 @@ export default function DashboardPage() {
 						targetPage: "carga",
 					});
 				}
+
+				// 2. Plan staleness > 14 days
+				const { data: planData, error: planErr } = await supabase
+					.from("proyectos")
+					.select("updated_at")
+					.order("updated_at", { ascending: false })
+					.limit(1);
+
+				if (!planErr && planData && planData.length > 0 && planData[0].updated_at) {
+					const lastUpdate = new Date(planData[0].updated_at).getTime();
+					const daysSince = Math.floor(
+						(Date.now() - lastUpdate) / (1000 * 60 * 60 * 24),
+					);
+					if (daysSince > 14) {
+						alerts.push({
+							id: "plan-stale",
+							emoji: "📋",
+							message: `El plan no se actualiza hace ${daysSince} días`,
+							action: "Ir al plan",
+							targetPage: "plan",
+						});
+					}
+				}
+
+				// 3. Costaleros sin contacto
+				const { count: noContactCount, error: contactErr } = await supabase
+					.from("census")
+					.select("*", { count: "exact", head: true })
+					.or("email.is.null,email.eq.,telefono.is.null,telefono.eq.");
+
+				if (!contactErr && noContactCount && noContactCount > 0) {
+					alerts.push({
+						id: "no-contact",
+						emoji: "📱",
+						message: `${noContactCount} costalero${noContactCount > 1 ? "s" : ""} sin email o teléfono`,
+						action: "Ir al censo",
+						targetPage: "carga",
+					});
+				}
 			} catch (e) {
-				console.error("Error checking census staleness:", e);
+				console.error("Error checking attention alerts:", e);
 			}
 			setAttention(alerts);
 		}
 
 		fetchStats();
-		fetchLastChange();
+		fetchActivity();
 		fetchAttention();
 	}, []);
 
@@ -168,7 +291,7 @@ export default function DashboardPage() {
 
 	return (
 		<div className="flex flex-col gap-6 p-4 animate-in fade-in duration-500">
-			{/* Bienvenida — FIX: use apodo || nombre so it shows "Chiqui" not "Superadmin" */}
+			{/* Bienvenida */}
 			<div className="flex flex-col gap-1 items-center">
 				<h1
 					className="text-3xl font-black cinzel text-[var(--cre)] text-center"
@@ -191,62 +314,48 @@ export default function DashboardPage() {
 				&quot;{BROTHERHOOD_QUOTES[quoteIndex]}&quot;
 			</p>
 
-			{/* Último cambio widget */}
-			<div className="bg-[var(--neg-m)] border border-[var(--oro)]/20 rounded-xl p-4">
-				<h2 className="text-sm font-black cinzel text-[var(--cre)] mb-2">
-					Último cambio
-				</h2>
-				{lastChangeLoading ? (
-					<p className="text-[var(--cre-o)] text-sm">Cargando...</p>
-				) : lastChange ? (
-					<div className="flex items-center gap-3 text-sm">
-						<span className="text-lg">
-							{formatSection(lastChange.section).emoji}
-						</span>
-						<div className="flex flex-col">
-							<span className="text-[var(--cre)] font-medium">
-								{lastChange.action}
-							</span>
-							<span className="text-[var(--cre-o)] text-xs">
-								por {lastChange.user_name} · hace{" "}
-								{timeAgo(lastChange.changed_at)}
-							</span>
-						</div>
-					</div>
-				) : (
-					<p className="text-[var(--cre-o)] text-sm italic">
-						Aún no hay cambios registrados
-					</p>
-				)}
-			</div>
-
-			{/* Necesita tu atención widget */}
-			{attention.length > 0 && (
-				<div className="flex flex-col gap-2">
-					<h2 className="text-sm font-black cinzel text-[var(--cre)]">
-						Necesita tu atención
-					</h2>
-					{attention.map((alert) => (
-						<div
-							key={alert.id}
-							className="bg-[var(--warn-oro-bg)] border border-[var(--warn-oro-bd)] rounded-xl p-4 flex items-center gap-3"
-						>
-							<span className="text-lg">{alert.emoji}</span>
-							<span className="text-[var(--cre)] text-sm flex-1">
-								{alert.message}
-							</span>
-							{alert.action && alert.targetPage && (
-								<button
-									onClick={() => setActivePage(alert.targetPage!)}
-									className="text-xs font-bold text-[var(--warn-oro)] hover:underline"
-								>
-									{alert.action}
-								</button>
-							)}
-						</div>
-					))}
+			{/* Center of Command card — tabs: Activity / Attention */}
+			<div className="bg-[var(--neg-m)] border border-[var(--oro)]/20 rounded-xl overflow-hidden">
+				{/* Tab header */}
+				<div className="flex border-b border-[var(--oro)]/20">
+					<button
+						onClick={() => setTab("activity")}
+						className={`flex-1 py-3 text-sm font-bold cinzel uppercase tracking-wider transition-colors ${
+							tab === "activity"
+								? "text-[var(--oro)] border-b-2 border-[var(--oro)] bg-[var(--oro)]/5"
+								: "text-[var(--cre-o)] hover:text-[var(--cre)]"
+						}`}
+					>
+						Actividad{" "}
+						{activity.length > 0 && (
+							<span className="text-xs ml-1">({activity.length})</span>
+						)}
+					</button>
+					<button
+						onClick={() => setTab("attention")}
+						className={`flex-1 py-3 text-sm font-bold cinzel uppercase tracking-wider transition-colors ${
+							tab === "attention"
+								? "text-[var(--warn-oro)] border-b-2 border-[var(--warn-oro)] bg-[var(--warn-oro-bg)]"
+								: "text-[var(--cre-o)] hover:text-[var(--cre)]"
+						}`}
+					>
+						Atención{" "}
+						{attention.length > 0 && (
+							<span className="text-xs ml-1">({attention.length})</span>
+						)}
+					</button>
 				</div>
-			)}
+
+				{/* Tab body */}
+				<div className="p-4 min-h-[120px]">
+					{tab === "activity" && (
+						<ActivityList items={activity} loading={activityLoading} />
+					)}
+					{tab === "attention" && (
+						<AttentionList items={attention} onNavigate={setActivePage} />
+					)}
+				</div>
+			</div>
 
 			{/* Stats Cards */}
 			<div className="grid grid-cols-2 gap-4">
