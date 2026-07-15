@@ -23,6 +23,7 @@ interface LastChange {
 	user_name: string;
 	user_role: string;
 	changed_at: string;
+	detail?: string | null;
 }
 
 interface AttentionAlert {
@@ -92,6 +93,9 @@ function ActivityList({
 						<div className="flex flex-col min-w-0">
 							<span className="text-[var(--cre)] font-medium truncate">
 								{item.action}
+								{item.detail && (
+									<span className="text-[var(--oro)]"> · {item.detail}</span>
+								)}
 							</span>
 							<span className="text-[var(--cre-o)] text-xs">
 								por {item.user_name} · {timeAgo(item.changed_at)}
