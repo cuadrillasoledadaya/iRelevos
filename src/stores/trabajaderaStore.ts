@@ -6,7 +6,7 @@
 
 import { create } from 'zustand'
 import { defaultRoles } from '@/lib/roles'
-import { tramosOptimos, aplicarSugerencias, generarSugerencias } from '@/lib/algoritmos'
+import { tramosOptimos, aplicarSugerencias, generarSugerencias, sugerirDistribucion } from '@/lib/algoritmos'
 import type { DatosPerfil, RolCode, Trabajadera } from '@/lib/types'
 import type { SugerenciaRes } from '@/lib/algoritmos'
 
@@ -33,6 +33,13 @@ export interface TrabajaderaStore {
   sugerirYCalcular: (tid: number) => void
   previsualizarSugerencia: (tid: number) => SugerenciaRes | null
   confirmarSugerencia: (tid: number) => boolean
+  toggleCuadrillaDoblada: (tid: number) => {
+    anterior: boolean
+    nuevo: boolean
+    distribucionAplicada: { a: number[]; b: number[] } | null
+    pinsInvalidated: boolean
+  }
+  setDistribucionCuadrillas: (tid: number, a: number[], b: number[]) => void
 }
 
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void
@@ -353,5 +360,76 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
       }
       _completarPlan(tid)
       return true
+    },
+
+    toggleCuadrillaDoblada: (tid) => {
+      const result = {
+        anterior: false,
+        nuevo: false,
+        distribucionAplicada: null as { a: number[]; b: number[] } | null,
+        pinsInvalidated: false,
+      }
+      _mutar(d => {
+        const t = _getTrab(d, tid)
+        const anterior = t.cuadrillaDoblada ?? false
+        result.anterior = anterior
+
+        if (!anterior) {
+          // Activate: set flag, apply suggested distribution, clear pins
+          t.cuadrillaDoblada = true
+          const dist = sugerirDistribucion(t.nombres)
+          const a = dist.a.map((name) => t.nombres.indexOf(name))
+          const b = dist.b.map((name) => t.nombres.indexOf(name))
+          t.distribucionCuadrillas = { a, b }
+          result.distribucionAplicada = { a, b }
+        } else {
+          // Deactivate: clear flag, keep distribution
+          t.cuadrillaDoblada = false
+        }
+        result.nuevo = t.cuadrillaDoblada ?? false
+
+        // Invalidate pins and plan
+        if (t.pinned) {
+          result.pinsInvalidated = true
+        }
+        t.pinned = null
+        t.plan = null
+        t.obj = null
+        t.analisis = null
+      })
+      return result
+    },
+
+    setDistribucionCuadrillas: (tid, a, b) => {
+      _mutar(d => {
+        const t = _getTrab(d, tid)
+        const n = t.nombres.length
+        const allIndices = new Set([...a, ...b])
+        if (a.length + b.length !== n) {
+          throw new Error(
+            `Distribución inválida: suma=${a.length + b.length}, nombres=${n}`,
+          )
+        }
+        for (const idx of allIndices) {
+          if (idx < 0 || idx >= n) {
+            throw new Error(
+              `Distribución inválida: índice ${idx} fuera de rango [0, ${n})`,
+            )
+          }
+        }
+        // Check disjoint
+        const aSet = new Set(a)
+        for (const idx of b) {
+          if (aSet.has(idx)) {
+            throw new Error(
+              `Distribución inválida: índice ${idx} aparece en ambas cuadrillas`,
+            )
+          }
+        }
+        t.distribucionCuadrillas = { a: [...a], b: [...b] }
+        t.plan = null
+        t.obj = null
+        t.analisis = null
+      })
     },
   }))

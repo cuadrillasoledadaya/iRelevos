@@ -171,10 +171,11 @@ export const planStore = create<PlanStore>()((set, get) => ({
 			return result;
 		},
 
-		previsualizarCorreccionesBulk: (tid) => {
-			const t = _getTrab(_getS(), tid);
-			if (!t.plan || !t.analisis) return null;
-			const s = generarSugerenciasCorreccion(t);
+	previsualizarCorreccionesBulk: (tid) => {
+		const t = _getTrab(_getS(), tid);
+		if (!t.plan || !t.analisis) return null;
+		if (t.cuadrillaDoblada) return null;
+		const s = generarSugerenciasCorreccion(t);
 			if (s.correcciones.length === 0) return null;
 			const summary: Record<string, number> = {};
 			for (const c of s.correcciones) {
@@ -184,14 +185,14 @@ export const planStore = create<PlanStore>()((set, get) => ({
 			return { correcciones: s.correcciones, summary };
 		},
 
-		confirmarCorreccionesBulk: (tid) => {
-			let result: ResultadoBulkApply = { aplicadas: 0, saltadas: 0, cap_alcanzado: false, violations: [] };
-			_mutar((d) => {
-				const t = _getTrab(d, tid);
-				if (!t.plan) {
-					set({ ultimoResultadoBulk: result });
-					return;
-				}
+	confirmarCorreccionesBulk: (tid) => {
+		let result: ResultadoBulkApply = { aplicadas: 0, saltadas: 0, cap_alcanzado: false, violations: [] };
+		_mutar((d) => {
+			const t = _getTrab(d, tid);
+			if (!t.plan || t.cuadrillaDoblada) {
+				set({ ultimoResultadoBulk: result });
+				return;
+			}
 				result = aplicarTodasLasCorrecciones(t);
 				set({ ultimoResultadoBulk: result });
 			});
