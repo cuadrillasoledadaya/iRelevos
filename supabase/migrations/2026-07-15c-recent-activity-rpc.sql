@@ -4,7 +4,10 @@
 -- activity feed (multiple rows).
 -- ══════════════════════════════════════════════════════════════════
 
+-- Idempotent: drop both possible signatures (arity-0 from migration 1,
+-- arity-1 from a previous partial application of this migration)
 DROP FUNCTION IF EXISTS get_last_change();
+DROP FUNCTION IF EXISTS get_last_change(INTEGER);
 
 CREATE FUNCTION get_last_change(limit_n INT DEFAULT 1)
 RETURNS TABLE(
