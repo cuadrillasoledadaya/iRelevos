@@ -17,6 +17,7 @@ import ConfirmarAsignacionBanner from "../feedback/ConfirmarAsignacionBanner";
 import ViolationsBanner from "../feedback/ViolationsBanner";
 import PreviewCorreccionesSheet from "../sheets/PreviewCorreccionesSheet";
 import ConflictResolverSheet from "../sheets/ConflictResolverSheet";
+import DistributionEditor from "./DistributionEditor";
 
 export default function PlanPage() {
 	const S = projectStore((s) => s.S);
@@ -431,11 +432,14 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 	const limpiarPlan = planStore.getState().limpiarPlan;
 	const getErroresPinned = planStore.getState().getErroresPinned;
 	const quitarBloqueos = planStore.getState().quitarBloqueos;
-	const aplicarSugerencia = planStore.getState().aplicarSugerencia;
-	const ultimoResultadoBulk = planStore((s) => s.ultimoResultadoBulk);
-	const [bannerDismissed, setBannerDismissed] = useState(false);
-	const [previewOpen, setPreviewOpen] = useState(false);
-	const bannerResult = bannerDismissed ? null : ultimoResultadoBulk;
+  const aplicarSugerencia = planStore.getState().aplicarSugerencia;
+  const toggleCuadrillaDoblada = trabajaderaStore.getState().toggleCuadrillaDoblada;
+  const ultimoResultadoBulk = planStore((s) => s.ultimoResultadoBulk);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [showPinToast, setShowPinToast] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
+  const bannerResult = bannerDismissed ? null : ultimoResultadoBulk;
 	const setBancoTargetLocal = uiStore.getState().setBancoTarget;
 	const openSheetLocal = uiStore.getState().openSheet;
 	const { profile } = useAuth();
@@ -464,9 +468,11 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 	// Memoizado: 1× por trabajadera, reusado en celdas y sección inferior
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const sugerencias = useMemo(
-		() => generarSugerenciasCorreccion(t),
+		() => t.cuadrillaDoblada
+			? { correcciones: [] as ReturnType<typeof generarSugerenciasCorreccion>["correcciones"] }
+			: generarSugerenciasCorreccion(t),
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-		[t.plan, t.analisis, t.nombres, t.tramos, t.bajas, t.obj, t.puntuaciones, t.tramosClaves],
+		[t.plan, t.analisis, t.nombres, t.tramos, t.bajas, t.obj, t.puntuaciones, t.tramosClaves, t.cuadrillaDoblada],
 	);
 
 	function openBanco(ti: number) {
@@ -495,6 +501,18 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						{nActivos} act. · {t.tramos.length} tramos · Salen {F}
 					</div>
 				</div>
+				{t.cuadrillaDoblada && (
+					<span
+						className="badge"
+						style={{
+							backgroundColor: "var(--cd-bg)",
+							borderColor: "var(--cd-bd)",
+							color: "var(--cd-tx)",
+						}}
+					>
+						⚒ Cuadrilla Doblada
+					</span>
+				)}
 				<div className="t-chev">▼</div>
 			</div>
 
@@ -573,6 +591,63 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 							<div className="leg-dot L"></div> Auto
 						</div>
 					</div>
+
+					{/* Cuadrilla Doblada toggle */}
+					<div className="mrow mt-3">
+						<button
+							className="btn btn-sm"
+							style={{
+								backgroundColor: t.cuadrillaDoblada
+									? "var(--cd-bg)"
+									: "transparent",
+								borderColor: "var(--cd-bd)",
+								color: "var(--cd-tx)",
+							}}
+							onClick={() => {
+								const res = toggleCuadrillaDoblada(t.id);
+								if (res.pinsInvalidated) {
+									setShowPinToast(true);
+									setTimeout(() => setShowPinToast(false), 4000);
+								}
+								if (res.nuevo && !t.plan) {
+									setShowEditor(true);
+								} else {
+									setShowEditor(false);
+								}
+							}}
+						>
+							Cuadrilla Doblada: {t.cuadrillaDoblada ? "ON" : "OFF"}
+						</button>
+					</div>
+
+					{/* Pin invalidation toast */}
+					{showPinToast && (
+						<div
+							className="mt-3 p-2 rounded-md text-[0.7rem]"
+							style={{
+								backgroundColor: "var(--warn-bg)",
+								border: "1px solid var(--warn-bd)",
+								color: "var(--oro-c)",
+							}}
+							onClick={() => setShowPinToast(false)}
+						>
+							Se invalidaron los pines existentes
+						</div>
+					)}
+
+					{/* Distribution Editor */}
+					{t.cuadrillaDoblada &&
+						t.distribucionCuadrillas &&
+						!t.plan &&
+						showEditor && (
+						<DistributionEditor
+							tid={t.id}
+							nombres={t.nombres}
+							distribucion={t.distribucionCuadrillas}
+							onConfirm={() => setShowEditor(false)}
+							onCancel={() => setShowEditor(false)}
+						/>
+					)}
 				</div>
 
 				{erroresPinned.length > 0 && (
@@ -898,7 +973,8 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 										</div>
 									))}
 									{/* Botón Confirmar asignación - aplica todas y fija */}
-									{sugerencias.correcciones.length > 0 && (
+									{sugerencias.correcciones.length > 0 &&
+										!t.cuadrillaDoblada && (
 										<div className="mt-3 flex justify-end">
 											<button
 												className="btn btn-sm"
@@ -937,6 +1013,19 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 								</>
 							);
 						})()}
+						{/* Correcciones skip banner for cuadrilla doblada */}
+						{t.cuadrillaDoblada && t.plan && (
+							<div
+								className="mt-3 p-3 rounded-md text-[0.75rem]"
+								style={{
+									backgroundColor: "var(--warn-bg)",
+									borderLeft: "3px solid var(--warn)",
+									color: "var(--oro-c)",
+								}}
+							>
+								En modo Cuadrilla Doblada las sugerencias de corrección están deshabilitadas.
+							</div>
+						)}
 					</div>
 				)}
 
