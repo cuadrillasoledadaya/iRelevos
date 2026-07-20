@@ -2,6 +2,8 @@
 // CUADRILLA DOBLADA — lógica para trabajaderas con 10+ costaleros
 // ══════════════════════════════════════════════════════════════════
 
+import type { Trabajadera, TramoSlot } from "../types";
+
 export const ANCHO_TRABAJADERA = 5
 export const UMBRAL_DOBLADO = 2 * ANCHO_TRABAJADERA
 
@@ -250,4 +252,68 @@ export function simularCicloCompleto(
 	}
 
 	return relevos
+}
+
+/**
+ * Adapter: maps cuadrilla doblada simulation output to TramoSlot[] shape.
+ * Returns [] when n < 10 (defensive guard).
+ * Throws if any name in the simulation is missing from t.nombres.
+ *
+ * Each TramoSlot represents the state AFTER a relevo: `dentro` = who is
+ * currently cargando (inside), `fuera` = everyone else.
+ */
+export function cuadrillaDobladaATramoSlots(
+	t: Trabajadera,
+	distribucion?: Distribucion,
+): TramoSlot[] {
+	if (t.nombres.length < 10) return [];
+
+	// If no distribution provided, try to build one from t.distribucionCuadrillas (indices)
+	let dist = distribucion;
+	if (!dist && t.distribucionCuadrillas) {
+		dist = {
+			a: t.distribucionCuadrillas.a.map((i) => t.nombres[i]),
+			b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]),
+		};
+	}
+
+	const relevos = simularCicloCompleto(t.nombres, dist);
+	const slots: TramoSlot[] = [];
+
+	// Track cumulative cargando state across relevos
+	let cargando: string[] = [];
+
+	for (const relevo of relevos) {
+		// Build new cargando: remove sale, add entra
+		const saleSet = new Set(relevo.sale);
+
+		// Remove those who sale
+		cargando = cargando.filter((name) => !saleSet.has(name));
+		// Add those who entra
+		for (const name of relevo.entra) {
+			if (!cargando.includes(name)) {
+				cargando.push(name);
+			}
+		}
+
+		const dentroIndices = cargando.map((name) => {
+			const idx = t.nombres.indexOf(name);
+			if (idx === -1) {
+				throw new Error(`No se pudo mapear nombre a índice: ${name}`);
+			}
+			return idx;
+		});
+
+		const allIndices = Array.from({ length: t.nombres.length }, (_, i) => i);
+		const fueraIndices = allIndices
+			.filter((i) => !dentroIndices.includes(i))
+			.sort((a, b) => a - b);
+
+		slots.push({
+			dentro: [...dentroIndices].sort((a, b) => a - b),
+			fuera: fueraIndices,
+		});
+	}
+
+	return slots;
 }

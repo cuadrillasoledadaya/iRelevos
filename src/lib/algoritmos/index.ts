@@ -38,3 +38,14 @@ export { isGenericTramo } from "./utils";
 // Reconcile (plan-history)
 export { reconcile, normalizeName } from "./reconcile";
 export type { ReconcileResult } from "./reconcile";
+
+// Cuadrilla Doblada
+export {
+	puedeDoblarse,
+	requiereDecisionDoblado,
+	sugerirDistribucion,
+	simularCicloCompleto,
+	agruparEnCuadrillas,
+	cuadrillaDobladaATramoSlots,
+} from "./cuadrillaDoblada";
+export type { Distribucion, Relevo } from "./cuadrillaDoblada";

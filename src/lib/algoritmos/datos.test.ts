@@ -248,5 +248,64 @@ describe("datos", () => {
 				sec: "FIJ_I",
 			});
 		});
+
+		it("debería default cuadrillaDoblada to false on legacy snapshot", () => {
+			const datosLegacy = {
+				banco: [],
+				planes: [],
+				trabajaderas: [
+					{
+						id: 1,
+						nombres: ["A", "B", "C", "D", "E", "F"],
+						salidas: 2,
+						roles: [{ pri: "COR" as const, sec: "FIJ_I" as const }],
+						pinned: null,
+						bajas: [],
+						regla5costaleros: false,
+						puntuaciones: {},
+						tramosClaves: [],
+						tramos: ["T1"],
+						plan: null,
+						obj: null,
+						analisis: null,
+					},
+				],
+			};
+			const resultado = migrarDatos(datosLegacy as unknown as DatosPerfil);
+			expect(resultado.trabajaderas[0].cuadrillaDoblada).toBe(false);
+			expect(resultado.trabajaderas[0].distribucionCuadrillas).toBeNull();
+		});
+
+		it("debería preserve existing non-null cuadrillaDoblada and distribucionCuadrillas", () => {
+			const datos = {
+				banco: [],
+				planes: [],
+				trabajaderas: [
+					{
+						id: 1,
+						nombres: ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"],
+						salidas: 2,
+						roles: [],
+						pinned: null,
+						bajas: [],
+						regla5costaleros: false,
+						puntuaciones: {},
+						tramosClaves: [],
+						tramos: ["T1"],
+						plan: null,
+						obj: null,
+						analisis: null,
+						cuadrillaDoblada: true,
+						distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+					},
+				],
+			};
+			const resultado = migrarDatos(datos as unknown as DatosPerfil);
+			expect(resultado.trabajaderas[0].cuadrillaDoblada).toBe(true);
+			expect(resultado.trabajaderas[0].distribucionCuadrillas).toEqual({
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			});
+		});
 	});
 });

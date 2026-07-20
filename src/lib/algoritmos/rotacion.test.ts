@@ -152,6 +152,53 @@ describe("rotacion", () => {
 				expect(todos).toEqual([0, 1, 2, 3, 4, 5]);
 			});
 		});
+
+		it("delegates to cuadrilla doblada when flag is true and n >= 10", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3"],
+			);
+			t.cuadrillaDoblada = true;
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			};
+			const result = calcularCiclo(t);
+			expect(result.plan.length).toBeGreaterThan(0);
+			result.plan.forEach((slot) => {
+				expect(slot.dentro).toHaveLength(5);
+				expect(slot.fuera).toHaveLength(7);
+			});
+		});
+
+		it("falls back to standard path when flag is true but n < 10", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F", "G", "H"],
+				["T1", "T2", "T3"],
+			);
+			t.cuadrillaDoblada = true;
+			const result = calcularCiclo(t);
+			// Standard path: 8 nombres, F=3, 3 tramos
+			expect(result.plan.length).toBe(3);
+			result.plan.forEach((slot) => {
+				expect(slot.dentro).toHaveLength(5);
+				expect(slot.fuera).toHaveLength(3);
+			});
+		});
+
+		it("standard path preserved when flag is absent", () => {
+			const t = makeTrabajadera(
+				["A", "B", "C", "D", "E", "F"],
+				["T1", "T2", "T3"],
+			);
+			// cuadrillaDoblada is undefined
+			const result = calcularCiclo(t);
+			expect(result.plan).toHaveLength(3);
+			result.plan.forEach((slot) => {
+				expect(slot.dentro).toHaveLength(5);
+				expect(slot.fuera).toHaveLength(1);
+			});
+		});
 	});
 
 	describe("tramosOptimos", () => {

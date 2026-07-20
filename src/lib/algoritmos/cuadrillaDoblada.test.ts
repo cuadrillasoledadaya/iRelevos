@@ -14,8 +14,10 @@ import {
 	aplicarRelevoPrincipal,
 	aplicarRelevoIntermedio,
 	simularCicloCompleto,
+	cuadrillaDobladaATramoSlots,
 	type EstadoPlan,
 } from "./cuadrillaDoblada"
+import type { Trabajadera } from "../types"
 
 const nombres = (n: number): string[] =>
 	Array.from({ length: n }, (_, i) => `c${i + 1}`)
@@ -276,6 +278,97 @@ describe("cuadrillaDoblada", () => {
 		it("los relevos deberían estar numerados secuencialmente desde 1", () => {
 			const relevos = simularCicloCompleto(nombres(13))
 			relevos.forEach((r, i) => expect(r.numero).toBe(i + 1))
+		})
+	})
+
+	describe("cuadrillaDobladaATramoSlots", () => {
+		function makeTrabajadera(
+			nombres: string[],
+			distribucionCuadrillas?: { a: number[]; b: number[] },
+		): Trabajadera {
+			return {
+				id: 1,
+				nombres,
+				roles: nombres.map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const })),
+				salidas: 2,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+				distribucionCuadrillas,
+			}
+		}
+
+		it("returns [] when n < 10", () => {
+			const t = makeTrabajadera(nombres(8))
+			expect(cuadrillaDobladaATramoSlots(t)).toEqual([])
+		})
+
+		it("produces valid TramoSlot[] for n=10", () => {
+			const t = makeTrabajadera(nombres(10))
+			const slots = cuadrillaDobladaATramoSlots(t)
+			expect(slots.length).toBeGreaterThan(0)
+			slots.forEach((s) => {
+				expect(s.dentro).toHaveLength(5)
+				expect(s.fuera).toHaveLength(5)
+			})
+		})
+
+		it("produces valid TramoSlot[] for n=12 with 6/6 distribution", () => {
+			const t = makeTrabajadera(nombres(12), {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			})
+			// Adapter accepts name-based Distribucion; indices are on Trabajadera
+			const slots = cuadrillaDobladaATramoSlots(t, {
+				a: ["c1", "c2", "c3", "c4", "c5", "c6"],
+				b: ["c7", "c8", "c9", "c10", "c11", "c12"],
+			})
+			expect(slots.length).toBeGreaterThan(0)
+			slots.forEach((s) => {
+				expect(s.dentro).toHaveLength(5)
+				expect(s.fuera).toHaveLength(7)
+			})
+		})
+
+		it("produces valid TramoSlot[] for n=13", () => {
+			const t = makeTrabajadera(nombres(13))
+			const slots = cuadrillaDobladaATramoSlots(t)
+			expect(slots.length).toBeGreaterThan(0)
+			slots.forEach((s) => {
+				expect(s.dentro).toHaveLength(5)
+				expect(s.fuera).toHaveLength(8)
+			})
+		})
+
+		it("produces valid TramoSlot[] for n=20", () => {
+			const t = makeTrabajadera(nombres(20))
+			const slots = cuadrillaDobladaATramoSlots(t)
+			expect(slots.length).toBeGreaterThan(0)
+			slots.forEach((s) => {
+				expect(s.dentro).toHaveLength(5)
+				expect(s.fuera).toHaveLength(15)
+			})
+		})
+
+		it("throws on name/index drift", () => {
+			const t = makeTrabajadera(nombres(10), {
+				a: [0, 1, 2, 3, 4],
+				b: [5, 6, 7, 8, 9],
+			})
+			// Distribution references names that don't exist in t.nombres
+			const badDist = {
+				a: ["c1", "c2", "c3", "c4", "c99"],
+				b: ["c5", "c6", "c7", "c8", "c10"],
+			}
+			expect(() => cuadrillaDobladaATramoSlots(t, badDist)).toThrow(
+				/c99/,
+			)
 		})
 	})
 })
