@@ -633,4 +633,91 @@ describe("MiPlanPersonal — costalero plan view", () => {
 			expect(screen.getByText(/1 aplicadas/)).toBeInTheDocument();
 		});
 	});
+
+	// ═════════════════════════════════════════════════════════════
+	// Cuadrilla Doblada integration tests
+	// ═════════════════════════════════════════════════════════════
+
+	describe("cuadrilla doblada UI", () => {
+		it("badge hidden when cuadrillaDoblada is false", () => {
+			const t = makeTrabajadera({ cuadrillaDoblada: false });
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+			// The badge uses ⚒ emoji — search for that specifically
+			expect(screen.queryByText("⚒ Cuadrilla Doblada")).not.toBeInTheDocument();
+		});
+
+		it("badge appears when cuadrillaDoblada is true", () => {
+			const t = makeTrabajadera({ cuadrillaDoblada: true });
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+			expect(screen.getByText("⚒ Cuadrilla Doblada")).toBeInTheDocument();
+		});
+
+		it("Confirmar asignación hidden and skip banner shown when cuadrillaDoblada is true", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				plan: [
+					{ dentro: [0, 1, 2, 3, 4], fuera: [], dentroFisico: [0, 1, 2, 3, 4] },
+				],
+				obj: { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1 },
+				analisis: {
+					conteo: { 0: 2, 1: 0, 2: 0, 3: 0, 4: 0 },
+					okObj: false,
+					dentro5: true,
+					primer: [],
+					ultimo: [],
+					rep: [],
+					cons: 0,
+				},
+			});
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+			expect(screen.queryByText(/Confirmar asignación/)).not.toBeInTheDocument();
+			expect(
+				screen.getByText(
+					"En modo Cuadrilla Doblada las sugerencias de corrección están deshabilitadas.",
+				),
+			).toBeInTheDocument();
+		});
+	});
 });
