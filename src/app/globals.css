@@ -1678,6 +1678,70 @@ body {
 .plan-trab {
 	margin-bottom: 1.4rem;
 }
+
+/* ── Cuadrilla Doblada toggle (header switch) ── */
+.cd-toggle {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	flex-shrink: 0;
+	padding: 0.22rem 0.5rem;
+	background: transparent;
+	border: 1px solid var(--cd-bd);
+	border-radius: 999px;
+	color: var(--cd-tx);
+	font-family: inherit;
+	font-size: 0.7rem;
+	cursor: pointer;
+	transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+.cd-toggle:hover {
+	background: rgba(201, 168, 76, 0.06);
+}
+.cd-toggle:active {
+	transform: scale(0.97);
+}
+.cd-toggle:focus-visible {
+	outline: 2px solid var(--oro);
+	outline-offset: 2px;
+}
+.cd-toggle-label {
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+.cd-toggle-pill {
+	position: relative;
+	width: 26px;
+	height: 14px;
+	border-radius: 999px;
+	background: rgba(201, 168, 76, 0.18);
+	border: 1px solid var(--cd-bd);
+	transition: background 0.15s;
+}
+.cd-toggle-pill.on {
+	background: var(--cd-bg);
+}
+.cd-toggle-knob {
+	position: absolute;
+	top: 1px;
+	left: 1px;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--oro);
+	transition: transform 0.15s;
+}
+.cd-toggle-pill.on .cd-toggle-knob {
+	transform: translateX(12px);
+}
+.cd-toggle-state {
+	font-size: 0.62rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	color: var(--oro);
+	min-width: 22px;
+	text-align: center;
+}
 .plan-head {
 	font-family: "Cinzel", serif;
 	font-size: 0.68rem;

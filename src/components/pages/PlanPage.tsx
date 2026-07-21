@@ -513,6 +513,41 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						⚒ Cuadrilla Doblada
 					</span>
 				)}
+				{/* Cuadrilla Doblada toggle — always visible in the header */}
+				<button
+					type="button"
+					className="cd-toggle"
+					aria-label="Alternar Cuadrilla Doblada"
+					aria-pressed={t.cuadrillaDoblada}
+					title={
+						t.cuadrillaDoblada
+							? "Desactivar Cuadrilla Doblada"
+							: "Activar Cuadrilla Doblada (recomendado para 10+ costaleros)"
+					}
+					onClick={(e) => {
+						e.stopPropagation();
+						const res = toggleCuadrillaDoblada(t.id);
+						if (res.pinsInvalidated) {
+							setShowPinToast(true);
+							setTimeout(() => setShowPinToast(false), 4000);
+						}
+						if (res.nuevo && !t.plan) {
+							setShowEditor(true);
+						} else {
+							setShowEditor(false);
+						}
+					}}
+				>
+					<span className="cd-toggle-label">Doblada</span>
+					<span
+						className={`cd-toggle-pill ${t.cuadrillaDoblada ? "on" : "off"}`}
+					>
+						<span className="cd-toggle-knob" />
+					</span>
+					<span className="cd-toggle-state">
+						{t.cuadrillaDoblada ? "ON" : "OFF"}
+					</span>
+				</button>
 				<div className="t-chev">▼</div>
 			</div>
 
@@ -590,34 +625,6 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						<div className="leg-item">
 							<div className="leg-dot L"></div> Auto
 						</div>
-					</div>
-
-					{/* Cuadrilla Doblada toggle */}
-					<div className="mrow mt-3">
-						<button
-							className="btn btn-sm"
-							style={{
-								backgroundColor: t.cuadrillaDoblada
-									? "var(--cd-bg)"
-									: "transparent",
-								borderColor: "var(--cd-bd)",
-								color: "var(--cd-tx)",
-							}}
-							onClick={() => {
-								const res = toggleCuadrillaDoblada(t.id);
-								if (res.pinsInvalidated) {
-									setShowPinToast(true);
-									setTimeout(() => setShowPinToast(false), 4000);
-								}
-								if (res.nuevo && !t.plan) {
-									setShowEditor(true);
-								} else {
-									setShowEditor(false);
-								}
-							}}
-						>
-							Cuadrilla Doblada: {t.cuadrillaDoblada ? "ON" : "OFF"}
-						</button>
 					</div>
 
 					{/* Pin invalidation toast */}
