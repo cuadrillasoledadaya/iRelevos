@@ -21,6 +21,14 @@ const { useAuth } = await import("@/hooks/useAuth");
 
 import ConfirmarAsignacionBanner from "../../feedback/ConfirmarAsignacionBanner";
 
+const mockSetActivePage = vi.fn((page: string) => page);
+const mockToggleCuadrillaDoblada = vi.fn(() => ({
+	anterior: false,
+	nuevo: true,
+	distribucionAplicada: null,
+	pinsInvalidated: false,
+}));
+
 let currentPlanStoreState = {
 	calcularTodo: vi.fn(),
 	calcularTrab: vi.fn(),
@@ -41,6 +49,7 @@ let currentPlanStoreState = {
 				openSheet: vi.fn(),
 				setCellTarget: vi.fn(),
 				setBancoTarget: vi.fn(),
+				setActivePage: (page: string) => mockSetActivePage(page),
 			})),
 		},
 	projectStore: vi.fn((selector) =>
@@ -49,7 +58,9 @@ let currentPlanStoreState = {
 			censusBoquilla: {},
 		}),
 	),
-	trabajaderaStore: { getState: vi.fn(() => ({})) },
+	trabajaderaStore: { getState: vi.fn(() => ({
+		toggleCuadrillaDoblada: vi.fn(() => mockToggleCuadrillaDoblada()),
+	})) },
 	planStore: Object.assign(
 		vi.fn((selector: any) => selector(currentPlanStoreState)),
 		{ getState: vi.fn(() => currentPlanStoreState) },
@@ -68,7 +79,7 @@ function setPlanStoreState(overrides: Partial<typeof currentPlanStoreState>) {
 	);
 }
 
-const { projectStore, planStore } = await import("@/stores");
+const { projectStore, planStore, uiStore, trabajaderaStore } = await import("@/stores");
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -631,6 +642,140 @@ describe("MiPlanPersonal — costalero plan view", () => {
 			expect(screen.getByText("F máxima excedida")).toBeInTheDocument();
 			// ConfirmarAsignacionBanner also renders
 			expect(screen.getByText(/1 aplicadas/)).toBeInTheDocument();
+		});
+	});
+
+	// ═════════════════════════════════════════════════════════════
+	// REQ-UI-PLAN-2: Toggle as navigation shortcut
+	// REQ-UI-PLAN-6: Read-only A/B summary
+	// ═════════════════════════════════════════════════════════════
+
+	describe("REQ-UI-PLAN-2: Toggle navigation + label", () => {
+		beforeEach(() => {
+			vi.clearAllMocks();
+		});
+
+		it("clicking the toggle calls setActivePage('config')", () => {
+			const t = makeTrabajadera({ cuadrillaDoblada: false });
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+
+			const toggleBtn = screen.getByRole("button", {
+				name: /Configurar Cuadrilla Doblada/i,
+			});
+			fireEvent.click(toggleBtn);
+
+			// The uiStore mock's setActivePage delegates to mockSetActivePage
+			expect(mockSetActivePage).toHaveBeenCalledWith("config");
+		});
+
+		it("toggle label shows OFF when cuadrillaDoblada is false", () => {
+			const t = makeTrabajadera({ cuadrillaDoblada: false });
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+
+			expect(screen.getByText("OFF")).toBeInTheDocument();
+		});
+
+		it("toggle label shows ON when cuadrillaDoblada is true", () => {
+			const t = makeTrabajadera({ cuadrillaDoblada: true });
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+
+			expect(screen.getByText("ON")).toBeInTheDocument();
+		});
+	});
+
+	describe("REQ-UI-PLAN-6: Read-only A/B summary", () => {
+		it("shows A/B counts when doblada is active with distribution", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+			});
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+
+			expect(screen.getByText("A:")).toBeInTheDocument();
+			expect(screen.getByText("B:")).toBeInTheDocument();
+			expect(screen.getByText(/Editar en Configuración/)).toBeInTheDocument();
+		});
+
+		it("no summary when cuadrillaDoblada is false", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: false,
+				distribucionCuadrillas: null,
+			});
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+
+			expect(screen.queryByText("A:")).not.toBeInTheDocument();
+			expect(screen.queryByText("B:")).not.toBeInTheDocument();
+			expect(screen.queryByText(/Editar en Configuración/)).not.toBeInTheDocument();
 		});
 	});
 
