@@ -19,6 +19,7 @@ import {
 	relevosATramoSlots,
 	CuadrillaDobladaSinPrimarioError,
 	type EstadoPlan,
+	type Distribucion,
 } from "./cuadrillaDoblada"
 import type { Trabajadera } from "../types"
 

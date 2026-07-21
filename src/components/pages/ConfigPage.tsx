@@ -8,9 +8,11 @@ import {
 	trabajaderaStore,
 	planStore,
 } from "@/stores";
-import type { Trabajadera, PlanRelevo } from "@/lib/types";
-import { tramosOptimos } from "@/lib/algoritmos";
+import type { Trabajadera, PlanRelevo, TramoTipo } from "@/lib/types";
+import { tramosOptimos, sugerirDistribucion } from "@/lib/algoritmos";
 import { shortName, pillName } from "@/lib/nombres";
+import DistributionEditor from "./DistributionEditor";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function ConfigPage() {
 	const S = projectStore((s) => s.S);
@@ -527,6 +529,11 @@ export default function ConfigPage() {
 
 function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 	const S = projectStore((s) => s.S);
+	const { profile } = useAuth();
+	const esMando =
+		profile?.role === "superadmin" ||
+		profile?.role === "capataz" ||
+		profile?.role === "auxiliar";
 	const setSalidas = trabajaderaStore.getState().setSalidas;
 	const addTramo = trabajaderaStore.getState().addTramo;
 	const delTramo = trabajaderaStore.getState().delTramo;
@@ -536,9 +543,15 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 	const calcularTrab = planStore.getState().calcularTrab;
 	const toggleTramoClave = trabajaderaStore.getState().toggleTramoClave;
 	const cargarPlanEnTrabajadera = planStore.getState().cargarPlanEnTrabajadera;
+	const toggleCuadrillaDoblada = trabajaderaStore.getState().toggleCuadrillaDoblada;
+	const setTipoTramo = trabajaderaStore.getState().setTipoTramo;
+	const setDistribucionCuadrillas = trabajaderaStore.getState().setDistribucionCuadrillas;
 
 	const [isOpen, setIsOpen] = useState(false);
 	const [planSel, setPlanSel] = useState("");
+	const [showEditor, setShowEditor] = useState(false);
+	const [editDist, setEditDist] = useState<{ a: number[]; b: number[] } | null>(null);
+	const [allSecError, setAllSecError] = useState<string | null>(null);
 
 	const total = t.nombres.length;
 	const nBajas = t.bajas?.length || 0;
@@ -604,6 +617,58 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 		openSheet("banco");
 	}
 
+	function handleToggleDoblada() {
+		if (!esMando) return;
+		const res = toggleCuadrillaDoblada(t.id);
+		if (res.nuevo && res.distribucionAplicada) {
+			setEditDist(res.distribucionAplicada);
+			setShowEditor(true);
+		} else {
+			setShowEditor(false);
+			setEditDist(null);
+		}
+		setAllSecError(null);
+	}
+
+	function handleTipoChange(ti: number, tipo: TramoTipo) {
+		if (!esMando) return;
+		setTipoTramo(t.id, ti, tipo);
+		// Validate: at least one primario
+		const current = t.tramosTipo ?? [];
+		const updated = current.map((v, i) => (i === ti ? tipo : v));
+		if (!updated.includes("primario")) {
+			setAllSecError("Al menos un tramo debe ser primario");
+		} else {
+			setAllSecError(null);
+		}
+	}
+
+	function handleOpenEditor() {
+		const dist = t.distribucionCuadrillas;
+		if (dist) {
+			setEditDist({ a: [...dist.a], b: [...dist.b] });
+		} else {
+			const suggested = sugerirDistribucion(t.nombres);
+			const a = suggested.a.map((name) => t.nombres.indexOf(name));
+			const b = suggested.b.map((name) => t.nombres.indexOf(name));
+			setEditDist({ a, b });
+		}
+		setShowEditor(true);
+	}
+
+	function handleEditorConfirm() {
+		if (editDist) {
+			setDistribucionCuadrillas(t.id, editDist.a, editDist.b);
+		}
+		setShowEditor(false);
+		setEditDist(null);
+	}
+
+	function handleEditorCancel() {
+		setShowEditor(false);
+		setEditDist(null);
+	}
+
 	return (
 		<div className={`card ${cardCls} ${isOpen ? "open" : ""} mb-4`}>
 			<div className="trab-hdr" onClick={() => setIsOpen(!isOpen)}>
@@ -663,6 +728,52 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 					</div>
 				</div>
 
+				{/* Cuadrilla Doblada master toggle — mando-only */}
+				{esMando && totalActivos >= 10 && (
+					<div className="mbox mt3">
+						<div className="flex aic jb">
+							<div>
+								<div className="text-[0.7rem] font-bold text-[var(--cd-tx)]">
+									Cuadrilla Doblada
+								</div>
+								<div className="text-[0.55rem] text-[var(--cre-o)]">
+									{t.cuadrillaDoblada
+										? "Activa — configura tramos y distribución abajo"
+										: "10+ costaleros disponibles — activar para rotación A/B"}
+								</div>
+							</div>
+							<button
+								type="button"
+								className="cd-toggle"
+								aria-pressed={t.cuadrillaDoblada}
+								onClick={handleToggleDoblada}
+							>
+								<span className="cd-toggle-label">Doblada</span>
+								<span
+									className={`cd-toggle-pill ${t.cuadrillaDoblada ? "on" : "off"}`}
+								>
+									<span className="cd-toggle-knob" />
+								</span>
+								<span className="cd-toggle-state">
+									{t.cuadrillaDoblada ? "ON" : "OFF"}
+								</span>
+							</button>
+						</div>
+						{t.cuadrillaDoblada && t.distribucionCuadrillas && (
+							<div className="mt2 text-[0.6rem] text-[var(--cre-o)]">
+								A: {t.distribucionCuadrillas.a.length} / B:{" "}
+								{t.distribucionCuadrillas.b.length}{" "}
+								<button
+									className="btn btn-ghost btn-xs ml1"
+									onClick={handleOpenEditor}
+								>
+									Editar distribución →
+								</button>
+							</div>
+						)}
+					</div>
+				)}
+
 				<div
 					className="xs toro-o cinzel uppercase mb3"
 					style={{ letterSpacing: ".06em" }}
@@ -713,6 +824,9 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 							<span className="tr-sp"></span>
 						);
 
+						const tipoActual: TramoTipo =
+							t.tramosTipo?.[ti] ?? "primario";
+
 						return (
 							<div key={ti} className="tr-wrap">
 								<div className="tr-row">
@@ -734,6 +848,33 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 										value={nombre}
 										onChange={(e) => setNombreTramo(t.id, ti, e.target.value)}
 									/>
+									{/* P/S selector — only when doblado ON */}
+									{t.cuadrillaDoblada && esMando && (
+										<div className="flex gap-1 ml1">
+											<button
+												className={`btn btn-xs px2 py1 rounded text-[0.6rem] font-bold ${
+													tipoActual === "primario"
+														? "bg-[rgba(26,92,42,0.6)] text-ok-tx border border-ok-bd"
+														: "bg-[var(--cd-bg)] text-[var(--cd-tx)] border border-[var(--cd-bd)]"
+												}`}
+												onClick={() => handleTipoChange(ti, "primario")}
+												title="Tramo primario"
+											>
+												P
+											</button>
+											<button
+												className={`btn btn-xs px2 py1 rounded text-[0.6rem] font-bold ${
+													tipoActual === "secundario"
+														? "bg-[rgba(139,26,26,0.6)] text-err-tx border border-err-bd"
+														: "bg-[var(--cd-bg)] text-[var(--cd-tx)] border border-[var(--cd-bd)]"
+												}`}
+												onClick={() => handleTipoChange(ti, "secundario")}
+												title="Tramo secundario"
+											>
+												S
+											</button>
+										</div>
+									)}
 									<button
 										className={`btn btn-icon btn-sm ${t.tramosClaves?.includes(ti) ? "text-black shadow-[0_0_8px_rgba(201,168,76,0.5)]" : "btn-ghost text-cre-o"}`}
 										style={
@@ -803,6 +944,24 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 						⚙ Calcular
 					</button>
 				</div>
+
+				{/* Validation error: all-secundario blocks confirm */}
+				{allSecError && (
+					<div className="mt2 text-[0.65rem] text-err-tx font-bold text-center">
+						⚠ {allSecError}
+					</div>
+				)}
+
+				{/* Distribution Editor */}
+				{showEditor && editDist && esMando && (
+					<DistributionEditor
+						tid={t.id}
+						nombres={t.nombres}
+						distribucion={editDist}
+						onConfirm={handleEditorConfirm}
+						onCancel={handleEditorCancel}
+					/>
+				)}
 
 				{hayPlan && an && (
 					<div className="mt4">
