@@ -767,7 +767,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											</div>
 										</td>
 										{t.tramos.map((_, ti) => {
-											const v = pinned[ti][ci];
+											const v = pinned?.[ti]?.[ci] ?? "L";
 											const r = t.plan?.[ti];
 											let isAutoD = false;
 											let isAutoF = false;
