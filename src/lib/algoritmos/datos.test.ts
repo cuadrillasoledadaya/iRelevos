@@ -307,5 +307,94 @@ describe("datos", () => {
 				b: [6, 7, 8, 9, 10, 11],
 			});
 		});
+
+		it("debería default tramosTipo to all-primario on legacy snapshot", () => {
+			const datosLegacy = {
+				banco: [],
+				planes: [],
+				trabajaderas: [
+					{
+						id: 1,
+						nombres: ["A", "B", "C", "D", "E", "F"],
+						salidas: 2,
+						roles: [{ pri: "COR" as const, sec: "FIJ_I" as const }],
+						pinned: null,
+						bajas: [],
+						regla5costaleros: false,
+						puntuaciones: {},
+						tramosClaves: [],
+						tramos: ["T1", "T2", "T3"],
+						plan: null,
+						obj: null,
+						analisis: null,
+					},
+				],
+			};
+			const resultado = migrarDatos(datosLegacy as unknown as DatosPerfil);
+			const t = resultado.trabajaderas[0];
+			expect(t.tramosTipo).toBeDefined();
+			expect(t.tramosTipo).toEqual(["primario", "primario", "primario"]);
+			expect(t.tramosTipo).toHaveLength(3);
+		});
+
+		it("debería repair tramosTipo length drift (shorter than tramos)", () => {
+			const datos = {
+				banco: [],
+				planes: [],
+				trabajaderas: [
+					{
+						id: 1,
+						nombres: ["A", "B", "C", "D", "E", "F"],
+						salidas: 2,
+						roles: [],
+						pinned: null,
+						bajas: [],
+						regla5costaleros: false,
+						puntuaciones: {},
+						tramosClaves: [],
+						tramos: ["T1", "T2", "T3", "T4"],
+						tramosTipo: ["primario", "secundario"],
+						plan: null,
+						obj: null,
+						analisis: null,
+					},
+				],
+			};
+			const resultado = migrarDatos(datos as unknown as DatosPerfil);
+			const t = resultado.trabajaderas[0];
+			expect(t.tramosTipo).toHaveLength(4);
+			expect(t.tramosTipo![0]).toBe("primario");
+			expect(t.tramosTipo![1]).toBe("secundario");
+			expect(t.tramosTipo![2]).toBe("primario");
+			expect(t.tramosTipo![3]).toBe("primario");
+		});
+
+		it("debería preserve existing tramosTipo when length matches", () => {
+			const datos = {
+				banco: [],
+				planes: [],
+				trabajaderas: [
+					{
+						id: 1,
+						nombres: ["A", "B", "C", "D", "E", "F"],
+						salidas: 2,
+						roles: [],
+						pinned: null,
+						bajas: [],
+						regla5costaleros: false,
+						puntuaciones: {},
+						tramosClaves: [],
+						tramos: ["T1", "T2", "T3"],
+						tramosTipo: ["secundario", "primario", "secundario"],
+						plan: null,
+						obj: null,
+						analisis: null,
+					},
+				],
+			};
+			const resultado = migrarDatos(datos as unknown as DatosPerfil);
+			const t = resultado.trabajaderas[0];
+			expect(t.tramosTipo).toEqual(["secundario", "primario", "secundario"]);
+		});
 	});
 });

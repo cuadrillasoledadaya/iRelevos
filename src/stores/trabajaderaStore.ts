@@ -7,7 +7,7 @@
 import { create } from 'zustand'
 import { defaultRoles } from '@/lib/roles'
 import { tramosOptimos, aplicarSugerencias, generarSugerencias, sugerirDistribucion } from '@/lib/algoritmos'
-import type { DatosPerfil, RolCode, Trabajadera } from '@/lib/types'
+import type { DatosPerfil, RolCode, Trabajadera, TramoTipo } from '@/lib/types'
 import type { SugerenciaRes } from '@/lib/algoritmos'
 
 export interface TrabajaderaStore {
@@ -40,6 +40,8 @@ export interface TrabajaderaStore {
     pinsInvalidated: boolean
   }
   setDistribucionCuadrillas: (tid: number, a: number[], b: number[]) => void
+  /** Set tipo (primario/secundario) for a specific tramo; validates 0 <= ti < tramos.length */
+  setTipoTramo: (tid: number, ti: number, tipo: TramoTipo) => void
 }
 
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void
@@ -250,6 +252,7 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
       _mutar(d => {
         const t = _getTrab(d, tid)
         t.tramos.push(`Tramo ${t.tramos.length + 1} (T${tid})`)
+        if (t.tramosTipo) t.tramosTipo.push('primario')
         t.plan = null
         t.obj = null
         t.analisis = null
@@ -261,6 +264,7 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
       _mutar(d => {
         const t = _getTrab(d, tid)
         t.tramos.splice(ti, 1)
+        if (t.tramosTipo) t.tramosTipo.splice(ti, 1)
         t.plan = null
         t.obj = null
         t.analisis = null
@@ -295,9 +299,11 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
         if (actual < nOpt) {
           for (let i = actual; i < nOpt; i++) {
             t.tramos.push(`Tramo ${i + 1} (T${tid})`)
+            if (t.tramosTipo) t.tramosTipo.push('primario')
           }
         } else if (actual > nOpt) {
           t.tramos = t.tramos.slice(0, nOpt)
+          if (t.tramosTipo) t.tramosTipo = t.tramosTipo.slice(0, nOpt)
         }
         t.plan = null
         t.obj = null
@@ -375,8 +381,11 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
         result.anterior = anterior
 
         if (!anterior) {
-          // Activate: set flag, apply suggested distribution, clear pins
+          // Activate: set flag, seed tramosTipo all-primario, apply suggested distribution, clear pins
           t.cuadrillaDoblada = true
+          if (!t.tramosTipo) {
+            t.tramosTipo = Array(t.tramos.length).fill('primario')
+          }
           const dist = sugerirDistribucion(t.nombres)
           const a = dist.a.map((name) => t.nombres.indexOf(name))
           const b = dist.b.map((name) => t.nombres.indexOf(name))
@@ -398,6 +407,24 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
         t.analisis = null
       })
       return result
+    },
+
+    setTipoTramo: (tid, ti, tipo) => {
+      _mutar(d => {
+        const t = _getTrab(d, tid)
+        if (ti < 0 || ti >= t.tramos.length) {
+          throw new Error(
+            `setTipoTramo: índice ${ti} fuera de rango [0, ${t.tramos.length})`,
+          )
+        }
+        if (!t.tramosTipo) {
+          t.tramosTipo = Array(t.tramos.length).fill('primario')
+        }
+        t.tramosTipo[ti] = tipo
+        t.plan = null
+        t.obj = null
+        t.analisis = null
+      })
     },
 
     setDistribucionCuadrillas: (tid, a, b) => {

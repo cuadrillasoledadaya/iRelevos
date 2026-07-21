@@ -36,6 +36,8 @@ export interface Analisis {
   cons: number
 }
 
+export type TramoTipo = 'primario' | 'secundario'
+
 export interface Trabajadera {
   id: number
   nombres: string[]
@@ -53,6 +55,8 @@ export interface Trabajadera {
   tramosClaves: number[]
   cuadrillaDoblada?: boolean
   distribucionCuadrillas?: { a: number[]; b: number[] } | null
+  /** Parallel to tramos; length invariant: tramosTipo.length === tramos.length when present */
+  tramosTipo?: TramoTipo[]
 }
 
 export interface PlanRelevo {

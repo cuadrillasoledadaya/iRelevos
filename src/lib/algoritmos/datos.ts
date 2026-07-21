@@ -37,6 +37,7 @@ export function datosVacios(): DatosPerfil {
 				`Tramo 2 (T${i + 1})`,
 				`Tramo 3 (T${i + 1})`,
 			],
+			tramosTipo: ["primario", "primario", "primario"],
 			plan: null,
 			obj: null,
 			analisis: null,
@@ -84,6 +85,17 @@ export function migrarDatos(datos: DatosPerfil): DatosPerfil {
 		if (!t.tramosClaves) t.tramosClaves = [];
 		if (t.cuadrillaDoblada === undefined) t.cuadrillaDoblada = false;
 		if (t.distribucionCuadrillas === undefined) t.distribucionCuadrillas = null;
+
+		// Default tramosTipo to all-primario; repair length drift
+		if (!t.tramosTipo) {
+			t.tramosTipo = Array(t.tramos.length).fill("primario");
+		} else if (t.tramosTipo.length !== t.tramos.length) {
+			// Rebuild to match tramos length, preserving existing entries where possible
+			const old = t.tramosTipo;
+			t.tramosTipo = Array.from({ length: t.tramos.length }, (_, i) =>
+				i < old.length ? old[i] : "primario",
+			);
+		}
 
 		if (t.plan && t.plan[0]?.dentro?.length) {
 			const idx = +t.plan[0].dentro[0];

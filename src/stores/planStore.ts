@@ -316,6 +316,13 @@ export const planStore = create<PlanStore>()((set, get) => ({
 				const t = d.trabajaderas.find((x) => x.id === tid);
 				if (!t) return;
 				t.tramos = [...plan.tramos];
+				// Sync tramosTipo to match new tramos length
+				if (t.tramosTipo) {
+					const old = t.tramosTipo;
+					t.tramosTipo = Array.from({ length: plan.tramos.length }, (_, i) =>
+						i < old.length ? old[i] : "primario",
+					);
+				}
 				t.plan = null;
 				t.obj = null;
 				t.analisis = null;

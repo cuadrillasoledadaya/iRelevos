@@ -18,6 +18,7 @@ function makeDatos(): DatosPerfil {
         salidas: 2,
         roles: [],
         tramos: ["T1", "T2", "T3"],
+        tramosTipo: ["primario", "secundario", "primario"],
         plan: null,
         obj: null,
         analisis: null,
@@ -113,6 +114,69 @@ describe("trabajaderaStore cuadrilla doblada", () => {
       expect(() =>
         trabajaderaStore.getState().setDistribucionCuadrillas(1, [0, 1, 2, 3, 4, 99], [5, 6, 7, 8, 9, 10]),
       ).toThrow(/fuera de rango/);
+    });
+  });
+
+  describe("setTipoTramo", () => {
+    it("sets tipo for a valid tramo index", () => {
+      const t = datos.trabajaderas[0];
+      expect(t.tramosTipo![0]).toBe("primario");
+      trabajaderaStore.getState().setTipoTramo(1, 0, "secundario");
+      expect(t.tramosTipo![0]).toBe("secundario");
+      expect(t.tramosTipo).toHaveLength(3);
+    });
+
+    it("throws on out-of-range index", () => {
+      expect(() =>
+        trabajaderaStore.getState().setTipoTramo(1, 99, "secundario"),
+      ).toThrow(/fuera de rango/);
+    });
+
+    it("throws on negative index", () => {
+      expect(() =>
+        trabajaderaStore.getState().setTipoTramo(1, -1, "secundario"),
+      ).toThrow(/fuera de rango/);
+    });
+
+    it("clears plan/obj/analisis after mutation", () => {
+      const t = datos.trabajaderas[0];
+      t.plan = [{ dentro: [0, 1, 2, 3, 4], fuera: [5, 6, 7, 8, 9, 10, 11] }];
+      t.obj = { 0: 1 };
+      t.analisis = { conteo: {}, okObj: true, dentro5: true, primer: [], ultimo: [], rep: [], cons: 0 };
+      trabajaderaStore.getState().setTipoTramo(1, 1, "secundario");
+      expect(t.plan).toBeNull();
+      expect(t.obj).toBeNull();
+      expect(t.analisis).toBeNull();
+    });
+  });
+
+  describe("drift protection", () => {
+    it("addTramo appends primario to tramosTipo", () => {
+      const t = datos.trabajaderas[0];
+      expect(t.tramosTipo).toHaveLength(3);
+      trabajaderaStore.getState().addTramo(1);
+      expect(t.tramos).toHaveLength(4);
+      expect(t.tramosTipo).toHaveLength(4);
+      expect(t.tramosTipo![3]).toBe("primario");
+    });
+
+    it("delTramo removes corresponding tramosTipo entry", () => {
+      const t = datos.trabajaderas[0];
+      expect(t.tramosTipo).toEqual(["primario", "secundario", "primario"]);
+      trabajaderaStore.getState().delTramo(1, 1);
+      expect(t.tramos).toHaveLength(2);
+      expect(t.tramosTipo).toHaveLength(2);
+      expect(t.tramosTipo).toEqual(["primario", "primario"]);
+    });
+
+    it("toggleCuadrillaDoblada seeds tramosTipo on activation", () => {
+      const t = datos.trabajaderas[0];
+      t.tramosTipo = undefined;
+      expect(t.tramosTipo).toBeUndefined();
+      trabajaderaStore.getState().toggleCuadrillaDoblada(1);
+      expect(t.tramosTipo).toBeDefined();
+      expect(t.tramosTipo).toHaveLength(3);
+      expect(t.tramosTipo).toEqual(["primario", "primario", "primario"]);
     });
   });
 });
