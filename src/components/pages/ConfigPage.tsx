@@ -632,15 +632,19 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 
 	function handleTipoChange(ti: number, tipo: TramoTipo) {
 		if (!esMando) return;
-		setTipoTramo(t.id, ti, tipo);
-		// Validate: at least one primario
-		const current = t.tramosTipo ?? [];
+		// Read current tramosTipo from the store (not stale closure)
+		const currentTrabajadera = projectStore.getState().S.trabajaderas.find(
+			(w: Trabajadera) => w.id === t.id,
+		);
+		const current = currentTrabajadera?.tramosTipo ?? [];
+		// Validate BEFORE mutating: would this result in all-secundario?
 		const updated = current.map((v, i) => (i === ti ? tipo : v));
 		if (!updated.includes("primario")) {
 			setAllSecError("Al menos un tramo debe ser primario");
-		} else {
-			setAllSecError(null);
+			return; // Block the store mutation
 		}
+		setAllSecError(null);
+		setTipoTramo(t.id, ti, tipo);
 	}
 
 	function handleOpenEditor() {

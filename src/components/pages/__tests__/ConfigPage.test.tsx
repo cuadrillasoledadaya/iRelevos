@@ -19,6 +19,17 @@ const { useAuth } = await import("@/hooks/useAuth");
 
 // ── Mock stores ──────────────────────────────────────────────────
 
+// Shared mutable state so projectStore.getState() reflects mutations
+let mockState: {
+	S: DatosPerfil;
+} = { S: {} as DatosPerfil };
+
+function resetMockState(trabajaderas: Trabajadera[]) {
+	mockState = {
+		S: { banco: [], planes: [], trabajaderas: [...trabajaderas] },
+	};
+}
+
 const mockToggleCuadrillaDoblada = vi.fn(() => ({
 	anterior: false,
 	nuevo: true,
@@ -26,7 +37,14 @@ const mockToggleCuadrillaDoblada = vi.fn(() => ({
 	pinsInvalidated: false,
 }));
 
-const mockSetTipoTramo = vi.fn();
+const mockSetTipoTramo = vi.fn((tid: number, ti: number, tipo: string) => {
+	// Actually mutate the shared state so handleTipoChange can read current value
+	const t = mockState.S.trabajaderas?.find((w) => w.id === tid);
+	if (t) {
+		if (!t.tramosTipo) t.tramosTipo = Array(t.tramos.length).fill("primario");
+		t.tramosTipo[ti] = tipo as "primario" | "secundario";
+	}
+});
 const mockSetDistribucionCuadrillas = vi.fn();
 const mockSetActivePage = vi.fn();
 
@@ -67,11 +85,7 @@ vi.mock("@/stores", () => ({
 				vaciarCenso: vi.fn(),
 			}),
 		),
-		{ getState: vi.fn(() => ({
-			S: {} as DatosPerfil,
-			censusBoquilla: {},
-			vaciarCenso: vi.fn(),
-		})) },
+		{ getState: vi.fn(() => mockState) },
 	),
 	trabajaderaStore: {
 		getState: vi.fn(() => mockTrabajaderaStoreState),
@@ -145,6 +159,9 @@ function renderConfigPage({
 	trabajaderas?: Trabajadera[];
 	profile?: Profile;
 } = {}) {
+	// Initialize shared mutable state with deep copies
+	resetMockState(trabajaderas.map((t) => ({ ...t, tramosTipo: t.tramosTipo ? [...t.tramosTipo] : undefined, distribucionCuadrillas: t.distribucionCuadrillas ? { a: [...t.distribucionCuadrillas.a], b: [...t.distribucionCuadrillas.b] } : null }) as Trabajadera));
+
 	vi.mocked(useAuth).mockReturnValue({
 		profile,
 		session: null,
@@ -344,8 +361,8 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 		it("clicking S on a tramo calls setTipoTramo with 'secundario'", () => {
 			const t = makeTrabajadera({
 				cuadrillaDoblada: true,
-				tramos: ["T1", "T2"],
-				tramosTipo: ["primario", "secundario"],
+				tramos: ["T1", "T2", "T3"],
+				tramosTipo: ["primario", "primario", "secundario"],
 			});
 			renderConfigPage({ trabajaderas: [t] });
 
@@ -369,12 +386,35 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 			expect(mockSetTipoTramo).toHaveBeenCalledWith(t.id, 0, "primario");
 		});
 
-		it("error message text matches spec: 'Al menos un tramo debe ser primario'", () => {
-			// The component renders: {allSecError && (<div>⚠ {allSecError}</div>)}
-			// where allSecError = "Al menos un tramo debe ser primario"
-			// Verify the spec-required error string
-			const expectedError = "Al menos un tramo debe ser primario";
-			expect(expectedError).toBe("Al menos un tramo debe ser primario");
+		it("REQ-UI-CFG-4: all-secundario shows error and blocks store mutation", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				tramos: ["T1", "T2"],
+				tramosTipo: ["primario", "primario"],
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			// Click S on tramo 0 → now [S, P] — still valid, no error
+			const sButtons = screen.getAllByText("S");
+			fireEvent.click(sButtons[0]);
+
+			// No error yet (tramo 1 is still primario)
+			expect(screen.queryByText(/Al menos un tramo debe ser primario/i)).not.toBeInTheDocument();
+
+			// Click S on tramo 1 → now [S, S] — ALL secundario, error should appear
+			const sButtonsAfter = screen.getAllByText("S");
+			fireEvent.click(sButtonsAfter[1]);
+
+			// Error must be visible in the DOM
+			expect(screen.getByText(/Al menos un tramo debe ser primario/i)).toBeInTheDocument();
+
+			// The store should NOT have been mutated with the last secundario change
+			// (the last call to setTipoTramo should NOT be the all-S one)
+			const allSecundarioCalls = mockSetTipoTramo.mock.calls.filter(
+				(call) => call[2] === "secundario",
+			);
+			// Only 1 secundario call (the first one that was valid), not 2
+			expect(allSecundarioCalls.length).toBe(1);
 		});
 	});
 
