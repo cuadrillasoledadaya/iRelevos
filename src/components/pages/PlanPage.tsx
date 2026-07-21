@@ -436,6 +436,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
   const aplicarSugerencia = planStore.getState().aplicarSugerencia;
   const toggleCuadrillaDoblada = trabajaderaStore.getState().toggleCuadrillaDoblada;
   const ultimoResultadoBulk = planStore((s) => s.ultimoResultadoBulk);
+  const setActivePage = uiStore.getState().setActivePage;
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [showPinToast, setShowPinToast] = useState(false);
@@ -514,29 +515,28 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						⚒ Cuadrilla Doblada
 					</span>
 				)}
-				{/* Cuadrilla Doblada toggle — always visible in the header */}
+				{/* Cuadrilla Doblada toggle — navigation shortcut to ConfigPage */}
 				<button
 					type="button"
 					className="cd-toggle"
-					aria-label="Alternar Cuadrilla Doblada"
+					aria-label="Configurar Cuadrilla Doblada"
 					aria-pressed={t.cuadrillaDoblada}
 					title={
 						t.cuadrillaDoblada
-							? "Desactivar Cuadrilla Doblada"
-							: "Activar Cuadrilla Doblada (recomendado para 10+ costaleros)"
+							? "Editar configuración de Cuadrilla Doblada"
+							: "Activar Cuadrilla Doblada (ir a Configuración)"
 					}
 					onClick={(e) => {
 						e.stopPropagation();
-						const res = toggleCuadrillaDoblada(t.id);
-						if (res.pinsInvalidated) {
-							setShowPinToast(true);
-							setTimeout(() => setShowPinToast(false), 4000);
+						if (!t.cuadrillaDoblada) {
+							// Activate via store, then navigate
+							const res = toggleCuadrillaDoblada(t.id);
+							if (res.pinsInvalidated) {
+								setShowPinToast(true);
+								setTimeout(() => setShowPinToast(false), 4000);
+							}
 						}
-						if (res.nuevo && !t.plan) {
-							setShowEditor(true);
-						} else {
-							setShowEditor(false);
-						}
+						setActivePage("config");
 					}}
 				>
 					<span className="cd-toggle-label">Doblada</span>
@@ -553,6 +553,25 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 			</div>
 
 			<div className="trab-body">
+				{/* Read-only A/B summary when doblado active */}
+				{t.cuadrillaDoblada && t.distribucionCuadrillas && (
+					<div className="mbox mb3">
+						<div className="flex aic jb">
+							<div className="text-[0.65rem] text-[var(--cd-tx)]">
+								<span className="font-bold">A:</span> {t.distribucionCuadrillas.a.length}{" "}
+								/ <span className="font-bold">B:</span>{" "}
+								{t.distribucionCuadrillas.b.length}
+							</div>
+							<button
+								className="btn btn-ghost btn-xs"
+								onClick={() => setActivePage("config")}
+							>
+								Editar en Configuración →
+							</button>
+						</div>
+					</div>
+				)}
+
 				{/* Controles de Tramos y Salidas (Solo Mandos) */}
 				{esMando && (
 					<div className="mbox">
