@@ -64,17 +64,11 @@ export function calcularCiclo(t: Trabajadera): {
 
 	// Cuadrilla doblada path — three-way dispatch
 	if (t.cuadrillaDoblada === true && total >= 10) {
-		// Per-tramo dispatch: tramosTipo present
-		if (t.tramosTipo && t.tramosTipo.length > 0) {
-			try {
-				const dist = t.distribucionCuadrillas
-					? {
-							a: t.distribucionCuadrillas.a.map((i) => t.nombres[i]),
-							b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]),
-						}
-					: undefined;
-				const relevos = simularCicloConTipos(t.nombres, t.tramosTipo, dist);
-				const plan = relevosATramoSlots(t, relevos);
+	// Per-tramo dispatch: tramosTipo present
+			if (t.tramosTipo && t.tramosTipo.length > 0) {
+				try {
+					const relevos = simularCicloConTipos(t, t.tramosTipo);
+					const plan = relevosATramoSlots(t, relevos);
 				const aplicaRegla5 = false;
 				const objetivo = objSalidas(total, numTramos, salidas, aplicaRegla5);
 				return { plan, objetivo };

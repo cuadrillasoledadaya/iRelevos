@@ -332,15 +332,16 @@ export function cuadrillaDobladaATramoSlots(
  *   - 'primario' → aplicarRelevoPrincipal (full swap between cuadrillas)
  *   - 'secundario' → aplicarRelevoIntermedio (FIFO rotation within active cuadrilla)
  *
+ * Throws Error("tramosTipo length must equal tramos length") if lengths differ.
  * Throws CuadrillaDobladaSinPrimarioError if no tramo is marked primario.
- * Throws on length mismatch between costaleros and tramosTipo.
  */
 export function simularCicloConTipos(
-	costaleros: string[],
+	t: Trabajadera,
 	tramosTipo: TramoTipo[],
-	distribucion?: Distribucion,
-	ancho = ANCHO_TRABAJADERA,
 ): Relevo[] {
+	if (tramosTipo.length !== t.tramos.length) {
+		throw new Error("tramosTipo length must equal tramos length");
+	}
 	if (tramosTipo.length === 0) return [];
 
 	// Validate: at least one primario
@@ -348,29 +349,36 @@ export function simularCicloConTipos(
 		throw new CuadrillaDobladaSinPrimarioError();
 	}
 
+	const costaleros = t.nombres;
+	const distribucion = t.distribucionCuadrillas
+		? {
+				a: t.distribucionCuadrillas.a.map((i) => t.nombres[i]),
+				b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]),
+			}
+		: undefined;
 	const dist = distribucion ?? sugerirDistribucion(costaleros)
-	const cuadrillas = agruparEnCuadrillas(costaleros, dist, ancho)
-	if (cuadrillas.a.miembros.length < ancho || cuadrillas.b.miembros.length < ancho) {
+	const cuadrillas = agruparEnCuadrillas(costaleros, dist)
+	if (cuadrillas.a.miembros.length < ANCHO_TRABAJADERA || cuadrillas.b.miembros.length < ANCHO_TRABAJADERA) {
 		throw new Error(
-			`Para simular ciclo doblado, ambas cuadrillas deben tener al menos ${ancho} miembros. A=${cuadrillas.a.miembros.length}, B=${cuadrillas.b.miembros.length}`,
+			`Para simular ciclo doblado, ambas cuadrillas deben tener al menos ${ANCHO_TRABAJADERA} miembros. A=${cuadrillas.a.miembros.length}, B=${cuadrillas.b.miembros.length}`,
 		)
 	}
 	const distCompleta: Distribucion = {
 		a: cuadrillas.a.miembros,
 		b: cuadrillas.b.miembros,
 	}
-	let estado = crearEstadoInicial(distCompleta, ancho)
+	let estado = crearEstadoInicial(distCompleta)
 	const relevos: Relevo[] = []
 	let n = 1
 
 	for (const tipo of tramosTipo) {
 		if (tipo === "primario") {
-			const r = aplicarRelevoPrincipal(estado, ancho)
+			const r = aplicarRelevoPrincipal(estado)
 			estado = r.estado
 			relevos.push({ ...r.relevo, numero: n++ })
 		} else {
 			// secundario → intermedio
-			const r = aplicarRelevoIntermedio(estado, ancho)
+			const r = aplicarRelevoIntermedio(estado)
 			estado = r.estado
 			relevos.push({ ...r.relevo, numero: n++ })
 		}
