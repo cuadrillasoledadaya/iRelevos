@@ -351,6 +351,70 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 				expect(screen.getByText(/Cancelar/)).toBeInTheDocument();
 			});
 		});
+
+		it("REQ-UI-CFG-3: manual move updates indices on confirm", async () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			// Open the editor
+			screen.getByText(/Editar distribución/).click();
+			await waitFor(() => {
+				expect(screen.getByText(/Cuadrilla A/)).toBeInTheDocument();
+			});
+
+			// Find the first name in column A (Alice, index 0) — it has role="button"
+			const firstInA = screen.getByRole("button", { name: /Alice, press Enter or arrow to move/i });
+
+			// Move it to column B via keyboard (ArrowRight or Enter)
+			fireEvent.keyDown(firstInA, { key: "ArrowRight" });
+
+			// Click Confirm
+			const confirmBtn = screen.getByRole("button", { name: /Confirmar/i });
+			fireEvent.click(confirmBtn);
+
+			// The store was called with new arrays
+			expect(mockSetDistribucionCuadrillas).toHaveBeenCalled();
+			const callArgs = mockSetDistribucionCuadrillas.mock.calls[0];
+			// The arrays must be DIFFERENT from the original
+			expect(callArgs[1]).not.toEqual([0, 1, 2, 3, 4, 5]);
+			expect(callArgs[2]).not.toEqual([6, 7, 8, 9, 10, 11]);
+			// Invariant: a.length + b.length === nombres.length
+			expect(callArgs[1].length + callArgs[2].length).toBe(t.nombres.length);
+		});
+
+		it("REQ-UI-CFG-3: cancel discards local edits", async () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			// Open the editor
+			screen.getByText(/Editar distribución/).click();
+			await waitFor(() => {
+				expect(screen.getByText(/Cuadrilla A/)).toBeInTheDocument();
+			});
+
+			// Simulate a local move
+			const firstInA = screen.getByRole("button", { name: /Alice, press Enter or arrow to move/i });
+			fireEvent.keyDown(firstInA, { key: "ArrowRight" });
+
+			// Click Cancelar
+			const cancelBtn = screen.getByRole("button", { name: /Cancelar/i });
+			fireEvent.click(cancelBtn);
+
+			// The store was NOT called with a changed distribution
+			const calls = mockSetDistribucionCuadrillas.mock.calls;
+			const hasNewDistribucion = calls.some(
+				(call) =>
+					JSON.stringify(call[1]) !== JSON.stringify([0, 1, 2, 3, 4, 5]) ||
+					JSON.stringify(call[2]) !== JSON.stringify([6, 7, 8, 9, 10, 11]),
+			);
+			expect(hasNewDistribucion).toBe(false);
+		});
 	});
 
 	// ═════════════════════════════════════════════════════════════
