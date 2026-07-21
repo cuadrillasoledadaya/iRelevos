@@ -245,7 +245,8 @@ function MiPlanPersonal({
 				</h2>
 				<div className="flex flex-col gap-1.5">
 					{t.tramos.map((nombreTramo, ti) => {
-						const r = plan[ti];
+						const r = plan?.[ti];
+						if (!r) return null;
 						const esDentro = r.dentro.includes(ci);
 						const esFuera = r.fuera.includes(ci);
 						const esClave = t.tramosClaves?.includes(ti);

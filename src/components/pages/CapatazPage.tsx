@@ -78,7 +78,8 @@ function CapatazTrabajadera({
 
 	function handleTapPill(target: SwapTarget, e: React.MouseEvent) {
 		e.stopPropagation();
-		const r = t.plan![target.ti];
+		const r = t.plan?.[target.ti];
+		if (!r) return;
 		const dentroFisico = getDentroFisico(t, r);
 		const dt = localSwapSel;
 
@@ -166,7 +167,8 @@ function CapatazTrabajadera({
 
 			<div className="trab-body">
 				{t.tramos.map((nombre: string, ti: number) => {
-					const r = t.plan![ti];
+					const r = t.plan?.[ti];
+					if (!r) return null;
 					const dentroFisico = getDentroFisico(t, r);
 					const isSwapTargetRow =
 						localSwapSel && "a" in localSwapSel && localSwapSel.a?.ti === ti;
@@ -286,8 +288,8 @@ function CapatazTrabajadera({
 												? "FIJ"
 												: "COR";
 									const isRep =
-										ti === t.tramos.length - 1 && t.plan![0].fuera.includes(ci);
-									const isCons = ti > 0 && t.plan![ti - 1].fuera.includes(ci);
+										ti === t.tramos.length - 1 && (t.plan?.[0]?.fuera.includes(ci) ?? false);
+									const isCons = ti > 0 && (t.plan?.[ti - 1]?.fuera.includes(ci) ?? false);
 
 									const cf = isRep ? "f rep" : isCons ? "f cons" : "f";
 									const tClass = getTapClass({
