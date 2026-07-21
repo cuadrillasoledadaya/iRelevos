@@ -199,6 +199,60 @@ describe("rotacion", () => {
 				expect(slot.fuera).toHaveLength(1);
 			});
 		});
+
+		it("per-tramo dispatch when cuadrillaDoblada + tramosTipo present", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3"],
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario", "primario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			};
+			const result = calcularCiclo(t);
+			expect(result.plan).toHaveLength(3);
+			result.plan.forEach((slot) => {
+				expect(slot.dentro).toHaveLength(5);
+				expect(slot.fuera).toHaveLength(7);
+			});
+		});
+
+		it("legacy fallback when cuadrillaDoblada but no tramosTipo", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3"],
+			);
+			t.cuadrillaDoblada = true;
+			// No tramosTipo — should use legacy path
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			};
+			const result = calcularCiclo(t);
+			expect(result.plan.length).toBeGreaterThan(0);
+			result.plan.forEach((slot) => {
+				expect(slot.dentro).toHaveLength(5);
+				expect(slot.fuera).toHaveLength(7);
+			});
+		});
+
+		it("all-secundario tramosTipo returns empty plan (no primario)", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3"],
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["secundario", "secundario", "secundario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			};
+			const result = calcularCiclo(t);
+			expect(result.plan).toEqual([]);
+			expect(result.objetivo).toEqual({});
+		});
 	});
 
 	describe("tramosOptimos", () => {

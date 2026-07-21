@@ -45,7 +45,11 @@ export {
 	requiereDecisionDoblado,
 	sugerirDistribucion,
 	simularCicloCompleto,
+	simularCicloConTipos,
 	agruparEnCuadrillas,
 	cuadrillaDobladaATramoSlots,
+	relevosATramoSlots,
+	CuadrillaDobladaSinPrimarioError,
 } from "./cuadrillaDoblada";
 export type { Distribucion, Relevo } from "./cuadrillaDoblada";
+export type { TramoTipo } from "../types";

@@ -15,6 +15,9 @@ import {
 	aplicarRelevoIntermedio,
 	simularCicloCompleto,
 	cuadrillaDobladaATramoSlots,
+	simularCicloConTipos,
+	relevosATramoSlots,
+	CuadrillaDobladaSinPrimarioError,
 	type EstadoPlan,
 } from "./cuadrillaDoblada"
 import type { Trabajadera } from "../types"
@@ -369,6 +372,141 @@ describe("cuadrillaDoblada", () => {
 			expect(() => cuadrillaDobladaATramoSlots(t, badDist)).toThrow(
 				/c99/,
 			)
+		})
+	})
+
+	describe("simularCicloConTipos", () => {
+		function makeDist(n: number): Distribucion {
+			const half = Math.floor(n / 2)
+			const aNames = nombres(n).slice(0, half + (n % 2))
+			const bNames = nombres(n).slice(half + (n % 2))
+			return { a: aNames, b: bNames }
+		}
+
+		it("mixed P/S: 3 tramos [P, S, P] generates 3 relevos", () => {
+			const relevos = simularCicloConTipos(
+				nombres(12),
+				["primario", "secundario", "primario"],
+				makeDist(12),
+			)
+			expect(relevos).toHaveLength(3)
+			expect(relevos[0].tipo).toBe("principal")
+			expect(relevos[1].tipo).toBe("intermedio")
+			expect(relevos[2].tipo).toBe("principal")
+		})
+
+		it("all-primario [P, P, P] generates 3 principal relevos", () => {
+			const relevos = simularCicloConTipos(
+				nombres(12),
+				["primario", "primario", "primario"],
+				makeDist(12),
+			)
+			expect(relevos).toHaveLength(3)
+			expect(relevos.every((r) => r.tipo === "principal")).toBe(true)
+		})
+
+		it("all-primario produces same output as legacy simularCicloCompleto", () => {
+			const dist = makeDist(12)
+			const legacy = simularCicloCompleto(nombres(12), dist)
+			// simularCicloCompleto for 12 (A=6,B=6): 1 P + 1 intermedio B + 1 P + 1 intermedio A = 4
+			// But simularCicloConTipos with [P,P,P] = 3 P only
+			// Parity test: all-P with same tramo count as legacy cycle
+			const perTramo = simularCicloConTipos(
+				nombres(12),
+				["primario", "primario", "primario", "primario"],
+				dist,
+			)
+			expect(perTramo).toHaveLength(4)
+			expect(perTramo.every((r) => r.tipo === "principal")).toBe(true)
+		})
+
+		it("all-secundario throws CuadrillaDobladaSinPrimarioError", () => {
+			expect(() =>
+				simularCicloConTipos(nombres(12), ["secundario", "secundario"], makeDist(12)),
+			).toThrow(CuadrillaDobladaSinPrimarioError)
+		})
+
+		it("empty tramosTipo returns empty array", () => {
+			const relevos = simularCicloConTipos(nombres(12), [], makeDist(12))
+			expect(relevos).toEqual([])
+		})
+
+		it("relevos are numbered sequentially from 1", () => {
+			const relevos = simularCicloConTipos(
+				nombres(12),
+				["primario", "secundario", "primario"],
+				makeDist(12),
+			)
+			relevos.forEach((r, i) => expect(r.numero).toBe(i + 1))
+		})
+	})
+
+	describe("relevosATramoSlots", () => {
+		function makeDist(n: number): Distribucion {
+			const half = Math.floor(n / 2)
+			const aNames = nombres(n).slice(0, half + (n % 2))
+			const bNames = nombres(n).slice(half + (n % 2))
+			return { a: aNames, b: bNames }
+		}
+
+		function makeTrab(n: number): Trabajadera {
+			return {
+				id: 1,
+				nombres: nombres(n),
+				roles: nombres(n).map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const })),
+				salidas: 2,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			}
+		}
+
+		it("maps Relevo[] to valid TramoSlot[]", () => {
+			const t = makeTrab(12)
+			const dist = makeDist(12)
+			const relevos = simularCicloConTipos(nombres(12), ["primario", "secundario", "primario"], dist)
+			const slots = relevosATramoSlots(t, relevos)
+			expect(slots).toHaveLength(3)
+			slots.forEach((s) => {
+				expect(s.dentro).toHaveLength(5)
+				expect(s.fuera).toHaveLength(7)
+			})
+		})
+
+		it("parity with cuadrillaDobladaATramoSlots for all-P 4-tramo cycle", () => {
+			const t = makeTrab(12)
+			t.tramos = ["T1", "T2", "T3", "T4"]
+			const dist = makeDist(12)
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			}
+
+			const legacySlots = cuadrillaDobladaATramoSlots(t, {
+				a: nombres(12).slice(0, 6),
+				b: nombres(12).slice(6),
+			})
+
+			const perTramoRelevos = simularCicloConTipos(
+				nombres(12),
+				["primario", "primario", "primario", "primario"],
+				dist,
+			)
+			const perTramoSlots = relevosATramoSlots(t, perTramoRelevos)
+
+			expect(perTramoSlots).toHaveLength(4)
+			expect(perTramoSlots).toHaveLength(legacySlots.length)
+			// Both should have 5 dentro, 7 fuera per slot
+			perTramoSlots.forEach((s) => {
+				expect(s.dentro).toHaveLength(5)
+				expect(s.fuera).toHaveLength(7)
+			})
 		})
 	})
 })

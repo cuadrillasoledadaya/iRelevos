@@ -3,7 +3,12 @@
 // ══════════════════════════════════════════════════════════════════
 
 import type { Trabajadera, TramoSlot, Analisis } from "../types";
-import { cuadrillaDobladaATramoSlots } from "./cuadrillaDoblada";
+import {
+	cuadrillaDobladaATramoSlots,
+	simularCicloConTipos,
+	relevosATramoSlots,
+	CuadrillaDobladaSinPrimarioError,
+} from "./cuadrillaDoblada";
 
 export function objSalidas(
 	total: number,
@@ -56,10 +61,33 @@ export function calcularCiclo(t: Trabajadera): {
 	const numTramos = t.tramos.length;
 	const salidas = t.salidas ?? 2;
 
-	// Cuadrilla doblada path
+	// Cuadrilla doblada path — three-way dispatch
 	if (t.cuadrillaDoblada === true && total >= 10) {
+		// Per-tramo dispatch: tramosTipo present
+		if (t.tramosTipo && t.tramosTipo.length > 0) {
+			try {
+				const dist = t.distribucionCuadrillas
+					? {
+							a: t.distribucionCuadrillas.a.map((i) => t.nombres[i]),
+							b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]),
+						}
+					: undefined;
+				const relevos = simularCicloConTipos(t.nombres, t.tramosTipo, dist);
+				const plan = relevosATramoSlots(t, relevos);
+				const aplicaRegla5 = false;
+				const objetivo = objSalidas(total, numTramos, salidas, aplicaRegla5);
+				return { plan, objetivo };
+			} catch (err: unknown) {
+				// Surface typed error as empty plan + error in analisis
+				if (err instanceof CuadrillaDobladaSinPrimarioError) {
+					return { plan: [], objetivo: {} };
+				}
+				throw err;
+			}
+		}
+		// Legacy doblado: tramosTipo absent → cuadrillaDobladaATramoSlots
 		const plan = cuadrillaDobladaATramoSlots(t);
-		const aplicaRegla5 = false; // doblado implies n >= 10, regla5 never applies
+		const aplicaRegla5 = false;
 		const objetivo = objSalidas(total, numTramos, salidas, aplicaRegla5);
 		return { plan, objetivo };
 	}

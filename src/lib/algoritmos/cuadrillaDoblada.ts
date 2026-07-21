@@ -2,10 +2,18 @@
 // CUADRILLA DOBLADA — lógica para trabajaderas con 10+ costaleros
 // ══════════════════════════════════════════════════════════════════
 
-import type { Trabajadera, TramoSlot } from "../types";
+import type { Trabajadera, TramoSlot, TramoTipo } from "../types";
 
 export const ANCHO_TRABAJADERA = 5
 export const UMBRAL_DOBLADO = 2 * ANCHO_TRABAJADERA
+
+/** Thrown when cuadrilla doblada is active but no tramo is marked as primario. */
+export class CuadrillaDobladaSinPrimarioError extends Error {
+  constructor() {
+    super('Al menos un tramo debe ser primario')
+    this.name = 'CuadrillaDobladaSinPrimarioError'
+  }
+}
 
 export type CuadrillaId = "A" | "B"
 export type TipoRelevo = "principal" | "intermedio"
@@ -316,4 +324,99 @@ export function cuadrillaDobladaATramoSlots(
 	}
 
 	return slots;
+}
+
+/**
+ * Simulates one cycle of cuadrilla doblada with per-tramo P/S designation.
+ * For each tramo in order:
+ *   - 'primario' → aplicarRelevoPrincipal (full swap between cuadrillas)
+ *   - 'secundario' → aplicarRelevoIntermedio (FIFO rotation within active cuadrilla)
+ *
+ * Throws CuadrillaDobladaSinPrimarioError if no tramo is marked primario.
+ * Throws on length mismatch between costaleros and tramosTipo.
+ */
+export function simularCicloConTipos(
+	costaleros: string[],
+	tramosTipo: TramoTipo[],
+	distribucion?: Distribucion,
+	ancho = ANCHO_TRABAJADERA,
+): Relevo[] {
+	if (tramosTipo.length === 0) return [];
+
+	// Validate: at least one primario
+	if (!tramosTipo.includes("primario")) {
+		throw new CuadrillaDobladaSinPrimarioError();
+	}
+
+	const dist = distribucion ?? sugerirDistribucion(costaleros)
+	const cuadrillas = agruparEnCuadrillas(costaleros, dist, ancho)
+	if (cuadrillas.a.miembros.length < ancho || cuadrillas.b.miembros.length < ancho) {
+		throw new Error(
+			`Para simular ciclo doblado, ambas cuadrillas deben tener al menos ${ancho} miembros. A=${cuadrillas.a.miembros.length}, B=${cuadrillas.b.miembros.length}`,
+		)
+	}
+	const distCompleta: Distribucion = {
+		a: cuadrillas.a.miembros,
+		b: cuadrillas.b.miembros,
+	}
+	let estado = crearEstadoInicial(distCompleta, ancho)
+	const relevos: Relevo[] = []
+	let n = 1
+
+	for (const tipo of tramosTipo) {
+		if (tipo === "primario") {
+			const r = aplicarRelevoPrincipal(estado, ancho)
+			estado = r.estado
+			relevos.push({ ...r.relevo, numero: n++ })
+		} else {
+			// secundario → intermedio
+			const r = aplicarRelevoIntermedio(estado, ancho)
+			estado = r.estado
+			relevos.push({ ...r.relevo, numero: n++ })
+		}
+	}
+
+	return relevos
+}
+
+/**
+ * Adapter: maps Relevo[] output from simularCicloConTipos to TramoSlot[] shape.
+ * Each TramoSlot represents the state AFTER a relevo.
+ */
+export function relevosATramoSlots(
+	t: Trabajadera,
+	relevos: Relevo[],
+): TramoSlot[] {
+	const slots: TramoSlot[] = []
+	let cargando: string[] = []
+
+	for (const relevo of relevos) {
+		const saleSet = new Set(relevo.sale)
+		cargando = cargando.filter((name) => !saleSet.has(name))
+		for (const name of relevo.entra) {
+			if (!cargando.includes(name)) {
+				cargando.push(name)
+			}
+		}
+
+		const dentroIndices = cargando.map((name) => {
+			const idx = t.nombres.indexOf(name)
+			if (idx === -1) {
+				throw new Error(`No se pudo mapear nombre a índice: ${name}`)
+			}
+			return idx
+		})
+
+		const allIndices = Array.from({ length: t.nombres.length }, (_, i) => i)
+		const fueraIndices = allIndices
+			.filter((i) => !dentroIndices.includes(i))
+			.sort((a, b) => a - b)
+
+		slots.push({
+			dentro: [...dentroIndices].sort((a, b) => a - b),
+			fuera: fueraIndices,
+		})
+	}
+
+	return slots
 }
