@@ -95,6 +95,13 @@ export interface TrabajaderaActions {
   sugerirYCalcular: (tid: number) => void
   previsualizarSugerencia: (tid: number) => SugerenciaRes | null
   confirmarSugerencia: (tid: number) => boolean
+  toggleCuadrillaDoblada: (tid: number) => {
+    anterior: boolean
+    nuevo: boolean
+    distribucionAplicada: { a: number[]; b: number[] } | null
+    pinsInvalidated: boolean
+  }
+  setDistribucionCuadrillas: (tid: number, a: number[], b: number[]) => void
 }
 
 export type TrabajaderaSlice = TrabajaderaActions
