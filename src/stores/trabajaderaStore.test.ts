@@ -55,7 +55,7 @@ beforeEach(() => {
 describe("trabajaderaStore cuadrilla doblada", () => {
   describe("toggleCuadrillaDoblada", () => {
     it("activates with suggested distribution and clears pins", () => {
-      datos.trabajaderas[0].pinned = [[["D"], ["F"]]];
+      datos.trabajaderas[0].pinned = [["D"], ["F"]];
       const result = trabajaderaStore.getState().toggleCuadrillaDoblada(1);
 
       expect(result.anterior).toBe(false);
