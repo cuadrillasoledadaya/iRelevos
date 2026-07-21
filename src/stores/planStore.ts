@@ -75,11 +75,12 @@ export const planStore = create<PlanStore>()((set, get) => ({
 		calcularTodo: () => {
 			_mutar((d) => {
 				d.trabajaderas.forEach((t) => {
-					const { plan, objetivo } = calcularCiclo(t);
+					const { plan, objetivo, error } = calcularCiclo(t);
 					ordenarDentroFisico(t, plan);
 					t.plan = plan;
 					t.obj = objetivo;
 					t.analisis = analizar(plan, t.nombres.length, objetivo, t);
+					if (error) t.analisis.error = error;
 					t.pinned = null;
 				});
 			});
@@ -88,11 +89,12 @@ export const planStore = create<PlanStore>()((set, get) => ({
 		calcularTrab: (tid) => {
 			_mutar((d) => {
 				const t = _getTrab(d, tid);
-				const { plan, objetivo } = calcularCiclo(t);
+				const { plan, objetivo, error } = calcularCiclo(t);
 				ordenarDentroFisico(t, plan);
 				t.plan = plan;
 				t.obj = objetivo;
 				t.analisis = analizar(plan, t.nombres.length, objetivo, t);
+				if (error) t.analisis.error = error;
 				t.pinned = null;
 			});
 		},

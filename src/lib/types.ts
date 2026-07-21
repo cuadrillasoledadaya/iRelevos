@@ -34,6 +34,8 @@ export interface Analisis {
   ultimo: number[]
   rep: number[]
   cons: number
+  /** Error message from algorithm (e.g., CuadrillaDobladaSinPrimarioError) */
+  error?: string | null
 }
 
 export type TramoTipo = 'primario' | 'secundario'

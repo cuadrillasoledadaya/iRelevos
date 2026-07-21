@@ -56,6 +56,7 @@ export function objSalidas(
 export function calcularCiclo(t: Trabajadera): {
 	plan: TramoSlot[];
 	objetivo: Record<number, number>;
+	error?: string;
 } {
 	const total = t.nombres.length;
 	const numTramos = t.tramos.length;
@@ -78,9 +79,9 @@ export function calcularCiclo(t: Trabajadera): {
 				const objetivo = objSalidas(total, numTramos, salidas, aplicaRegla5);
 				return { plan, objetivo };
 			} catch (err: unknown) {
-				// Surface typed error as empty plan + error in analisis
+				// Surface typed error
 				if (err instanceof CuadrillaDobladaSinPrimarioError) {
-					return { plan: [], objetivo: {} };
+					return { plan: [], objetivo: {}, error: err.message };
 				}
 				throw err;
 			}
