@@ -3,6 +3,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import type { Trabajadera, TramoSlot, Analisis } from "../types";
+import { cuadrillaDobladaATramoSlots } from "./cuadrillaDoblada";
 
 export function objSalidas(
 	total: number,
@@ -54,6 +55,15 @@ export function calcularCiclo(t: Trabajadera): {
 	const total = t.nombres.length;
 	const numTramos = t.tramos.length;
 	const salidas = t.salidas ?? 2;
+
+	// Cuadrilla doblada path
+	if (t.cuadrillaDoblada === true && total >= 10) {
+		const plan = cuadrillaDobladaATramoSlots(t);
+		const aplicaRegla5 = false; // doblado implies n >= 10, regla5 never applies
+		const objetivo = objSalidas(total, numTramos, salidas, aplicaRegla5);
+		return { plan, objetivo };
+	}
+
 	const aplicaRegla5 = t.regla5costaleros && total === 5;
 	const F = aplicaRegla5 ? 1 : total - 5;
 	if (F <= 0 || numTramos <= 0) return { plan: [], objetivo: {} };

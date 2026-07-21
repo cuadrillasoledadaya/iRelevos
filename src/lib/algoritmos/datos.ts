@@ -82,6 +82,8 @@ export function migrarDatos(datos: DatosPerfil): DatosPerfil {
 		if (!t.puntuaciones) t.puntuaciones = {};
 		if (!t.boquilla) t.boquilla = {};
 		if (!t.tramosClaves) t.tramosClaves = [];
+		if (t.cuadrillaDoblada === undefined) t.cuadrillaDoblada = false;
+		if (t.distribucionCuadrillas === undefined) t.distribucionCuadrillas = null;
 
 		if (t.plan && t.plan[0]?.dentro?.length) {
 			const idx = +t.plan[0].dentro[0];

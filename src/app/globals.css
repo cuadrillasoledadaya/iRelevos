@@ -42,6 +42,10 @@
 	--preview-bg: rgba(168, 85, 247, 0.12);
 	--preview-bd: #a855f7;
 	--preview-tx: #d8b4fe;
+	/* Cuadrilla Doblada */
+	--cd-bg: #2a211a;
+	--cd-bd: #8a6d2f;
+	--cd-tx: #e8c97a;
 	--txt-body: var(--cre);
 }
 /* ── TEMA CLARO ── */
@@ -65,6 +69,9 @@ html.light {
 	--preview-bg: rgba(168, 85, 247, 0.08);
 	--preview-tx: #581c87;
 	--preview-bd: #7e22ce;
+	--cd-bg: #f5f0e8;
+	--cd-bd: #c9a84c;
+	--cd-tx: #8a6d2f;
 }
 
 /* ── OVERRIDES TEMA CLARO ── */

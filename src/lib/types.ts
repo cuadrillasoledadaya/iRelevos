@@ -51,6 +51,8 @@ export interface Trabajadera {
   puntuaciones: Record<string, number>
   boquilla?: Record<string, boolean>
   tramosClaves: number[]
+  cuadrillaDoblada?: boolean
+  distribucionCuadrillas?: { a: number[]; b: number[] } | null
 }
 
 export interface PlanRelevo {
