@@ -353,6 +353,37 @@ describe("rotacion", () => {
 			expect(plan[5].fuera).toContain(7); // c8 (idx 7) in F
 			expect(plan[5].fuera).not.toContain(6); // c7 NOT in F
 		});
+
+		// ══════════════════════════════════════════════════════════════
+		// B3 — "No hay disponibles": si una cuadrilla tiene exactamente
+		// ANCHO miembros (sin disp), un S swap sobre ella debe ser
+		// capturado y devuelto como error claro por calcularCiclo.
+		// Antes: el error se propagaba sin manejo, rompiendo la app.
+		// ══════════════════════════════════════════════════════════════
+
+		it("S sobre cuadrilla sin disp: calcularCiclo devuelve error claro (no throw)", () => {
+			// 10 costaleros, distribución 5/5. Cada cuadrilla tiene 5
+			// miembros exactos = ANCHO. Después del primer P, B queda con
+			// cargando=5, disp=0. Un S sobre B falla — el dispatcher
+			// debe capturar y devolver un error en lugar de throw.
+			const t = makeTrabajadera(
+				Array.from({ length: 10 }, (_, i) => `c${i + 1}`),
+				["T1", "T2"],
+				1, // single salida
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario"]; // T1 P, T2 S — B sin disp
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4],
+				b: [5, 6, 7, 8, 9],
+			};
+			// calcularCiclo debe devolver { plan: [], objetivo: {}, error: ... }
+			// en lugar de throw (que rompería el forEach en calcularTodo).
+			const result = calcularCiclo(t);
+			expect(result.error).toBeDefined();
+			expect(result.error).toMatch(/disponibles|intermedio|secundario/i);
+			expect(result.plan).toEqual([]);
+		});
 	});
 
 	describe("tramosOptimos", () => {

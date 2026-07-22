@@ -215,6 +215,43 @@ describe("cuadrillaDoblada", () => {
 			expect(e2.estados.A.cargando).not.toContain("c2")
 			expect(e2.estados.A.disponibles).toEqual(["c1", "c2"])
 		})
+		it("S swap con cargando vacío debe cargar desde disp (no corromper con undefined)", () => {
+			// B2: si la cuadrilla activa está vacía (cargando=[]) y hay
+			// disponibles, el S swap debe "cargar" la cuadrilla desde disp
+			// (mover primeros ANCHO al cargando) en vez de corromper el
+			// state con `sale!` undefined.
+			const estadoInicial: EstadoPlan = {
+				cuadrillaActiva: "A",
+				estados: {
+					A: { cargando: [], disponibles: ["c1", "c2", "c3", "c4", "c5", "c6"] },
+					B: { cargando: [], disponibles: [] },
+				},
+			}
+			const { estado: nuevo, relevo } = aplicarRelevoIntermedio(estadoInicial)
+			// No debe haber undefined en disp (era el bug B2)
+			expect(nuevo.estados.A.disponibles).not.toContain(undefined)
+			expect(nuevo.estados.A.disponibles).toEqual(["c6"])
+			// A queda cargada con los primeros 5 de disp
+			expect(nuevo.estados.A.cargando).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			// Sale está vacío (nadie salía — es un load, no un swap)
+			expect(relevo.sale).toEqual([])
+			// Entra son los 5 que entraron
+			expect(relevo.entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
+		})
+		it("S swap con cuadrilla completamente vacía (sin cargando ni disp) debe lanzar error claro", () => {
+			// Edge case: si tanto cargando como disp están vacíos, no hay
+			// nada que cargar — error claro.
+			const estadoInicial: EstadoPlan = {
+				cuadrillaActiva: "A",
+				estados: {
+					A: { cargando: [], disponibles: [] },
+					B: { cargando: [], disponibles: [] },
+				},
+			}
+			expect(() => aplicarRelevoIntermedio(estadoInicial)).toThrow(
+				/vac[ií]a|disponibles|intermedio/i,
+			)
+		})
 		it("debería lanzar error si no hay disponibles", () => {
 			// Estado: A está activa con cargando=[a1..a5] y disponibles=[].
 			const estado: EstadoPlan = {
@@ -224,7 +261,9 @@ describe("cuadrillaDoblada", () => {
 					B: { cargando: [], disponibles: ["c1", "c2", "c3", "c4", "c5"] },
 				},
 			}
-			expect(() => aplicarRelevoIntermedio(estado)).toThrow(/No hay disponibles/)
+			// v1.2.90: el error ahora es CuadrillaDobladaSinDisponibleError
+			// con contexto (tramoIdx=-1 para llamada directa).
+			expect(() => aplicarRelevoIntermedio(estado)).toThrow(/disponibles/i)
 		})
 	})
 
@@ -630,6 +669,85 @@ describe("cuadrillaDoblada", () => {
 			expect(e3.estados.A.cargando).toEqual(["c1", "c2", "c3", "c4", "c5"])
 			// B.disp debe tener c8 primero (sale al frente) para que la rotación avance
 			expect(e3.estados.B.disponibles[0]).toBe("c8")
+		})
+
+		// ══════════════════════════════════════════════════════════════
+		// Bajas (B1) — los costaleros marcados como baja no deben aparecer
+		// en la rotación. La distribución y la simulación los filtran.
+		// ══════════════════════════════════════════════════════════════
+
+		it("cuadrilla doblada: costaleros en bajas no aparecen en ningún relevo", () => {
+			// 14 costaleros, c3 (idx 2) y c8 (idx 7) de baja. Después de
+			// filtrar quedan 12 activos. La distribución es A=6, B=6 (cada
+			// una con 1 disponible después del P, los S funcionan). c3 y
+			// c8 no deben aparecer en ningún relevo.
+			const t = makeTrab(14, {
+				tramos: ["T1", "T2", "T3"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5,6], b: [7,8,9,10,11,12,13] },
+				bajas: [2, 7], // c3 (idx 2) y c8 (idx 7) están de baja
+			})
+			const relevos = simularCicloConTipos(t, ["primario", "secundario", "primario"])
+			const allMembers = new Set<string>()
+			relevos.forEach(r => {
+				r.sale.forEach(s => allMembers.add(s))
+				r.entra.forEach(s => allMembers.add(s))
+			})
+			// B1: c3 y c8 NO deben aparecer en ningún relevo
+			expect(allMembers.has("c3")).toBe(false)
+			expect(allMembers.has("c8")).toBe(false)
+		})
+
+		// ══════════════════════════════════════════════════════════════
+		// Patrón con S inicial (B2 integración) — antes metía `undefined`
+		// en disp. Ahora debe cargar la cuadrilla desde disp.
+		// ══════════════════════════════════════════════════════════════
+
+		it("tramosTipo que empieza con S: la cuadrilla activa se carga desde disp (no undefined)", () => {
+			// 12 costaleros (A=6, B=6), tramosTipo=[S, P, S].
+			// T1 S: A está vacía, debe cargar desde disp (no undefined).
+			// T2 P: A→B
+			// T3 S: B swap normal
+			const t = makeTrab(12, {
+				tramos: ["T1", "T2", "T3"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+			})
+			const relevos = simularCicloConTipos(t, ["secundario", "primario", "secundario"])
+			expect(relevos).toHaveLength(3)
+			// T1 S: load de A (sale=[], entra=primeros 5 de A)
+			expect(relevos[0].tipo).toBe("intermedio")
+			expect(relevos[0].cuadrilla).toBe("A")
+			expect(relevos[0].sale).toEqual([])
+			expect(relevos[0].entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			// T2 P: A→B (ahora A tiene 5 cargando, sale completo)
+			expect(relevos[1].tipo).toBe("principal")
+			expect(relevos[1].cuadrilla).toBe("B")
+			expect(relevos[1].sale).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			expect(relevos[1].entra).toEqual(["c7", "c8", "c9", "c10", "c11"])
+			// T3 S: B swap (sale=c7, entra=c12)
+			expect(relevos[2].tipo).toBe("intermedio")
+			expect(relevos[2].cuadrilla).toBe("B")
+			expect(relevos[2].sale).toEqual(["c7"])
+			expect(relevos[2].entra).toEqual(["c12"])
+		})
+
+		// ══════════════════════════════════════════════════════════════
+		// B3 — "No hay disponibles": si una cuadrilla tiene exactamente
+		// ANCHO miembros (sin disp), un S swap sobre ella debe lanzar
+		// error claro. Antes el error se propagaba sin manejo.
+		// ══════════════════════════════════════════════════════════════
+
+		it("S swap sobre cuadrilla con tamaño = ANCHO (sin disp) lanza error claro", () => {
+			// 10 costaleros, distribución 5/5. Cada cuadrilla tiene 5
+			// miembros exactos = ANCHO. Después del primer P, la cuadrilla
+			// inactiva tiene 0 en disp. Un S swap sobre ella falla.
+			const t = makeTrab(10, {
+				tramos: ["T1", "T2"],
+				distribucionCuadrillas: { a: [0,1,2,3,4], b: [5,6,7,8,9] },
+			})
+			// TramosTipo inválido: S después de P sin disp en B
+			expect(() => simularCicloConTipos(t, ["primario", "secundario"])).toThrow(
+				/disponibles|intermedio/i,
+			)
 		})
 	})
 

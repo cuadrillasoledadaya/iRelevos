@@ -8,6 +8,7 @@ import {
 	simularCicloConTipos,
 	relevosATramoSlots,
 	CuadrillaDobladaSinPrimarioError,
+	CuadrillaDobladaSinDisponibleError,
 } from "./cuadrillaDoblada";
 
 export function objSalidas(
@@ -73,8 +74,12 @@ export function calcularCiclo(t: Trabajadera): {
 				const objetivo = objSalidas(total, numTramos, salidas, aplicaRegla5);
 				return { plan, objetivo };
 			} catch (err: unknown) {
-				// Surface typed error
+				// Surface typed errors to the UI (don't throw — would crash
+				// calcularTodo's forEach in planStore).
 				if (err instanceof CuadrillaDobladaSinPrimarioError) {
+					return { plan: [], objetivo: {}, error: err.message };
+				}
+				if (err instanceof CuadrillaDobladaSinDisponibleError) {
 					return { plan: [], objetivo: {}, error: err.message };
 				}
 				throw err;

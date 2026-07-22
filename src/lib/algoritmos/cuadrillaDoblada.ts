@@ -15,6 +15,24 @@ export class CuadrillaDobladaSinPrimarioError extends Error {
   }
 }
 
+/**
+ * v1.2.90: Thrown when an S swap is requested on a cuadrilla that has
+ * costaleros cargando but no disponibles (i.e., the cuadrilla is full
+ * with exactly ANCHO_TRABAJADERA members, and a S swap has nothing to
+ * bring in). The dispatcher in calcularCiclo catches this and surfaces
+ * it as a user-visible error instead of letting it crash the app.
+ */
+export class CuadrillaDobladaSinDisponibleError extends Error {
+  constructor(public readonly tramoIdx: number, public readonly cuadrilla: CuadrillaId) {
+    super(
+      `Tramo ${tramoIdx + 1} (secundario): la cuadrilla ${cuadrilla} no tiene disponibles para hacer el relevo intermedio. ` +
+      `Una cuadrilla con exactamente ${ANCHO_TRABAJADERA} miembros no admite tramos secundarios después de un principal. ` +
+      `Agregá más costaleros a la cuadrilla o cambiá el tramo a primario.`,
+    )
+    this.name = 'CuadrillaDobladaSinDisponibleError'
+  }
+}
+
 export type CuadrillaId = "A" | "B"
 export type TipoRelevo = "principal" | "intermedio"
 
@@ -179,11 +197,53 @@ export function aplicarRelevoIntermedio(
 	estado: EstadoPlan,
 	ancho = ANCHO_TRABAJADERA,
 ): { estado: EstadoPlan; relevo: Relevo } {
-	void ancho
 	const activa = estado.cuadrillaActiva
 	const eActiva = estado.estados[activa]
+
+	// v1.2.90 B2: si la cuadrilla activa está vacía (cargando=[]), no
+	// hay nadie a quien SALE. Comportamiento anterior: destructuraba
+	// `sale` como undefined y lo metía en disp, corrompiendo el state.
+	// Ahora: si hay disponibles, "cargamos" la cuadrilla desde disp
+	// (los primeros ANCHO pasan a cargando, el resto queda en disp).
+	// Esto es un no-swap (sale=[], entra=los que entraron) que prepara
+	// la cuadrilla para futuros S swaps o para un P swap saliente.
+	if (eActiva.cargando.length === 0) {
+		if (eActiva.disponibles.length === 0) {
+			// Cuadrilla completamente vacía — no hay nada que cargar.
+			// Error genérico (no tenemos índice de tramo acá, lo
+			// captura el dispatcher con un mensaje más útil).
+			throw new Error(
+				`Cuadrilla ${activa} está completamente vacía (sin cargando ni disponibles) para relevo intermedio`,
+			)
+		}
+		const nuevosCargando = eActiva.disponibles.slice(0, ancho)
+		const restantes = eActiva.disponibles.slice(ancho)
+		const nuevoEstado: EstadoPlan = {
+			cuadrillaActiva: activa,
+			estados: {
+				...estado.estados,
+				[activa]: {
+					cargando: nuevosCargando,
+					disponibles: restantes,
+				},
+			},
+		}
+		const relevo: Relevo = {
+			tipo: "intermedio",
+			numero: 0,
+			cuadrilla: activa,
+			sale: [],
+			entra: nuevosCargando,
+		}
+		return { estado: nuevoEstado, relevo }
+	}
+
+	// Camino normal: sale uno de cargando (FIFO), entra uno de disp (FIFO).
 	if (eActiva.disponibles.length === 0) {
-		throw new Error(`No hay disponibles en cuadrilla ${activa} para relevo intermedio`)
+		// v1.2.90 B3: error estructurado con índice de tramo y cuadrilla,
+		// capturado por calcularCiclo y surfaceado al usuario.
+		// (tramoIdx = -1 indica que se llamó directo sin contexto de simulación)
+		throw new CuadrillaDobladaSinDisponibleError(-1, activa)
 	}
 	const [sale, ...restoCargando] = eActiva.cargando
 	const [entra, ...restoDisponibles] = eActiva.disponibles
@@ -193,7 +253,7 @@ export function aplicarRelevoIntermedio(
 			...estado.estados,
 			[activa]: {
 				cargando: [...restoCargando, entra],
-				disponibles: [...restoDisponibles, sale!],
+				disponibles: [...restoDisponibles, sale],
 			},
 		},
 	}
@@ -201,8 +261,8 @@ export function aplicarRelevoIntermedio(
 		tipo: "intermedio",
 		numero: 0,
 		cuadrilla: activa,
-		sale: [sale!],
-		entra: [entra!],
+		sale: [sale],
+		entra: [entra],
 	}
 	return { estado: nuevoEstado, relevo }
 }
@@ -367,14 +427,22 @@ export function simularCicloConTipos(
 	}
 
 	const costaleros = t.nombres;
+	// v1.2.90 B1: filtrar costaleros de baja para que NO aparezcan en la
+	// rotación. La distribución y la simulación solo usan los activos.
+	// Los nombres siguen siendo los mismos (subset de t.nombres), así que
+	// t.nombres.indexOf(name) en relevosATramoSlots sigue funcionando.
+	const bajas = t.bajas ?? [];
+	const nombresActivos = bajas.length > 0
+		? costaleros.filter((_, i) => !bajas.includes(i))
+		: costaleros;
 	const distribucion = t.distribucionCuadrillas
 		? {
-				a: t.distribucionCuadrillas.a.map((i) => t.nombres[i]),
-				b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]),
+				a: t.distribucionCuadrillas.a.map((i) => t.nombres[i]).filter((name) => !bajas.includes(t.nombres.indexOf(name))),
+				b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]).filter((name) => !bajas.includes(t.nombres.indexOf(name))),
 			}
 		: undefined;
-	const dist = distribucion ?? sugerirDistribucion(costaleros)
-	const cuadrillas = agruparEnCuadrillas(costaleros, dist)
+	const dist = distribucion ?? sugerirDistribucion(nombresActivos)
+	const cuadrillas = agruparEnCuadrillas(nombresActivos, dist)
 	if (cuadrillas.a.miembros.length < ANCHO_TRABAJADERA || cuadrillas.b.miembros.length < ANCHO_TRABAJADERA) {
 		throw new Error(
 			`Para simular ciclo doblado, ambas cuadrillas deben tener al menos ${ANCHO_TRABAJADERA} miembros. A=${cuadrillas.a.miembros.length}, B=${cuadrillas.b.miembros.length}`,
@@ -389,16 +457,30 @@ export function simularCicloConTipos(
 	let n = 1
 
 	for (let ciclo = 0; ciclo < salidas; ciclo++) {
-		for (const tipo of tramosTipo) {
+		for (let ti = 0; ti < tramosTipo.length; ti++) {
+			const tipo = tramosTipo[ti]
 			if (tipo === "primario") {
 				const r = aplicarRelevoPrincipal(estado)
 				estado = r.estado
 				relevos.push({ ...r.relevo, numero: n++ })
 			} else {
 				// secundario → intermedio
-				const r = aplicarRelevoIntermedio(estado)
-				estado = r.estado
-				relevos.push({ ...r.relevo, numero: n++ })
+				try {
+					const r = aplicarRelevoIntermedio(estado)
+					estado = r.estado
+					relevos.push({ ...r.relevo, numero: n++ })
+				} catch (err) {
+					// v1.2.90 B3: si el error es "no disponibles",
+					// re-throw con el índice de tramo real para que
+					// el dispatcher surface un mensaje útil al usuario.
+					if (err instanceof CuadrillaDobladaSinDisponibleError) {
+						throw new CuadrillaDobladaSinDisponibleError(
+							ciclo * tramosTipo.length + ti,
+							err.cuadrilla,
+						)
+					}
+					throw err
+				}
 			}
 		}
 	}
