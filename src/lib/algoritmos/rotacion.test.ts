@@ -204,6 +204,7 @@ describe("rotacion", () => {
 			const t = makeTrabajadera(
 				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
 				["T1", "T2", "T3"],
+				1, // salidas=1 to keep this test focused on dispatch, not multi-salida
 			);
 			t.cuadrillaDoblada = true;
 			t.tramosTipo = ["primario", "secundario", "primario"];
@@ -252,6 +253,73 @@ describe("rotacion", () => {
 			const result = calcularCiclo(t);
 			expect(result.plan).toEqual([]);
 			expect(result.objetivo).toEqual({});
+		});
+
+		// ══════════════════════════════════════════════════════════════
+		// Multi-salida integration (bug fix v1.2.87)
+		// calcularCiclo must pass t.salidas to simularCicloConTipos so
+		// the plan has S*numTramos slots covering all salidas. Otherwise
+		// the capataz repeats the same plan for salida 2.
+		// ══════════════════════════════════════════════════════════════
+
+		it("cuadrilla doblada with salidas=2 produces 2*numTramos plan slots", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3", "T4"],
+				2, // salidas
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario", "secundario", "primario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			};
+			const { plan } = calcularCiclo(t);
+			expect(plan).toHaveLength(8); // 2 salidas × 4 tramos
+			plan.forEach((s) => {
+				expect(s.dentro).toHaveLength(5);
+				expect(s.fuera).toHaveLength(7);
+			});
+		});
+
+		it("cuadrilla doblada with salidas=1 still produces numTramos plan slots (backward compat)", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3", "T4"],
+				1, // salidas
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario", "secundario", "primario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			};
+			const { plan } = calcularCiclo(t);
+			expect(plan).toHaveLength(4); // 1 salida × 4 tramos
+		});
+
+		it("cuadrilla doblada salida 2 S swap differs from salida 1 (rotation actually advances)", () => {
+			// Con [P,S,S,P] × 2 con 12 costaleros: la S en salida 1 (T2) y
+			// la S en salida 2 (T6) NO deben proponer el mismo swap
+			// porque el estado de la cuadrilla activa cambió entremedio.
+			const t = makeTrabajadera(
+				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3", "T4"],
+				2,
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario", "secundario", "primario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			};
+			const { plan } = calcularCiclo(t);
+			expect(plan).toHaveLength(8);
+			// Salida 1 T2 (S) y Salida 2 T6 (S): el swap debe ser distinto
+			// (al menos uno de los 5 dentro cambió)
+			const salida1S = [...plan[1].dentro].sort((a, b) => a - b);
+			const salida2S = [...plan[5].dentro].sort((a, b) => a - b);
+			expect(salida1S).not.toEqual(salida2S);
 		});
 	});
 

@@ -462,6 +462,103 @@ describe("cuadrillaDoblada", () => {
 				simularCicloConTipos(t, ["primario", "secundario"]),
 			).toThrow("tramosTipo length must equal tramos length")
 		})
+
+		// ══════════════════════════════════════════════════════════════
+		// Multi-salida support (bug fix v1.2.87)
+		// Before: state initialized once, plan covered 1 salida only;
+		// same swaps repeated in salida 2 → "always the same ones change".
+		// After: simularCicloConTipos runs the cycle S times with state
+		// persisting between cycles, so the rotation actually advances
+		// across salidas and the S swaps in salida 2 differ from salida 1.
+		// ══════════════════════════════════════════════════════════════
+
+		it("defaults to salidas=1 when called with 2 args (backward compat)", () => {
+			const t = makeTrab(12, {
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+			})
+			const rImplicit = simularCicloConTipos(t, ["primario", "secundario", "primario"])
+			const rExplicit = simularCicloConTipos(
+				t,
+				["primario", "secundario", "primario"],
+				1,
+			)
+			expect(rImplicit).toEqual(rExplicit)
+		})
+
+		it("salidas=2 produces 2*numTramos relevos (state persists between cycles)", () => {
+			const t = makeTrab(12, {
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+			})
+			const relevos = simularCicloConTipos(
+				t,
+				["primario", "secundario", "primario"],
+				2,
+			)
+			expect(relevos).toHaveLength(6) // 2 cycles * 3 tramos
+		})
+
+		it("first cycle of salidas=2 matches salidas=1 (regression: cycle 1 unchanged)", () => {
+			const t = makeTrab(12, {
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+			})
+			const r1 = simularCicloConTipos(t, ["primario", "secundario", "primario"], 1)
+			const r2 = simularCicloConTipos(t, ["primario", "secundario", "primario"], 2)
+			expect(r2.slice(0, 3)).toEqual(r1)
+		})
+
+		it("second cycle S swap differs from first cycle S swap (rotation actually advances)", () => {
+			// With [P,S,S,P] × 2 with 12 costaleros (A=6, B=6):
+			//   - Salida 1 T2 (S): sale=[c7], entra=[c12]  (first b-slot vacated, last fills)
+			//   - Salida 2 T6 (S): sale=[c8], entra=[c7]   (rotation advanced by 1)
+			// [P,S,P] alone is too short: the B.disp queue resets to original order
+			// at the end of each P, so the S swap in cycle 2 is identical to cycle 1.
+			// 2 S between P's are needed to actually shift the rotation.
+			const t = makeTrab(12, {
+				tramos: ["T1", "T2", "T3", "T4"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+			})
+			const relevos = simularCicloConTipos(
+				t,
+				["primario", "secundario", "secundario", "primario"],
+				2,
+			)
+			// Salida 1 T2 (S) — index 1
+			expect(relevos[1].tipo).toBe("intermedio")
+			expect(relevos[1].sale).toEqual(["c7"])
+			expect(relevos[1].entra).toEqual(["c12"])
+			// Salida 2 T6 (S) — index 5
+			expect(relevos[5].tipo).toBe("intermedio")
+			expect(relevos[5].sale).toEqual(["c8"])
+			expect(relevos[5].entra).toEqual(["c7"])
+			// Rotation must actually advance — the S swaps must differ
+			expect(relevos[1].sale).not.toEqual(relevos[5].sale)
+		})
+
+		it("relevos are numbered sequentially across cycles (1..S*N)", () => {
+			const t = makeTrab(12, {
+				tramos: ["T1", "T2", "T3", "T4"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+			})
+			const relevos = simularCicloConTipos(
+				t,
+				["primario", "secundario", "secundario", "primario"],
+				2,
+			)
+			expect(relevos).toHaveLength(8)
+			relevos.forEach((r, i) => expect(r.numero).toBe(i + 1))
+		})
+
+		it("salidas=0 returns empty array (defensive)", () => {
+			const t = makeTrab(12, {
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+			})
+			const relevos = simularCicloConTipos(
+				t,
+				["primario", "secundario", "primario"],
+				0,
+			)
+			expect(relevos).toEqual([])
+		})
 	})
 
 	describe("relevosATramoSlots", () => {

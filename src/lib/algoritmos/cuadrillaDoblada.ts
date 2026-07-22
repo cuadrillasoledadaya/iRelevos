@@ -327,22 +327,34 @@ export function cuadrillaDobladaATramoSlots(
 }
 
 /**
- * Simulates one cycle of cuadrilla doblada with per-tramo P/S designation.
- * For each tramo in order:
+ * Simulates `salidas` cycles of cuadrilla doblada with per-tramo P/S
+ * designation. Each cycle iterates over `tramosTipo` in order:
  *   - 'primario' → aplicarRelevoPrincipal (full swap between cuadrillas)
  *   - 'secundario' → aplicarRelevoIntermedio (FIFO rotation within active cuadrilla)
  *
+ * The EstadoPlan PERSISTS between cycles, so the FIFO rotation actually
+ * advances across salidas and the S swaps in salida 2 differ from salida 1.
+ * Without this, the capataz would repeat the same single-cycle plan and
+ * the costaleros "at pico" (most D count) would always be the same.
+ *
  * Throws Error("tramosTipo length must equal tramos length") if lengths differ.
  * Throws CuadrillaDobladaSinPrimarioError if no tramo is marked primario.
+ *
+ * @param t           Trabajadera (provides nombres, distribucionCuadrillas, etc.)
+ * @param tramosTipo  Per-tramo type designation, length must equal t.tramos.length
+ * @param salidas     Number of cycles to simulate (default 1, backward compat).
+ *                    Each cycle produces t.tramos.length relevos. Must be >= 1.
  */
 export function simularCicloConTipos(
 	t: Trabajadera,
 	tramosTipo: TramoTipo[],
+	salidas: number = 1,
 ): Relevo[] {
 	if (tramosTipo.length !== t.tramos.length) {
 		throw new Error("tramosTipo length must equal tramos length");
 	}
 	if (tramosTipo.length === 0) return [];
+	if (salidas <= 0) return [];
 
 	// Validate: at least one primario
 	if (!tramosTipo.includes("primario")) {
@@ -371,16 +383,18 @@ export function simularCicloConTipos(
 	const relevos: Relevo[] = []
 	let n = 1
 
-	for (const tipo of tramosTipo) {
-		if (tipo === "primario") {
-			const r = aplicarRelevoPrincipal(estado)
-			estado = r.estado
-			relevos.push({ ...r.relevo, numero: n++ })
-		} else {
-			// secundario → intermedio
-			const r = aplicarRelevoIntermedio(estado)
-			estado = r.estado
-			relevos.push({ ...r.relevo, numero: n++ })
+	for (let ciclo = 0; ciclo < salidas; ciclo++) {
+		for (const tipo of tramosTipo) {
+			if (tipo === "primario") {
+				const r = aplicarRelevoPrincipal(estado)
+				estado = r.estado
+				relevos.push({ ...r.relevo, numero: n++ })
+			} else {
+				// secundario → intermedio
+				const r = aplicarRelevoIntermedio(estado)
+				estado = r.estado
+				relevos.push({ ...r.relevo, numero: n++ })
+			}
 		}
 	}
 
