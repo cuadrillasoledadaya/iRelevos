@@ -146,7 +146,12 @@ export function aplicarRelevoPrincipal(
 			...estado.estados,
 			[activa]: {
 				cargando: [],
-				disponibles: [...eActiva.disponibles, ...sale],
+				// sale (los que acaban de SALE) van al FRENTE del disp para
+				// que la próxima vez que esta cuadrilla se active, su primer
+				// cargando sea el siguiente de la rotación FIFO — no se
+				// resetea al orden original. Sin esto, en patrones
+				// alternados P/S el mismo costalero SALE en cada S de B.
+				disponibles: [...sale, ...eActiva.disponibles],
 			},
 			[otra]: {
 				cargando: nuevosCargando,

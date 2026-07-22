@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { uiStore, projectStore, planStore } from "@/stores";
 import {
 	getRol,
@@ -76,9 +76,21 @@ function CapatazTrabajadera({
 	// swapSel local para saber si estamos interactuando con esta trabajadera
 	const localSwapSel = swapSel?.a?.tid === t.id ? (swapSel as SwapState) : null;
 
+	// v1.2.88: el plan ahora cubre S*numTramos slots (S = t.salidas ?? 2).
+	// El capataz piensa en salidas una a la vez, no en un plan continuo.
+	// Switcher de salida: 0 = primera salida, 1 = segunda, etc.
+	const numSalidas = t.salidas ?? 2;
+	const numTramos = t.tramos.length;
+	const [salidaActual, setSalidaActual] = useState(0);
+	// Si cambia el número de salidas (poco común), clamp al rango válido
+	const salidaSegura = Math.min(Math.max(salidaActual, 0), Math.max(numSalidas - 1, 0));
+	const planOffset = salidaSegura * numTramos;
+
 	function handleTapPill(target: SwapTarget, e: React.MouseEvent) {
 		e.stopPropagation();
-		const r = t.plan?.[target.ti];
+		// target.ti es el índice LOCAL del tramo; agregamos planOffset para
+		// apuntar al slot correcto en t.plan (que tiene S*numTramos slots).
+		const r = t.plan?.[planOffset + target.ti];
 		if (!r) return;
 		const dentroFisico = getDentroFisico(t, r);
 		const dt = localSwapSel;
@@ -160,14 +172,43 @@ function CapatazTrabajadera({
 				<div className="t-badge">{t.id}</div>
 				<div className="t-info">
 					<div className="t-name">Trabajadera {t.id}</div>
-					<div className="t-meta">{t.tramos.length} tramos</div>
+					<div className="t-meta">{t.tramos.length} tramos · {numSalidas} {numSalidas === 1 ? "salida" : "salidas"}</div>
 				</div>
 				<div className="t-chev">▼</div>
 			</div>
 
 			<div className="trab-body">
+				{/* v1.2.88: Switcher de salida. Solo se muestra si hay >1 salida. */}
+				{numSalidas > 1 && (
+					<div
+						className="flex gap-2 mb-3 p-2 rounded"
+						style={{ background: "rgba(0,0,0,0.04)" }}
+						onClick={(e) => e.stopPropagation()}
+					>
+						<span className="text-[0.7rem] uppercase tracking-widest font-bold self-center text-[var(--cre-o)]">
+							Salida:
+						</span>
+						{Array.from({ length: numSalidas }, (_, i) => (
+							<button
+								key={i}
+								type="button"
+								className={`btn btn-sm ${salidaSegura === i ? "btn-oro" : "btn-out"}`}
+								onClick={() => {
+									setSalidaActual(i);
+									// Limpiar selección de swap al cambiar de salida
+									// (las coordenadas ti apuntan a otra salida)
+									setSwapSel(null);
+								}}
+								aria-pressed={salidaSegura === i}
+							>
+								{i + 1}
+							</button>
+						))}
+					</div>
+				)}
+
 				{t.tramos.map((nombre: string, ti: number) => {
-					const r = t.plan?.[ti];
+					const r = t.plan?.[planOffset + ti];
 					if (!r) return null;
 					const dentroFisico = getDentroFisico(t, r);
 					const isSwapTargetRow =
@@ -287,9 +328,12 @@ function CapatazTrabajadera({
 											: base === "FIJ"
 												? "FIJ"
 												: "COR";
+									// isRep / isCons ahora se evalúan DENTRO de la salida actual
+									// (no contra la primera fila de la salida anterior)
+									const lastTramoLocal = t.tramos.length - 1;
 									const isRep =
-										ti === t.tramos.length - 1 && (t.plan?.[0]?.fuera.includes(ci) ?? false);
-									const isCons = ti > 0 && (t.plan?.[ti - 1]?.fuera.includes(ci) ?? false);
+										ti === lastTramoLocal && (t.plan?.[planOffset]?.fuera.includes(ci) ?? false);
+									const isCons = ti > 0 && (t.plan?.[planOffset + ti - 1]?.fuera.includes(ci) ?? false);
 
 									const cf = isRep ? "f rep" : isCons ? "f cons" : "f";
 									const tClass = getTapClass({

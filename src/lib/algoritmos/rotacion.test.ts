@@ -321,6 +321,38 @@ describe("rotacion", () => {
 			const salida2S = [...plan[5].dentro].sort((a, b) => a - b);
 			expect(salida1S).not.toEqual(salida2S);
 		});
+
+		// ══════════════════════════════════════════════════════════════
+		// Alternating P/S pattern integration (bug fix v1.2.88)
+		// Before: aplicarRelevoPrincipal reset the disp queue to original
+		// order, so in alternating P/S patterns the S swap of B always
+		// SALE'd c7. User reported: "in the secondary tramos of B, c7
+		// always comes out in T2 and T6". After: disp = [sale, ...disp]
+		// persists the rotation, so c7 SALE in T2 and c8 SALE in T6.
+		// ══════════════════════════════════════════════════════════════
+
+		it("alternating P/S pattern: c7 SALEs in T2 but NOT in T6 (rotation advances)", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3", "T4", "T5", "T6"],
+				1, // single salida to focus on the alternation
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario", "primario", "secundario", "primario", "secundario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			};
+			const { plan } = calcularCiclo(t);
+			expect(plan).toHaveLength(6);
+			// T2 (S de B) — c7 SALE → c7 está en F
+			expect(plan[1].fuera).toContain(6); // c7 (idx 6) in F
+			// T4 (S de A) — c1 SALE → c1 está en F
+			expect(plan[3].fuera).toContain(0); // c1 (idx 0) in F
+			// T6 (S de B) — c8 SALE (rotación avanza) → c8 en F, c7 NO en F
+			expect(plan[5].fuera).toContain(7); // c8 (idx 7) in F
+			expect(plan[5].fuera).not.toContain(6); // c7 NOT in F
+		});
 	});
 
 	describe("tramosOptimos", () => {

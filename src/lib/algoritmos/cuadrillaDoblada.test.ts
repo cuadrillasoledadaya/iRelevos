@@ -509,10 +509,10 @@ describe("cuadrillaDoblada", () => {
 		it("second cycle S swap differs from first cycle S swap (rotation actually advances)", () => {
 			// With [P,S,S,P] × 2 with 12 costaleros (A=6, B=6):
 			//   - Salida 1 T2 (S): sale=[c7], entra=[c12]  (first b-slot vacated, last fills)
-			//   - Salida 2 T6 (S): sale=[c8], entra=[c7]   (rotation advanced by 1)
-			// [P,S,P] alone is too short: the B.disp queue resets to original order
-			// at the end of each P, so the S swap in cycle 2 is identical to cycle 1.
-			// 2 S between P's are needed to actually shift the rotation.
+			//   - Salida 2 T6 (S): sale=[c9], entra=[c8]   (rotation advanced by 2)
+			// Note: with v1.2.88 fix (sale goes to FRONT of disp on P),
+			// the rotation advances by 2 (c7→c8→c9 across T2→T3→end-of-cycle-1).
+			// Before the v1.2.88 fix this was only c7→c8 across the same span.
 			const t = makeTrab(12, {
 				tramos: ["T1", "T2", "T3", "T4"],
 				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
@@ -528,8 +528,8 @@ describe("cuadrillaDoblada", () => {
 			expect(relevos[1].entra).toEqual(["c12"])
 			// Salida 2 T6 (S) — index 5
 			expect(relevos[5].tipo).toBe("intermedio")
-			expect(relevos[5].sale).toEqual(["c8"])
-			expect(relevos[5].entra).toEqual(["c7"])
+			expect(relevos[5].sale).toEqual(["c9"])
+			expect(relevos[5].entra).toEqual(["c8"])
 			// Rotation must actually advance — the S swaps must differ
 			expect(relevos[1].sale).not.toEqual(relevos[5].sale)
 		})
@@ -558,6 +558,78 @@ describe("cuadrillaDoblada", () => {
 				0,
 			)
 			expect(relevos).toEqual([])
+		})
+
+		// ══════════════════════════════════════════════════════════════
+		// P-swap rotation persistence (bug fix v1.2.88)
+		// Before: aplicarRelevoPrincipal built new disp as
+		// `[...disponibles, ...sale]`, putting the just-left members at
+		// the END. With alternating P/S patterns, this RESETS the FIFO
+		// queue to original order after every P, so c7 (always the head
+		// of cargando after a P) was the one to SALE in every single S
+		// of B. User reported: "c7 always comes out in the S tramos of B".
+		// After: disp = [...sale, ...disponibles]. The just-left members
+		// go to the FRONT of the queue, so the next P→S cycle advances
+		// the rotation by one (c7, c8, c9, ...).
+		// ══════════════════════════════════════════════════════════════
+
+		it("alternating P/S pattern: S swaps of B rotate c7, c8, c9, ... (not always c7)", () => {
+			// Con 6 tramos [P, S, P, S, P, S] y 12 costaleros (A=6, B=6):
+			//   T1 P: A→B (B activa)
+			//   T2 S: B swap — sale=c7, entra=c12  (rotación inicial)
+			//   T3 P: B→A (A activa)
+			//   T4 S: A swap — sale=c1, entra=c6   (rotación de A)
+			//   T5 P: A→B (B activa)
+			//   T6 S: B swap — debe ser sale=c8, entra=c7 (rotación avanza)
+			//                            (sin el fix sería sale=c7, entra=c12)
+			const t = makeTrab(12, {
+				tramos: ["T1", "T2", "T3", "T4", "T5", "T6"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+			})
+			const relevos = simularCicloConTipos(
+				t,
+				["primario", "secundario", "primario", "secundario", "primario", "secundario"],
+			)
+			expect(relevos).toHaveLength(6)
+			// T2 (índice 1) — primer S de B
+			expect(relevos[1].tipo).toBe("intermedio")
+			expect(relevos[1].cuadrilla).toBe("B")
+			expect(relevos[1].sale).toEqual(["c7"])
+			expect(relevos[1].entra).toEqual(["c12"])
+			// T4 (índice 3) — S de A (porque T3 P dejó A activa)
+			expect(relevos[3].tipo).toBe("intermedio")
+			expect(relevos[3].cuadrilla).toBe("A")
+			expect(relevos[3].sale).toEqual(["c1"])
+			expect(relevos[3].entra).toEqual(["c6"])
+			// T6 (índice 5) — segundo S de B, debe rotar a c8 (NO c7)
+			expect(relevos[5].tipo).toBe("intermedio")
+			expect(relevos[5].cuadrilla).toBe("B")
+			expect(relevos[5].sale).toEqual(["c8"])
+			expect(relevos[5].entra).toEqual(["c7"])
+			// Garantía explícita: c7 no se repite en los S swaps de B
+			expect(relevos[5].sale).not.toEqual(relevos[1].sale)
+		})
+
+		it("after a P swap, the just-left members go to the FRONT of the disp queue", () => {
+			// Test unitario del comportamiento de aplicarRelevoPrincipal
+			// relevante al bug. Setup: A activa con cargando=[c1..c5].
+			const estadoInicial = crearEstadoInicial({
+				a: ["c1", "c2", "c3", "c4", "c5", "c6"],
+				b: ["c7", "c8", "c9", "c10", "c11", "c12"],
+			})
+			// A→B primero: A.sale=[], B.entra=[c7..c11]
+			const { estado: e1 } = aplicarRelevoPrincipal(estadoInicial)
+			// S en B: sale=c7, entra=c12
+			const { estado: e2 } = aplicarRelevoIntermedio(e1)
+			// Ahora: B.cargando=[c8..c12], B.disp=[c7]
+			expect(e2.estados.B.cargando).toEqual(["c8", "c9", "c10", "c11", "c12"])
+			expect(e2.estados.B.disponibles).toEqual(["c7"])
+			// B→A: sale=[c8..c12]
+			const { estado: e3 } = aplicarRelevoPrincipal(e2)
+			// A.entra = A.disp.slice(0,5) = [c1..c5]
+			expect(e3.estados.A.cargando).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			// B.disp debe tener c8 primero (sale al frente) para que la rotación avance
+			expect(e3.estados.B.disponibles[0]).toBe("c8")
 		})
 	})
 
