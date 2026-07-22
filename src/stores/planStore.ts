@@ -102,12 +102,27 @@ export const planStore = create<PlanStore>()((set, get) => ({
 		completarPlan: (tid) => {
 			_mutar((d) => {
 				const t = _getTrab(d, tid);
-				const res = completarAuto(t);
-				if ("error" in res) return;
-				ordenarDentroFisico(t, res.plan);
-				t.plan = res.plan;
-				t.obj = res.obj;
-				t.analisis = res.analisis;
+				// v1.2.89: dispatchar por tipo de trabajadera. Cuadrilla
+				// doblada usa la rotación (mismo algoritmo que Calcular
+				// Auto → simularCicloConTipos) — los pins se mantienen en
+				// t.pinned como referencia visual pero la rotación manda
+				// en caso de conflicto. Sin cuadrilla doblada, el greedy
+				// con pins sigue siendo el camino correcto.
+				if (t.cuadrillaDoblada === true && t.nombres.length >= 10) {
+					const { plan, objetivo, error } = calcularCiclo(t);
+					ordenarDentroFisico(t, plan);
+					t.plan = plan;
+					t.obj = objetivo;
+					t.analisis = analizar(plan, t.nombres.length, objetivo, t);
+					if (error) t.analisis.error = error;
+				} else {
+					const res = completarAuto(t);
+					if ("error" in res) return;
+					ordenarDentroFisico(t, res.plan);
+					t.plan = res.plan;
+					t.obj = res.obj;
+					t.analisis = res.analisis;
+				}
 			});
 		},
 
