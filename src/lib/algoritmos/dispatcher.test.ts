@@ -2,8 +2,9 @@
 // TESTS — dispatcher.ts (M4 shared dispatch helper)
 // ══════════════════════════════════════════════════════════════════
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { dispatchSimulacion } from "./dispatcher";
+import * as rotacion from "./rotacion";
 import type { DatosPerfil, Trabajadera } from "../types";
 
 function makeCuadrillaDoblada(): Trabajadera {
@@ -187,5 +188,200 @@ describe("dispatchSimulacion (M4)", () => {
 		dispatchSimulacion(t);
 		expect(t.nombres).toEqual(nombresAntes);
 		expect(t.distribucionCuadrillas).toBe(distAntes);
+	});
+
+	// ══════════════════════════════════════════════════════════════
+	// v1.2.92 #3: legacy path (sin tramosTipo) debe validar
+	// distribucionCuadrillas. Antes: out-of-range index aquí se
+	// convertía en t.nombres[99] === undefined, pasaba el filter de
+	// bajas, y moría con "No se pudo mapear nombre a índice" en
+	// cuadrillaDobladaATramoSlots:483 — un Error genérico que escapaba
+	// del dispatcher. Ahora: validarDistribucionCuadrillas se llama en
+	// dispatchSimulacion antes de dispatchar → error estructurado.
+	// ══════════════════════════════════════════════════════════════
+
+	function makeLegacyDoblada(): Trabajadera {
+		return {
+			id: 1,
+			nombres: Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+			roles: [],
+			salidas: 1,
+			tramos: ["T1", "T2", "T3"],
+			// NO tramosTipo → legacy path
+			plan: null,
+			obj: null,
+			analisis: null,
+			pinned: null,
+			bajas: [],
+			regla5costaleros: false,
+			puntuaciones: {},
+			boquilla: {},
+			tramosClaves: [],
+			cuadrillaDoblada: true,
+			distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+		};
+	}
+
+	it("legacy path con índice fuera de rango en A: devuelve error, no throw", () => {
+		const t = makeLegacyDoblada();
+		t.distribucionCuadrillas = {
+			a: [0, 1, 2, 3, 99], // 99 out of range
+			b: [5, 6, 7, 8, 9, 10, 11], // suma = 12, pero idx 99 fuera
+		};
+		// Wrapper para capturar throw — si dispatchSimulacion lanza, test falla
+		let thrown: unknown = null;
+		let result: ReturnType<typeof dispatchSimulacion> | null = null;
+		try {
+			result = dispatchSimulacion(t);
+		} catch (e) {
+			thrown = e;
+		}
+		expect(thrown).toBeNull();
+		expect(result).not.toBeNull();
+		expect(result!.error).toBeDefined();
+		expect(result!.error).toMatch(/fuera de rango|distribuci[óo]n/i);
+		expect(result!.plan).toEqual([]);
+	});
+
+	it("legacy path con duplicado en B: devuelve error, no throw", () => {
+		const t = makeLegacyDoblada();
+		t.distribucionCuadrillas = {
+			a: [0, 1, 2, 3, 4, 5],
+			b: [6, 7, 8, 9, 9, 10], // idx 9 duplicado en B
+		};
+		let thrown: unknown = null;
+		let result: ReturnType<typeof dispatchSimulacion> | null = null;
+		try {
+			result = dispatchSimulacion(t);
+		} catch (e) {
+			thrown = e;
+		}
+		expect(thrown).toBeNull();
+		expect(result!.error).toBeDefined();
+		expect(result!.error).toMatch(/duplicado|distribuci[óo]n/i);
+	});
+
+	it("legacy path con sub-ancho en A: devuelve error, no throw", () => {
+		const t = makeLegacyDoblada();
+		t.distribucionCuadrillas = {
+			a: [0, 1, 2, 3], // solo 4 (< 5 = ANCHO)
+			b: [4, 5, 6, 7, 8, 9, 10, 11], // 8 para que suma = 12
+		};
+		let thrown: unknown = null;
+		let result: ReturnType<typeof dispatchSimulacion> | null = null;
+		try {
+			result = dispatchSimulacion(t);
+		} catch (e) {
+			thrown = e;
+		}
+		expect(thrown).toBeNull();
+		expect(result!.error).toBeDefined();
+		expect(result!.error).toMatch(/ancho|distribuci[óo]n/i);
+	});
+
+	it("legacy path con suma_incorrecta: devuelve error, no throw", () => {
+		const t = makeLegacyDoblada();
+		// 9/12 con 12 totales — cada uno >= ANCHO, sin duplicados, en rango, pero suma=21 != 12
+		t.distribucionCuadrillas = {
+			a: [0, 1, 2, 3, 4, 5, 6, 7, 8],
+			b: [9, 10, 11, 0, 1, 2, 3, 4, 5, 6, 7, 8], // 12 elementos (algunos overlap)
+		};
+		let thrown: unknown = null;
+		let result: ReturnType<typeof dispatchSimulacion> | null = null;
+		try {
+			result = dispatchSimulacion(t);
+		} catch (e) {
+			thrown = e;
+		}
+		expect(thrown).toBeNull();
+		expect(result!.error).toBeDefined();
+	});
+
+	it("legacy path con distribución válida: no error, plan computado", () => {
+		const t = makeLegacyDoblada();
+		const { plan, objetivo, error } = dispatchSimulacion(t);
+		expect(error).toBeUndefined();
+		expect(plan.length).toBeGreaterThan(0);
+		expect(Object.keys(objetivo)).toHaveLength(12);
+	});
+
+	// ══════════════════════════════════════════════════════════════
+	// v1.2.92 #4: dispatchSimulacion no debe propagar errores genéricos.
+	// El JSDoc dice "Los callers deben propagarlo a la UI ... y NO
+	// re-lanzarlo — el dispatcher ya captura las excepciones
+	// estructuradas (CuadrillaDoblada*)". Pero el body no capturaba
+	// errores genéricos de simularCicloCompleto (cuadrillaDoblada.ts:140,
+	// 484) — la contract estaba rota. Ahora: try/catch convierte
+	// cualquier error en { plan:[], objetivo:{}, analisis:{error:msg},
+	// error:msg }.
+	// ══════════════════════════════════════════════════════════════
+
+	it("captura Error genérico de calcularCiclo y devuelve error shape (no throw)", () => {
+		const t = makeCuadrillaDoblada();
+		// Forzar un throw genérico desde calcularCiclo (simula el caso
+		// de line 140 / 484 de cuadrillaDoblada.ts: errores que no son
+		// CuadrillaDoblada* y escapaban del dispatcher)
+		const spy = vi
+			.spyOn(rotacion, "calcularCiclo")
+			.mockImplementation(() => {
+				throw new Error("Distribución inválida: suma=99, costaleros=12");
+			});
+		try {
+			let thrown: unknown = null;
+			let result: ReturnType<typeof dispatchSimulacion> | null = null;
+			try {
+				result = dispatchSimulacion(t);
+			} catch (e) {
+				thrown = e;
+			}
+			expect(thrown).toBeNull();
+			expect(result).not.toBeNull();
+			expect(result!.error).toBeDefined();
+			expect(result!.error).toMatch(/suma=99/);
+			expect(result!.plan).toEqual([]);
+			expect(result!.objetivo).toEqual({});
+			expect(result!.analisis.error).toBeDefined();
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	it("captura Error genérico (no CuadrillaDoblada*) y preserva el mensaje", () => {
+		const t = makeCuadrillaDoblada();
+		const spy = vi
+			.spyOn(rotacion, "calcularCiclo")
+			.mockImplementation(() => {
+				throw new Error("No se pudo mapear nombre a índice: c99");
+			});
+		try {
+			let thrown: unknown = null;
+			let result: ReturnType<typeof dispatchSimulacion> | null = null;
+			try {
+				result = dispatchSimulacion(t);
+			} catch (e) {
+				thrown = e;
+			}
+			expect(thrown).toBeNull();
+			expect(result!.error).toBeDefined();
+			expect(result!.error).toMatch(/c99/);
+		} finally {
+			spy.mockRestore();
+		}
+	});
+
+	it("preserva el mensaje de error original sin decoración", () => {
+		const t = makeCuadrillaDoblada();
+		const mensajeOriginal = "Custom error from simularCicloCompleto: xyz";
+		const spy = vi
+			.spyOn(rotacion, "calcularCiclo")
+			.mockImplementation(() => {
+				throw new Error(mensajeOriginal);
+			});
+		try {
+			const { error } = dispatchSimulacion(t);
+			expect(error).toBe(mensajeOriginal);
+		} finally {
+			spy.mockRestore();
+		}
 	});
 });

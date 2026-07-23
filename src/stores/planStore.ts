@@ -75,13 +75,38 @@ export const planStore = create<PlanStore>()((set, get) => ({
 		calcularTodo: () => {
 			_mutar((d) => {
 				d.trabajaderas.forEach((t) => {
-					const { plan, objetivo, error } = calcularCiclo(t);
-					ordenarDentroFisico(t, plan);
-					t.plan = plan;
-					t.obj = objetivo;
-					t.analisis = analizar(plan, t.nombres.length, objetivo, t);
-					if (error) t.analisis.error = error;
-					t.pinned = null;
+					// v1.2.92 #5: per-iteration try/catch. Si una trabajadera
+					// tira (cualquier Error, no solo CuadrillaDoblada*), el
+					// forEach abortaría a mitad de camino y dejaría el store
+					// en estado parcial (plan de id=1 seteado pero obj de id=2
+					// no). Reproduce el crash del capataz screen. La defense
+					// in depth: dispatchSimulacion (#4) ya no tira, pero
+					// calcularCiclo es la versión legacy llamada aquí
+					// directamente y puede tirar (e.g. tramosTipo
+					// length mismatch en simularCicloConTipos:527).
+					try {
+						const { plan, objetivo, error } = calcularCiclo(t);
+						ordenarDentroFisico(t, plan);
+						t.plan = plan;
+						t.obj = objetivo;
+						t.analisis = analizar(plan, t.nombres.length, objetivo, t);
+						if (error) t.analisis.error = error;
+						t.pinned = null;
+					} catch (err) {
+						const msg = err instanceof Error ? err.message : String(err);
+						t.plan = [];
+						t.obj = {};
+						t.analisis = {
+							conteo: {},
+							okObj: false,
+							dentro5: false,
+							primer: [],
+							ultimo: [],
+							rep: [],
+							cons: 0,
+							error: msg,
+						};
+					}
 				});
 			});
 		},
@@ -89,13 +114,30 @@ export const planStore = create<PlanStore>()((set, get) => ({
 		calcularTrab: (tid) => {
 			_mutar((d) => {
 				const t = _getTrab(d, tid);
-				const { plan, objetivo, error } = calcularCiclo(t);
-				ordenarDentroFisico(t, plan);
-				t.plan = plan;
-				t.obj = objetivo;
-				t.analisis = analizar(plan, t.nombres.length, objetivo, t);
-				if (error) t.analisis.error = error;
-				t.pinned = null;
+				// v1.2.92 #5: mismo per-iteration try/catch que calcularTodo.
+				try {
+					const { plan, objetivo, error } = calcularCiclo(t);
+					ordenarDentroFisico(t, plan);
+					t.plan = plan;
+					t.obj = objetivo;
+					t.analisis = analizar(plan, t.nombres.length, objetivo, t);
+					if (error) t.analisis.error = error;
+					t.pinned = null;
+				} catch (err) {
+					const msg = err instanceof Error ? err.message : String(err);
+					t.plan = [];
+					t.obj = {};
+					t.analisis = {
+						conteo: {},
+						okObj: false,
+						dentro5: false,
+						primer: [],
+						ultimo: [],
+						rep: [],
+						cons: 0,
+						error: msg,
+					};
+				}
 			});
 		},
 

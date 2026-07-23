@@ -49,7 +49,8 @@ export class CuadrillaDobladaDistribucionInvalidaError extends Error {
       | "duplicado"
       | "fuera_de_rango"
       | "sub_ancho"
-      | "overlap",
+      | "overlap"
+      | "suma_incorrecta",
     detail?: string,
   ) {
     const mensajes: Record<typeof motivo, string> = {
@@ -57,6 +58,7 @@ export class CuadrillaDobladaDistribucionInvalidaError extends Error {
       fuera_de_rango: `el índice ${indice} está fuera de rango (nombres tiene ${detail ?? "N"} elementos)`,
       sub_ancho: `la cuadrilla ${cuadrilla} tiene menos de ${detail ?? "ancho"} miembros`,
       overlap: `el índice ${indice} aparece en la cuadrilla ${cuadrilla} y también en la otra`,
+      suma_incorrecta: `la suma de A+B no coincide con el total de costaleros (suma=${detail ?? "?"})`,
     }
     super(
       `Distribución de cuadrilla inválida (cuadrilla ${cuadrilla}): ${mensajes[motivo]}. ` +
@@ -168,6 +170,21 @@ export function validarDistribucionCuadrillas(
 	totalNombres: number,
 	ancho: number = ANCHO_TRABAJADERA,
 ): void {
+	// v1.2.92 #6: suma === totalNombres must hold. Without this, a 9/12
+	// split (with 12 totales) passes B4 and dies in `agruparEnCuadrillas`
+	// (line 138) with a generic `Error` that escapes the typed-error net.
+	// Check this first so over/under-assignment is caught before
+	// duplicates/overlap/range checks (which become meaningless if sizes
+	// don't add up).
+	const suma = distribucion.a.length + distribucion.b.length
+	if (suma !== totalNombres) {
+		throw new CuadrillaDobladaDistribucionInvalidaError(
+			"A",
+			-1,
+			"suma_incorrecta",
+			`${suma}, total=${totalNombres}`,
+		)
+	}
 	if (distribucion.a.length < ancho) {
 		throw new CuadrillaDobladaDistribucionInvalidaError(
 			"A",
@@ -448,6 +465,18 @@ export function cuadrillaDobladaATramoSlots(
 	distribucion?: Distribucion,
 ): TramoSlot[] {
 	if (t.nombres.length < 10) return [];
+
+	// v1.2.92 #3 (defense at the leaf): validate distribucionCuadrillas
+	// indices early. Without this, an out-of-range index (e.g. 99)
+	// becomes t.nombres[99] === undefined, passes the `bajas` filter
+	// (indexOf(undefined) === -1), and dies at line 483 below with the
+	// generic "No se pudo mapear nombre a índice" Error — which is NOT
+	// a CuadrillaDoblada* error and escapes the typed-error net.
+	// The dispatcher also validates (defense in depth) so direct callers
+	// and the legacy branch in `calcularCiclo` both get a typed error.
+	if (t.distribucionCuadrillas) {
+		validarDistribucionCuadrillas(t.distribucionCuadrillas, t.nombres.length)
+	}
 
 	// If no distribution provided, try to build one from t.distribucionCuadrillas (indices)
 	let dist = distribucion;

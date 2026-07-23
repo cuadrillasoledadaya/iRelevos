@@ -536,6 +536,129 @@ describe("cuadrillaDoblada", () => {
 				),
 			).toThrow(CuadrillaDobladaDistribucionInvalidaError)
 		})
+
+		// v1.2.92 #6: suma === totalNombres
+		it("9/12 split con 12 totales (suma=21, costaleros=12): lanza con motivo 'suma_incorrecta'", () => {
+			try {
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 4, 5, 6, 7, 8], b: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] },
+					12,
+				)
+				expect.fail("debería haber lanzado")
+			} catch (err) {
+				expect(err).toBeInstanceOf(CuadrillaDobladaDistribucionInvalidaError)
+				const e = err as InstanceType<typeof CuadrillaDobladaDistribucionInvalidaError>
+				expect(e.motivo).toBe("suma_incorrecta")
+				expect(e.message).toMatch(/suma/i)
+			}
+		})
+
+		it("12/12 split con 12 totales (suma=24, costaleros=12): lanza con motivo 'suma_incorrecta'", () => {
+			// over-assignment — both >= ANCHO, no overlap, indices in range,
+			// but suma > totalNombres
+			try {
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], b: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+					12,
+				)
+				expect.fail("debería haber lanzado")
+			} catch (err) {
+				expect(err).toBeInstanceOf(CuadrillaDobladaDistribucionInvalidaError)
+				const e = err as InstanceType<typeof CuadrillaDobladaDistribucionInvalidaError>
+				expect(e.motivo).toBe("suma_incorrecta")
+			}
+		})
+
+		it("9/9 split con 12 totales (suma=18, cada uno >=ANCHO): lanza con motivo 'suma_incorrecta'", () => {
+			// under-assignment with each >= ANCHO: pasa sub_ancho, pasa duplicados
+			// (asume indices únicos y en rango), pero suma=18 != 12
+			try {
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 4, 5, 6, 7, 8], b: [9, 10, 11, 0, 1, 2, 3, 4, 5] },
+					12,
+				)
+				expect.fail("debería haber lanzado")
+			} catch (err) {
+				// overlap fires first (idx 0..5 en A y B) — pero lo importante es
+				// que cualquier error estructurado lo captura, no escapa como Error genérico
+				expect(err).toBeInstanceOf(CuadrillaDobladaDistribucionInvalidaError)
+			}
+		})
+
+		it("5/7 split con 12 totales (suma=12, cada uno >=ANCHO): happy path no lanza", () => {
+			// sanity: la única invariante adicional es suma === totalNombres,
+			// este caso suma=12, total=12 → no debe lanzar
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 4], b: [5, 6, 7, 8, 9, 10, 11] },
+					12,
+				),
+			).not.toThrow()
+		})
+
+		it("error de suma_incorrecta expone suma y totalNombres en detail", () => {
+			try {
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], b: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+					12,
+				)
+				expect.fail("debería haber lanzado")
+			} catch (err) {
+				const e = err as InstanceType<typeof CuadrillaDobladaDistribucionInvalidaError>
+				expect(e.motivo).toBe("suma_incorrecta")
+				// detail debe contener tanto la suma (26) como el total (12)
+				expect(e.message).toMatch(/26/)
+				expect(e.message).toMatch(/12/)
+			}
+		})
+	})
+
+	describe("cuadrillaDobladaATramoSlots — v1.2.92 #3 (defense at the leaf)", () => {
+		function makeLegacy(n: number): Trabajadera {
+			return {
+				id: 1,
+				nombres: nombres(n),
+				roles: nombres(n).map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const })),
+				salidas: 1,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			}
+		}
+
+		it("lanza CuadrillaDobladaDistribucionInvalidaError con índice fuera de rango", () => {
+			const t = makeLegacy(10)
+			t.distribucionCuadrillas = { a: [0, 1, 2, 3, 99], b: [4, 5, 6, 7, 8] }
+			expect(() => cuadrillaDobladaATramoSlots(t)).toThrow(
+				CuadrillaDobladaDistribucionInvalidaError,
+			)
+		})
+
+		it("lanza CuadrillaDobladaDistribucionInvalidaError con suma_incorrecta", () => {
+			const t = makeLegacy(12)
+			// 9/9 split, 12 totales, cada uno >= ANCHO pero suma=18 != 12
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 4, 5, 6, 7, 8],
+				b: [9, 10, 11, 0, 1, 2, 3, 4, 5],
+			}
+			expect(() => cuadrillaDobladaATramoSlots(t)).toThrow(
+				CuadrillaDobladaDistribucionInvalidaError,
+			)
+		})
+
+		it("sin distribucionCuadrillas: no valida (camino normal)", () => {
+			// 12 costaleros sin distribución → usar la sugerida
+			const t = makeLegacy(12)
+			expect(t.distribucionCuadrillas).toBeUndefined()
+			const slots = cuadrillaDobladaATramoSlots(t)
+			expect(slots.length).toBeGreaterThan(0)
+		})
 	})
 
 	describe("simularCicloConTipos — B4 integration (validation in entry point)", () => {
