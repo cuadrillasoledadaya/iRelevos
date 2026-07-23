@@ -376,6 +376,56 @@ describe("cuadrillaDoblada", () => {
 		})
 	})
 
+	// ── Task 1.7 RED: Internal call sites use tieneRolesAsignados guard ──
+	// Tests that agruparEnCuadrillas, simularCicloCompleto, and
+	// simularCicloConTipos pass t when roles are available.
+	// RED signal: optional t parameter not yet added to signatures.
+
+	describe("internal fallback call sites (RED: t param not yet added)", () => {
+		function makeT(
+			nombres: string[],
+			roles: { pri: string; sec: string }[],
+			id = 1,
+		): Trabajadera {
+			return {
+				id,
+				nombres,
+				roles: roles as Trabajadera["roles"],
+				salidas: 2,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			}
+		}
+
+		it("agruparEnCuadrillas with t (valid roles) uses role-aware path", () => {
+			const t = makeT(nombres(12), Array(12).fill({ pri: "COR", sec: "FIJ_I" }))
+			// @ts-expect-error — RED: t param not yet added to agruparEnCuadrillas
+			const { a, b } = agruparEnCuadrillas(t.nombres, undefined, ANCHO_TRABAJADERA, t)
+			expect(a.miembros).toHaveLength(6)
+			expect(b.miembros).toHaveLength(6)
+		})
+
+		it("simularCicloCompleto with t (valid roles) uses role-aware path", () => {
+			const t = makeT(nombres(12), Array(12).fill({ pri: "COR", sec: "FIJ_I" }))
+			// @ts-expect-error — RED: t param not yet added to simularCicloCompleto
+			const relevos = simularCicloCompleto(t.nombres, undefined, ANCHO_TRABAJADERA, t)
+			expect(relevos.length).toBeGreaterThan(0)
+		})
+
+		it("simularCicloConTipos with t (valid roles) uses role-aware path", () => {
+			const t = makeT(nombres(12), Array(12).fill({ pri: "COR", sec: "FIJ_I" }))
+			const relevos = simularCicloConTipos(t, ["primario", "secundario", "primario"])
+			expect(relevos.length).toBeGreaterThan(0)
+		})
+	})
+
 	describe("agruparEnCuadrillas", () => {
 		it("debería usar distribución sugerida si no se pasa", () => {
 			const { a, b } = agruparEnCuadrillas(nombres(13))
