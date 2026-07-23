@@ -163,6 +163,14 @@ export function requiereDecisionDoblado(costaleros: string[], ancho = ANCHO_TRAB
 }
 
 /**
+ * Returns true when `t.roles` is present and has the same length as `t.nombres`.
+ * Used as a guard before calling the role-aware `sugerirDistribucion(t)`.
+ */
+export function tieneRolesAsignados(t: Trabajadera): boolean {
+	return !!t.roles && t.roles.length === t.nombres.length
+}
+
+/**
  * Sugiere una distribución equitativa. A lleva el excedente si impar.
  * Ej: 13 costaleros → a=7, b=6.
  */
