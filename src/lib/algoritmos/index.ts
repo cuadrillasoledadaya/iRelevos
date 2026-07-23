@@ -39,6 +39,10 @@ export { isGenericTramo } from "./utils";
 export { reconcile, normalizeName } from "./reconcile";
 export type { ReconcileResult } from "./reconcile";
 
+// Dispatcher (M4 — shared dispatch entre calcularCiclo y completarPlan)
+export { dispatchSimulacion } from "./dispatcher";
+export type { ResultadoSimulacion } from "./dispatcher";
+
 // Cuadrilla Doblada
 export {
 	puedeDoblarse,
@@ -47,9 +51,12 @@ export {
 	simularCicloCompleto,
 	simularCicloConTipos,
 	agruparEnCuadrillas,
+	validarDistribucionCuadrillas,
 	cuadrillaDobladaATramoSlots,
 	relevosATramoSlots,
 	CuadrillaDobladaSinPrimarioError,
+	CuadrillaDobladaSinDisponibleError,
+	CuadrillaDobladaDistribucionInvalidaError,
 } from "./cuadrillaDoblada";
 export type { Distribucion, Relevo } from "./cuadrillaDoblada";
 export type { TramoTipo } from "../types";

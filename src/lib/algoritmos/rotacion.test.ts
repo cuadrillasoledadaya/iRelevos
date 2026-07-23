@@ -384,6 +384,79 @@ describe("rotacion", () => {
 			expect(result.error).toMatch(/disponibles|intermedio|secundario/i);
 			expect(result.plan).toEqual([]);
 		});
+
+		// ══════════════════════════════════════════════════════════════
+		// B4 — distribución inválida: índices fuera de rango / duplicados /
+		// sub-ancho / A∩B overlap deben surfacearse como error, no throw.
+		// ══════════════════════════════════════════════════════════════
+
+		it("distribución con índice fuera de rango: error claro (no throw)", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 10 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3"],
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario", "primario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 99], // 99 fuera de rango (nombres.length=10)
+				b: [5, 6, 7, 8, 9],
+			};
+			const result = calcularCiclo(t);
+			expect(result.error).toBeDefined();
+			expect(result.error).toMatch(/fuera de rango|distribuci[óo]n/i);
+			expect(result.plan).toEqual([]);
+		});
+
+		it("distribución con A∩B overlap: error claro (no throw)", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 10 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3"],
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario", "primario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 5], // c5 (idx 5) está en A y B
+				b: [5, 6, 7, 8, 9],
+			};
+			const result = calcularCiclo(t);
+			expect(result.error).toBeDefined();
+			expect(result.plan).toEqual([]);
+		});
+
+		it("distribución con duplicado en A: error claro (no throw)", () => {
+			const t = makeTrabajadera(
+				Array.from({ length: 10 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3"],
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario", "primario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3, 3], // 3 duplicado en A
+				b: [5, 6, 7, 8, 9],
+			};
+			const result = calcularCiclo(t);
+			expect(result.error).toBeDefined();
+			expect(result.plan).toEqual([]);
+		});
+
+		it("distribución sub-ancho: error claro (no throw)", () => {
+			// 12 costaleros, A=4 (sub-ancho). Con regla5 no aplica
+			// porque regla5costaleros=false. El dispatcher debe
+			// surfacear el error desde validarDistribucionCuadrillas.
+			const t = makeTrabajadera(
+				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				["T1", "T2", "T3"],
+			);
+			t.cuadrillaDoblada = true;
+			t.tramosTipo = ["primario", "secundario", "primario"];
+			t.distribucionCuadrillas = {
+				a: [0, 1, 2, 3], // 4 < ANCHO=5
+				b: [5, 6, 7, 8, 9, 10, 11],
+			};
+			const result = calcularCiclo(t);
+			expect(result.error).toBeDefined();
+			expect(result.plan).toEqual([]);
+		});
 	});
 
 	describe("tramosOptimos", () => {

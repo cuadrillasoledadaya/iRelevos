@@ -9,6 +9,7 @@ import {
 	relevosATramoSlots,
 	CuadrillaDobladaSinPrimarioError,
 	CuadrillaDobladaSinDisponibleError,
+	CuadrillaDobladaDistribucionInvalidaError,
 } from "./cuadrillaDoblada";
 
 export function objSalidas(
@@ -80,6 +81,9 @@ export function calcularCiclo(t: Trabajadera): {
 					return { plan: [], objetivo: {}, error: err.message };
 				}
 				if (err instanceof CuadrillaDobladaSinDisponibleError) {
+					return { plan: [], objetivo: {}, error: err.message };
+				}
+				if (err instanceof CuadrillaDobladaDistribucionInvalidaError) {
 					return { plan: [], objetivo: {}, error: err.message };
 				}
 				throw err;

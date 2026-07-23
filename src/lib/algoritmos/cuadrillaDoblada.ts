@@ -33,6 +33,39 @@ export class CuadrillaDobladaSinDisponibleError extends Error {
   }
 }
 
+/**
+ * v1.2.91 B4: Thrown when `distribucionCuadrillas` (indices into
+ * `t.nombres`) is invalid: duplicate indices, out-of-range, fewer than
+ * `ancho` members in either cuadrilla, or overlap between A and B.
+ * Carries the offending cuadrilla + index for actionable UI messages.
+ * The dispatcher in calcularCiclo catches this and surfaces it as a
+ * user-visible error instead of letting it crash the app.
+ */
+export class CuadrillaDobladaDistribucionInvalidaError extends Error {
+  constructor(
+    public readonly cuadrilla: CuadrillaId,
+    public readonly indice: number,
+    public readonly motivo:
+      | "duplicado"
+      | "fuera_de_rango"
+      | "sub_ancho"
+      | "overlap",
+    detail?: string,
+  ) {
+    const mensajes: Record<typeof motivo, string> = {
+      duplicado: `el índice ${indice} aparece más de una vez en la cuadrilla ${cuadrilla}`,
+      fuera_de_rango: `el índice ${indice} está fuera de rango (nombres tiene ${detail ?? "N"} elementos)`,
+      sub_ancho: `la cuadrilla ${cuadrilla} tiene menos de ${detail ?? "ancho"} miembros`,
+      overlap: `el índice ${indice} aparece en la cuadrilla ${cuadrilla} y también en la otra`,
+    }
+    super(
+      `Distribución de cuadrilla inválida (cuadrilla ${cuadrilla}): ${mensajes[motivo]}. ` +
+      `Corregí la distribución antes de calcular el plan.`,
+    )
+    this.name = 'CuadrillaDobladaDistribucionInvalidaError'
+  }
+}
+
 export type CuadrillaId = "A" | "B"
 export type TipoRelevo = "principal" | "intermedio"
 
@@ -114,6 +147,81 @@ export function agruparEnCuadrillas(
 	return {
 		a: { id: "A", miembros: [...dist.a] },
 		b: { id: "B", miembros: [...dist.b] },
+	}
+}
+
+/**
+ * v1.2.91 B4: Validates `t.distribucionCuadrillas` (indices into
+ * `t.nombres`) before any state mutation. Throws a typed
+ * `CuadrillaDobladaDistribucionInvalidaError` on the first violation
+ * found, carrying enough context (cuadrilla, indice, motivo) for the
+ * UI to surface a useful message.
+ *
+ * Checks (in order, short-circuit on first failure):
+ *   1. Each cuadrilla has at least `ancho` members.
+ *   2. No duplicate indices within a single cuadrilla.
+ *   3. All indices are in `[0, totalNombres)`.
+ *   4. A and B don't share any index (overlap).
+ */
+export function validarDistribucionCuadrillas(
+	distribucion: { a: number[]; b: number[] },
+	totalNombres: number,
+	ancho: number = ANCHO_TRABAJADERA,
+): void {
+	if (distribucion.a.length < ancho) {
+		throw new CuadrillaDobladaDistribucionInvalidaError(
+			"A",
+			-1,
+			"sub_ancho",
+			String(ancho),
+		)
+	}
+	if (distribucion.b.length < ancho) {
+		throw new CuadrillaDobladaDistribucionInvalidaError(
+			"B",
+			-1,
+			"sub_ancho",
+			String(ancho),
+		)
+	}
+	const seenA = new Set<number>()
+	for (const idx of distribucion.a) {
+		if (seenA.has(idx)) {
+			throw new CuadrillaDobladaDistribucionInvalidaError("A", idx, "duplicado")
+		}
+		seenA.add(idx)
+	}
+	const seenB = new Set<number>()
+	for (const idx of distribucion.b) {
+		if (seenB.has(idx)) {
+			throw new CuadrillaDobladaDistribucionInvalidaError("B", idx, "duplicado")
+		}
+		seenB.add(idx)
+	}
+	for (const idx of distribucion.a) {
+		if (idx < 0 || idx >= totalNombres) {
+			throw new CuadrillaDobladaDistribucionInvalidaError(
+				"A",
+				idx,
+				"fuera_de_rango",
+				String(totalNombres),
+			)
+		}
+	}
+	for (const idx of distribucion.b) {
+		if (idx < 0 || idx >= totalNombres) {
+			throw new CuadrillaDobladaDistribucionInvalidaError(
+				"B",
+				idx,
+				"fuera_de_rango",
+				String(totalNombres),
+			)
+		}
+	}
+	for (const idx of distribucion.a) {
+		if (seenB.has(idx)) {
+			throw new CuadrillaDobladaDistribucionInvalidaError("A", idx, "overlap")
+		}
 	}
 }
 
@@ -424,6 +532,15 @@ export function simularCicloConTipos(
 	// Validate: at least one primario
 	if (!tramosTipo.includes("primario")) {
 		throw new CuadrillaDobladaSinPrimarioError();
+	}
+
+	// v1.2.91 B4: validate distribucionCuadrillas indices BEFORE any
+	// state mutation. Without this, an invalid distribution (duplicate
+	// index, out-of-range, sub-ancho, or A∩B overlap) silently corrupts
+	// the FIFO queue or causes confusing "name/index drift" errors deep
+	// in the simulation.
+	if (t.distribucionCuadrillas) {
+		validarDistribucionCuadrillas(t.distribucionCuadrillas, t.nombres.length)
 	}
 
 	const costaleros = t.nombres;

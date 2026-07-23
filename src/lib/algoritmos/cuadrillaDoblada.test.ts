@@ -17,7 +17,9 @@ import {
 	cuadrillaDobladaATramoSlots,
 	simularCicloConTipos,
 	relevosATramoSlots,
+	validarDistribucionCuadrillas,
 	CuadrillaDobladaSinPrimarioError,
+	CuadrillaDobladaDistribucionInvalidaError,
 	type EstadoPlan,
 	type Distribucion,
 } from "./cuadrillaDoblada"
@@ -412,6 +414,188 @@ describe("cuadrillaDoblada", () => {
 			expect(() => cuadrillaDobladaATramoSlots(t, badDist)).toThrow(
 				/c99/,
 			)
+		})
+	})
+
+	describe("validarDistribucionCuadrillas (B4)", () => {
+		it("happy path: distribución válida no lanza", () => {
+			// 10 costaleros, 5/5
+			expect(() =>
+				validarDistribucionCuadrillas({ a: [0, 1, 2, 3, 4], b: [5, 6, 7, 8, 9] }, 10),
+			).not.toThrow()
+		})
+
+		it("happy path: distribución 7/6 (suma = total) es válida", () => {
+			// 13 costaleros, 7/6
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 4, 5, 6], b: [7, 8, 9, 10, 11, 12] },
+					13,
+				),
+			).not.toThrow()
+		})
+
+		it("índice duplicado dentro de A lanza CuadrillaDobladaDistribucionInvalidaError", () => {
+			// c3 está dos veces en A
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 3], b: [5, 6, 7, 8, 9] },
+					10,
+				),
+			).toThrow(CuadrillaDobladaDistribucionInvalidaError)
+		})
+
+		it("índice duplicado dentro de B lanza error", () => {
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 4], b: [5, 6, 7, 8, 8] },
+					10,
+				),
+			).toThrow(CuadrillaDobladaDistribucionInvalidaError)
+		})
+
+		it("índice fuera de rango (>= totalNombres) lanza error", () => {
+			// nombres.length=10, A contiene 99
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 99], b: [5, 6, 7, 8, 9] },
+					10,
+				),
+			).toThrow(CuadrillaDobladaDistribucionInvalidaError)
+		})
+
+		it("índice negativo lanza error", () => {
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, -1], b: [5, 6, 7, 8, 9] },
+					10,
+				),
+			).toThrow(CuadrillaDobladaDistribucionInvalidaError)
+		})
+
+		it("cuadrilla con menos de ANCHO miembros lanza error", () => {
+			// A solo tiene 4 (ancho=5)
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3], b: [5, 6, 7, 8, 9, 10] },
+					11,
+				),
+			).toThrow(CuadrillaDobladaDistribucionInvalidaError)
+		})
+
+		it("overlap A∩B (mismo costalero en ambas cuadrillas) lanza error", () => {
+			// c5 está en A y B
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 5], b: [5, 6, 7, 8, 9] },
+					10,
+				),
+			).toThrow(CuadrillaDobladaDistribucionInvalidaError)
+		})
+
+		it("el mensaje de error incluye el nombre de la cuadrilla problemática", () => {
+			try {
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 99], b: [5, 6, 7, 8, 9] },
+					10,
+				)
+				expect.fail("debería haber lanzado")
+			} catch (err) {
+				expect(err).toBeInstanceOf(CuadrillaDobladaDistribucionInvalidaError)
+				expect((err as Error).message).toMatch(/A/)
+			}
+		})
+
+		it("el mensaje de error incluye el índice problemático", () => {
+			try {
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2, 3, 99], b: [5, 6, 7, 8, 9] },
+					10,
+				)
+				expect.fail("debería haber lanzado")
+			} catch (err) {
+				expect((err as Error).message).toMatch(/99/)
+			}
+		})
+
+		it("acepta ancho custom (ej: 3)", () => {
+			// 6 costaleros, 3/3
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1, 2], b: [3, 4, 5] },
+					6,
+					3,
+				),
+			).not.toThrow()
+			// con ancho=3, una cuadrilla de 2 falla
+			expect(() =>
+				validarDistribucionCuadrillas(
+					{ a: [0, 1], b: [3, 4, 5] },
+					6,
+					3,
+				),
+			).toThrow(CuadrillaDobladaDistribucionInvalidaError)
+		})
+	})
+
+	describe("simularCicloConTipos — B4 integration (validation in entry point)", () => {
+		function makeTrab(
+			n: number,
+			overrides: Partial<Trabajadera> = {},
+		): Trabajadera {
+			return {
+				id: 1,
+				nombres: nombres(n),
+				roles: nombres(n).map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const })),
+				salidas: 2,
+				tramos: Array.from({ length: 3 }, (_, i) => `T${i + 1}`),
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+				...overrides,
+			}
+		}
+
+		it("lanza CuadrillaDobladaDistribucionInvalidaError con índice fuera de rango", () => {
+			const t = makeTrab(10, {
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 99], b: [5, 6, 7, 8, 9] },
+			})
+			expect(() => simularCicloConTipos(t, ["primario", "secundario", "primario"])).toThrow(
+				CuadrillaDobladaDistribucionInvalidaError,
+			)
+		})
+
+		it("lanza error con duplicado en A antes de cualquier state mutation", () => {
+			const t = makeTrab(10, {
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 3], b: [5, 6, 7, 8, 9] },
+			})
+			expect(() => simularCicloConTipos(t, ["primario", "secundario", "primario"])).toThrow(
+				CuadrillaDobladaDistribucionInvalidaError,
+			)
+		})
+
+		it("lanza error con A∩B overlap", () => {
+			const t = makeTrab(10, {
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 5], b: [5, 6, 7, 8, 9] },
+			})
+			expect(() => simularCicloConTipos(t, ["primario", "secundario", "primario"])).toThrow(
+				CuadrillaDobladaDistribucionInvalidaError,
+			)
+		})
+
+		it("sin distribucionCuadrillas: usa la sugerida y NO valida (camino normal)", () => {
+			// distribucionCuadrillas ausente → sugerirDistribucion, no hay nada que validar.
+			// Usamos 12 costaleros (A=6, B=6) para que B tenga disp después del primer P
+			// y el [P, S, P] funcione.
+			const t = makeTrab(12)
+			expect(t.distribucionCuadrillas).toBeUndefined()
+			const relevos = simularCicloConTipos(t, ["primario", "secundario", "primario"])
+			expect(relevos).toHaveLength(3)
 		})
 	})
 
