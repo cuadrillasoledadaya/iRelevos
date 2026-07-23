@@ -21,6 +21,7 @@ import {
 	CuadrillaDobladaSinPrimarioError,
 	CuadrillaDobladaDistribucionInvalidaError,
 	CuadrillaDobladaSubAnchoPostBajasError,
+	CuadrillaDobladaRolesInsuficientesError,
 	tieneRolesAsignados,
 	type EstadoPlan,
 	type Distribucion,

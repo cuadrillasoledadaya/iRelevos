@@ -115,6 +115,18 @@ export class CuadrillaDobladaSubAnchoPostBajasError extends Error {
   }
 }
 
+/**
+ * Thrown when `sugerirDistribucion(t)` receives malformed input:
+ * `t.roles` is undefined or `t.roles.length !== t.nombres.length`.
+ * Partial-but-valid role coverage is NOT an error — it produces a warning.
+ */
+export class CuadrillaDobladaRolesInsuficientesError extends Error {
+  constructor(public readonly motivo: string) {
+    super(`sugerirDistribucion: ${motivo}`)
+    this.name = 'CuadrillaDobladaRolesInsuficientesError'
+  }
+}
+
 export type CuadrillaId = "A" | "B"
 export type TipoRelevo = "principal" | "intermedio"
 
