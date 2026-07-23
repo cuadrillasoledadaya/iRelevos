@@ -21,6 +21,7 @@ import {
 	CuadrillaDobladaSinPrimarioError,
 	CuadrillaDobladaDistribucionInvalidaError,
 	CuadrillaDobladaSubAnchoPostBajasError,
+	tieneRolesAsignados,
 	type EstadoPlan,
 	type Distribucion,
 } from "./cuadrillaDoblada"
@@ -307,6 +308,74 @@ describe("cuadrillaDoblada", () => {
 			const d = sugerirDistribucion(t)
 			expect(d.a.length + d.b.length).toBe(12)
 			expect(d.warning).toBeDefined()
+		})
+	})
+
+	// ── Task 1.3 RED: tieneRolesAsignados tests ──
+	// RED signal: function does not exist yet (import error).
+
+	describe("tieneRolesAsignados (RED: function not yet implemented)", () => {
+		function makeT(
+			nombres: string[],
+			roles?: { pri: string; sec: string }[],
+			id = 1,
+		): Trabajadera {
+			return {
+				id,
+				nombres,
+				roles: roles as Trabajadera["roles"],
+				salidas: 2,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			}
+		}
+
+		it("roles undefined → false", () => {
+			const t: Trabajadera = {
+				id: 1,
+				nombres: nombres(12),
+				roles: undefined as unknown as Trabajadera["roles"],
+				salidas: 2,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			}
+			// @ts-expect-error — RED: function not yet exported
+			expect(tieneRolesAsignados(t)).toBe(false)
+		})
+
+		it("roles empty array → false", () => {
+			const t = makeT(nombres(12), [])
+			// @ts-expect-error — RED: function not yet exported
+			expect(tieneRolesAsignados(t)).toBe(false)
+		})
+
+		it("roles length mismatch → false", () => {
+			const t = makeT(nombres(12), [
+				{ pri: "PAT_D", sec: "COR" },
+				{ pri: "PAT_I", sec: "COR" },
+			]) // 2 roles, 12 nombres
+			// @ts-expect-error — RED: function not yet exported
+			expect(tieneRolesAsignados(t)).toBe(false)
+		})
+
+		it("all ok (roles.length === nombres.length) → true", () => {
+			const t = makeT(nombres(12), Array(12).fill({ pri: "COR", sec: "FIJ_I" }))
+			// @ts-expect-error — RED: function not yet exported
+			expect(tieneRolesAsignados(t)).toBe(true)
 		})
 	})
 
