@@ -353,13 +353,11 @@ describe("cuadrillaDoblada", () => {
 				puntuaciones: {},
 				tramosClaves: [],
 			}
-			// @ts-expect-error — RED: function not yet exported
 			expect(tieneRolesAsignados(t)).toBe(false)
 		})
 
 		it("roles empty array → false", () => {
 			const t = makeT(nombres(12), [])
-			// @ts-expect-error — RED: function not yet exported
 			expect(tieneRolesAsignados(t)).toBe(false)
 		})
 
@@ -368,13 +366,11 @@ describe("cuadrillaDoblada", () => {
 				{ pri: "PAT_D", sec: "COR" },
 				{ pri: "PAT_I", sec: "COR" },
 			]) // 2 roles, 12 nombres
-			// @ts-expect-error — RED: function not yet exported
 			expect(tieneRolesAsignados(t)).toBe(false)
 		})
 
 		it("all ok (roles.length === nombres.length) → true", () => {
 			const t = makeT(nombres(12), Array(12).fill({ pri: "COR", sec: "FIJ_I" }))
-			// @ts-expect-error — RED: function not yet exported
 			expect(tieneRolesAsignados(t)).toBe(true)
 		})
 	})

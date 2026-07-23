@@ -126,6 +126,8 @@ export interface Cuadrilla {
 export interface Distribucion {
 	a: string[]
 	b: string[]
+	/** Ephemeral warning for partial role coverage. Never persisted. */
+	warning?: string
 }
 
 export interface Relevo {
