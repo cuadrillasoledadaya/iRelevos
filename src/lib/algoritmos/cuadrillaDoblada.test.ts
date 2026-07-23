@@ -239,6 +239,77 @@ describe("cuadrillaDoblada", () => {
 		})
 	})
 
+	// ── Task 1.2 RED: CuadrillaDobladaRolesInsuficientesError tests ──
+	// RED signal: class does not exist yet (import + runtime errors).
+
+	describe("CuadrillaDobladaRolesInsuficientesError (RED: class not yet implemented)", () => {
+		function makeT(
+			nombres: string[],
+			roles: { pri: string; sec: string }[],
+			id = 1,
+		): Trabajadera {
+			return {
+				id,
+				nombres,
+				roles: roles as Trabajadera["roles"],
+				salidas: 2,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			}
+		}
+
+		it("throws on length mismatch (roles.length !== nombres.length)", () => {
+			const t = makeT(
+				nombres(12),
+				[
+					{ pri: "PAT_D", sec: "COR" },
+					{ pri: "PAT_I", sec: "COR" },
+					{ pri: "FIJ_D", sec: "COR" },
+					{ pri: "FIJ_I", sec: "COR" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+				], // 10 roles, 12 nombres
+			)
+			// @ts-expect-error — RED: class and signature not yet implemented
+			expect(() => sugerirDistribucion(t)).toThrow("CuadrillaDobladaRolesInsuficientesError")
+		})
+
+		it("partial coverage does NOT throw — returns warning", () => {
+			const t = makeT(
+				nombres(12),
+				[
+					{ pri: "PAT_D", sec: "COR" },
+					{ pri: "PAT_I", sec: "COR" },
+					{ pri: "FIJ_D", sec: "COR" },
+					{ pri: "FIJ_I", sec: "COR" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+				], // 12 roles, all COR except 4 — valid but partial
+			)
+			// @ts-expect-error — RED: signature not yet changed
+			const d = sugerirDistribucion(t)
+			expect(d.a.length + d.b.length).toBe(12)
+			expect(d.warning).toBeDefined()
+		})
+	})
+
 	describe("agruparEnCuadrillas", () => {
 		it("debería usar distribución sugerida si no se pasa", () => {
 			const { a, b } = agruparEnCuadrillas(nombres(13))
