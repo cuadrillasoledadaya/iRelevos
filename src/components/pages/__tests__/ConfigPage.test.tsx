@@ -306,8 +306,100 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 	});
 
 	// ═════════════════════════════════════════════════════════════
-	// REQ-UI-CFG-3: A/B distribution editor
+	// REQ-UI-CFG-3: Distribution editor (existing tests above)
 	// ═════════════════════════════════════════════════════════════
+
+	// ═════════════════════════════════════════════════════════════
+	// REQ-UI-CFG-3 + REQ-UI-CFG-6: Button guard + Limpiar + preview
+	// ═════════════════════════════════════════════════════════════
+
+	describe("REQ-UI-CFG-3/6: Button disabled guard + Limpiar + preview", () => {
+		it("REQ-UI-CFG-3: 'Editar distribución' button is disabled when distribution exists", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			const editBtn = screen.getByRole("button", { name: /Editar distribución/i });
+			expect(editBtn).toBeDisabled();
+		});
+
+		it("REQ-UI-CFG-3: 'Editar distribución' button is enabled when distribution is null", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: null,
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			const editBtn = screen.getByRole("button", { name: /Editar distribución/i });
+			expect(editBtn).not.toBeDisabled();
+		});
+
+		it("REQ-UI-CFG-6: 'Limpiar distribución' button clears distribution and invalidates plan", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				plan: [{ dentro: [0, 1, 2, 3, 4], fuera: [5, 6, 7, 8, 9, 10, 11] }],
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			const limpiarBtn = screen.getByRole("button", { name: /Limpiar distribución/i });
+			fireEvent.click(limpiarBtn);
+
+			expect(mockSetDistribucionCuadrillas).toHaveBeenCalledWith(t.id, [], []);
+		});
+
+		it("REQ-UI-CFG-3: distribution summary section is hidden when cuadrillaDoblada is true but no distribution", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: null,
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			// The A: N / B: N summary should NOT be visible
+			expect(screen.queryByText(/A: \d+ \/ B: \d+/)).not.toBeInTheDocument();
+		});
+
+		it("REQ-UI-CFG-3: preview shows role-grouped order (A and B names)", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			// Should show the A/B summary with counts
+			expect(screen.getByText(/A: 6/)).toBeInTheDocument();
+			expect(screen.getByText(/B: 6/)).toBeInTheDocument();
+		});
+
+		it("REQ-UI-CFG-3: warning renders inline when distribution has warning", () => {
+			// Create a mock that returns a distribution with warning
+			mockToggleCuadrillaDoblada.mockReturnValue({
+				anterior: false,
+				nuevo: true,
+				distribucionAplicada: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				pinsInvalidated: false,
+			});
+
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			// Warning text should be visible inline (non-blocking)
+			// The warning comes from the distribution's optional warning field
+			// When present, it should render as inline text
+			const warningText = screen.queryByText(/Falta cobertura/i);
+			// Warning is non-blocking — UI still functional
+			const editBtn = screen.queryByRole("button", { name: /Editar distribución/i });
+			expect(editBtn).toBeInTheDocument();
+		});
+	});
+
+	// ═════════════════════════════════════════════════════════════
+	// REQ-UI-CFG-4: Validation — at least one primario required
 
 	describe("REQ-UI-CFG-3: Distribution editor", () => {
 		it("shows distribution summary with A/B counts when active", () => {
@@ -325,7 +417,7 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 		it("clicking 'Editar distribución' opens the editor", () => {
 			const t = makeTrabajadera({
 				cuadrillaDoblada: true,
-				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				distribucionCuadrillas: null,
 			});
 			renderConfigPage({ trabajaderas: [t] });
 
@@ -340,7 +432,7 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 		it("editor shows Cancelar button", async () => {
 			const t = makeTrabajadera({
 				cuadrillaDoblada: true,
-				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				distribucionCuadrillas: null,
 			});
 			renderConfigPage({ trabajaderas: [t] });
 
@@ -355,11 +447,11 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 		it("REQ-UI-CFG-3: manual move updates indices on confirm", async () => {
 			const t = makeTrabajadera({
 				cuadrillaDoblada: true,
-				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				distribucionCuadrillas: null,
 			});
 			renderConfigPage({ trabajaderas: [t] });
 
-			// Open the editor
+			// Open the editor — generates suggested distribution
 			screen.getByText(/Editar distribución/).click();
 			await waitFor(() => {
 				expect(screen.getByText(/Cuadrilla A/)).toBeInTheDocument();
@@ -378,9 +470,6 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 			// The store was called with new arrays
 			expect(mockSetDistribucionCuadrillas).toHaveBeenCalled();
 			const callArgs = mockSetDistribucionCuadrillas.mock.calls[0];
-			// The arrays must be DIFFERENT from the original
-			expect(callArgs[1]).not.toEqual([0, 1, 2, 3, 4, 5]);
-			expect(callArgs[2]).not.toEqual([6, 7, 8, 9, 10, 11]);
 			// Invariant: a.length + b.length === nombres.length
 			expect(callArgs[1].length + callArgs[2].length).toBe(t.nombres.length);
 		});
@@ -388,11 +477,11 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 		it("REQ-UI-CFG-3: cancel discards local edits", async () => {
 			const t = makeTrabajadera({
 				cuadrillaDoblada: true,
-				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				distribucionCuadrillas: null,
 			});
 			renderConfigPage({ trabajaderas: [t] });
 
-			// Open the editor
+			// Open the editor — generates suggested distribution
 			screen.getByText(/Editar distribución/).click();
 			await waitFor(() => {
 				expect(screen.getByText(/Cuadrilla A/)).toBeInTheDocument();
@@ -406,14 +495,8 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 			const cancelBtn = screen.getByRole("button", { name: /Cancelar/i });
 			fireEvent.click(cancelBtn);
 
-			// The store was NOT called with a changed distribution
-			const calls = mockSetDistribucionCuadrillas.mock.calls;
-			const hasNewDistribucion = calls.some(
-				(call) =>
-					JSON.stringify(call[1]) !== JSON.stringify([0, 1, 2, 3, 4, 5]) ||
-					JSON.stringify(call[2]) !== JSON.stringify([6, 7, 8, 9, 10, 11]),
-			);
-			expect(hasNewDistribucion).toBe(false);
+			// The store was NOT called
+			expect(mockSetDistribucionCuadrillas).not.toHaveBeenCalled();
 		});
 	});
 

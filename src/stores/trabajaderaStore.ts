@@ -6,7 +6,7 @@
 
 import { create } from 'zustand'
 import { defaultRoles } from '@/lib/roles'
-import { tramosOptimos, aplicarSugerencias, generarSugerencias, sugerirDistribucion } from '@/lib/algoritmos'
+import { tramosOptimos, aplicarSugerencias, generarSugerencias, sugerirDistribucion, tieneRolesAsignados, sugerirDistribucionIndex } from '@/lib/algoritmos'
 import type { DatosPerfil, RolCode, Trabajadera, TramoTipo } from '@/lib/types'
 import type { SugerenciaRes } from '@/lib/algoritmos'
 
@@ -386,7 +386,7 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
           if (!t.tramosTipo) {
             t.tramosTipo = Array(t.tramos.length).fill('primario')
           }
-          const dist = sugerirDistribucion(t.nombres)
+          const dist = tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucionIndex(t.nombres)
           const a = dist.a.map((name) => t.nombres.indexOf(name))
           const b = dist.b.map((name) => t.nombres.indexOf(name))
           t.distribucionCuadrillas = { a, b }
