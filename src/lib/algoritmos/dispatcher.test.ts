@@ -384,4 +384,35 @@ describe("dispatchSimulacion (M4)", () => {
 			spy.mockRestore();
 		}
 	});
+
+	// ══════════════════════════════════════════════════════════════
+	// v1.2.93 #2: dispatcher debe surfacing
+	// CuadrillaDobladaSubAnchoPostBajasError con el mismo shape de
+	// error que el resto (no throw, sino { error: msg }).
+	// ══════════════════════════════════════════════════════════════
+
+	it("cuadrilla doblada con sub-ancho post-bajas: devuelve error, no throw", () => {
+		const t = makeCuadrillaDoblada();
+		// 12 costaleros, 6/6. Bajas: [7, 8] (c8, c9 en B → B queda 4).
+		t.nombres = Array.from({ length: 12 }, (_, i) => `c${i + 1}`);
+		t.roles = Array.from({ length: 12 }, () => ({ pri: "COR" as const, sec: "FIJ_I" as const }));
+		t.tramos = ["T1", "T2"];
+		t.tramosTipo = ["primario", "primario"];
+		t.distribucionCuadrillas = { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] };
+		t.bajas = [7, 8];
+		let thrown: unknown = null;
+		let result: ReturnType<typeof dispatchSimulacion> | null = null;
+		try {
+			result = dispatchSimulacion(t);
+		} catch (e) {
+			thrown = e;
+		}
+		expect(thrown).toBeNull();
+		expect(result).not.toBeNull();
+		expect(result!.error).toBeDefined();
+		expect(result!.error).toMatch(/baja/i);
+		expect(result!.error).toMatch(/B/);
+		expect(result!.error).toMatch(/4/);
+		expect(result!.plan).toEqual([]);
+	});
 });

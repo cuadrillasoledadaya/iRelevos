@@ -10,6 +10,7 @@ import {
 	CuadrillaDobladaSinPrimarioError,
 	CuadrillaDobladaSinDisponibleError,
 	CuadrillaDobladaDistribucionInvalidaError,
+	UMBRAL_DOBLADO,
 } from "./cuadrillaDoblada";
 
 export function objSalidas(
@@ -65,7 +66,7 @@ export function calcularCiclo(t: Trabajadera): {
 	const salidas = t.salidas ?? 2;
 
 	// Cuadrilla doblada path — three-way dispatch
-	if (t.cuadrillaDoblada === true && total >= 10) {
+	if (t.cuadrillaDoblada === true && total >= UMBRAL_DOBLADO) {
 	// Per-tramo dispatch: tramosTipo present
 			if (t.tramosTipo && t.tramosTipo.length > 0) {
 				try {

@@ -5,6 +5,15 @@
 import type { Trabajadera, TramoSlot, TramoTipo } from "../types";
 
 export const ANCHO_TRABAJADERA = 5
+/**
+ * v1.2.93 #1: número mínimo de costaleros para que tenga sentido simular
+ * una cuadrilla doblada. Equivale a 2 * ANCHO_TRABAJADERA — 2 costaleros
+ * por puesto (uno cargando + uno en reserva en la otra cuadrilla),
+ * ANCHO_TRABAJADERA costaleros por cuadrilla. Antes este valor (10)
+ * vivía como literal en 3 call-sites (cuadrillaDobladaATramoSlots,
+ * dispatchSimulacion, calcularCiclo), con riesgo de drift si alguna vez
+ * se cambiaba ANCHO. Ahora se calcula y se exporta como constante.
+ */
 export const UMBRAL_DOBLADO = 2 * ANCHO_TRABAJADERA
 
 /** Thrown when cuadrilla doblada is active but no tramo is marked as primario. */
@@ -65,6 +74,44 @@ export class CuadrillaDobladaDistribucionInvalidaError extends Error {
       `Corregí la distribución antes de calcular el plan.`,
     )
     this.name = 'CuadrillaDobladaDistribucionInvalidaError'
+  }
+}
+
+/**
+ * v1.2.93 #2: Thrown when the `bajas` filter reduces one of the
+ * cuadrillas below `anchoRequerido` (ANCHO_TRABAJADERA). The
+ * distribution itself was valid pre-bajas, so the old
+ * `CuadrillaDobladaDistribucionInvalidaError` doesn't fire — but
+ * filtering by `t.bajas` (B1) can leave a cuadrilla with fewer
+ * members than its slot requires. This error is distinct from
+ * "distribucionCuadrillas is invalid" because the problem is the
+ * COMBINATION of distribution + bajas, not the distribution alone.
+ *
+ * Carries context for actionable UI messages: which cuadrilla
+ * quedó corta, how many active members it has, the required
+ * minimum, and the names of the costaleros that were filtered out
+ * (so the capataz can see exactly which baja caused the issue).
+ *
+ * The dispatcher's catch-all converts it to the same
+ * `{ error: msg }` shape as the rest.
+ */
+export class CuadrillaDobladaSubAnchoPostBajasError extends Error {
+  constructor(
+    public readonly cuadrilla: CuadrillaId,
+    public readonly miembrosActivos: number,
+    public readonly anchoRequerido: number,
+    public readonly bajasAplicadas: string[],
+  ) {
+    const nombresBajas = bajasAplicadas.length > 0
+      ? bajasAplicadas.join(", ")
+      : "(ninguna)"
+    super(
+      `Distribución inválida post-bajas: la cuadrilla ${cuadrilla} quedó con ` +
+      `${miembrosActivos} miembros activos (mínimo ${anchoRequerido}). ` +
+      `Baja(s) aplicada(s): ${nombresBajas}. ` +
+      `Corregí la distribución o agregá más costaleros antes de calcular el plan.`,
+    )
+    this.name = 'CuadrillaDobladaSubAnchoPostBajasError'
   }
 }
 
@@ -464,7 +511,7 @@ export function cuadrillaDobladaATramoSlots(
 	t: Trabajadera,
 	distribucion?: Distribucion,
 ): TramoSlot[] {
-	if (t.nombres.length < 10) return [];
+	if (t.nombres.length < UMBRAL_DOBLADO) return [];
 
 	// v1.2.92 #3 (defense at the leaf): validate distribucionCuadrillas
 	// indices early. Without this, an out-of-range index (e.g. 99)
@@ -480,14 +527,49 @@ export function cuadrillaDobladaATramoSlots(
 
 	// If no distribution provided, try to build one from t.distribucionCuadrillas (indices)
 	let dist = distribucion;
+	// v1.2.93 #2 + #7: nombresActivos se usa para alinear `dist` (filtrado)
+	// con la lista de costaleros que pasamos a `simularCicloCompleto` (que
+	// exige `suma(dist) === length(costaleros)`). También es el set del
+	// que `simularCicloCompleto` deriva los relevos. Filtra `undefined`
+	// (defense in depth — ver #7 en simularCicloConTipos).
+	const bajas = t.bajas ?? [];
+	const nombresActivos = (bajas.length > 0
+		? t.nombres.filter((_, i) => !bajas.includes(i))
+		: t.nombres
+	).filter((name): name is string => name !== undefined);
 	if (!dist && t.distribucionCuadrillas) {
-		dist = {
-			a: t.distribucionCuadrillas.a.map((i) => t.nombres[i]),
-			b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]),
-		};
+		// v1.2.93 #2 + #7: legacy path antes NO filtraba bajas (era
+		// inconsistente con simularCicloConTipos). Ahora filtra y, si el
+		// filter deja una cuadrilla sub-ancho, lanza el mismo error
+		// tipado que el per-tramo path. También excluye `undefined` por
+		// nombre (defense in depth — ver #7 en simularCicloConTipos).
+		const filterBajas = (name: string | undefined): name is string =>
+			name !== undefined && !bajas.includes(t.nombres.indexOf(name));
+		const nombresBajas = bajas
+			.map((i) => t.nombres[i])
+			.filter((n): n is string => n !== undefined);
+		const nombresA = t.distribucionCuadrillas.a.map((i) => t.nombres[i]).filter(filterBajas);
+		const nombresB = t.distribucionCuadrillas.b.map((i) => t.nombres[i]).filter(filterBajas);
+		if (nombresA.length < ANCHO_TRABAJADERA) {
+			throw new CuadrillaDobladaSubAnchoPostBajasError(
+				"A",
+				nombresA.length,
+				ANCHO_TRABAJADERA,
+				nombresBajas,
+			);
+		}
+		if (nombresB.length < ANCHO_TRABAJADERA) {
+			throw new CuadrillaDobladaSubAnchoPostBajasError(
+				"B",
+				nombresB.length,
+				ANCHO_TRABAJADERA,
+				nombresBajas,
+			);
+		}
+		dist = { a: nombresA, b: nombresB };
 	}
 
-	const relevos = simularCicloCompleto(t.nombres, dist);
+	const relevos = simularCicloCompleto(nombresActivos, dist);
 	const slots: TramoSlot[] = [];
 
 	// Track cumulative cargando state across relevos
@@ -577,21 +659,51 @@ export function simularCicloConTipos(
 	// rotación. La distribución y la simulación solo usan los activos.
 	// Los nombres siguen siendo los mismos (subset de t.nombres), así que
 	// t.nombres.indexOf(name) en relevosATramoSlots sigue funcionando.
+	// v1.2.93 #7: el filter también descarta `undefined` (defense in depth
+	// — si la validación se bypasea y t.nombres[i] === undefined, no debe
+	// participar de la simulación). `agruparEnCuadrillas` exige
+	// suma(dist) === length(costaleros), así que ambos lados deben coincidir.
 	const bajas = t.bajas ?? [];
-	const nombresActivos = bajas.length > 0
+	const nombresActivos = (bajas.length > 0
 		? costaleros.filter((_, i) => !bajas.includes(i))
-		: costaleros;
+		: costaleros
+	).filter((name): name is string => name !== undefined);
+	// v1.2.93 #7: defense in depth — el filter descarta `undefined` por
+	// nombre (t.nombres.indexOf(undefined) === -1, bajas.includes(-1) ===
+	// false, así que el predicate clásico deja pasar undefined). El type
+	// guard explícito lo excluye. Validación previa (#3) bloquea
+	// out-of-range, pero defense in depth si esa validación se bypasea.
+	const filterBajas = (name: string | undefined): name is string =>
+		name !== undefined && !bajas.includes(t.nombres.indexOf(name));
+	const nombresBajas = bajas
+		.map((i) => t.nombres[i])
+		.filter((n): n is string => n !== undefined);
 	const distribucion = t.distribucionCuadrillas
 		? {
-				a: t.distribucionCuadrillas.a.map((i) => t.nombres[i]).filter((name) => !bajas.includes(t.nombres.indexOf(name))),
-				b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]).filter((name) => !bajas.includes(t.nombres.indexOf(name))),
+				a: t.distribucionCuadrillas.a.map((i) => t.nombres[i]).filter(filterBajas),
+				b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]).filter(filterBajas),
 			}
 		: undefined;
 	const dist = distribucion ?? sugerirDistribucion(nombresActivos)
 	const cuadrillas = agruparEnCuadrillas(nombresActivos, dist)
-	if (cuadrillas.a.miembros.length < ANCHO_TRABAJADERA || cuadrillas.b.miembros.length < ANCHO_TRABAJADERA) {
-		throw new Error(
-			`Para simular ciclo doblado, ambas cuadrillas deben tener al menos ${ANCHO_TRABAJADERA} miembros. A=${cuadrillas.a.miembros.length}, B=${cuadrillas.b.miembros.length}`,
+	// v1.2.93 #2: error tipado con contexto (cuadrilla, count, ANCHO,
+	// nombres de las bajas). El capataz puede ver exactamente cuál
+	// cuadrilla quedó corta y qué baja lo causó. El dispatcher's
+	// catch-all lo convierte al shape { error: msg } estándar.
+	if (cuadrillas.a.miembros.length < ANCHO_TRABAJADERA) {
+		throw new CuadrillaDobladaSubAnchoPostBajasError(
+			"A",
+			cuadrillas.a.miembros.length,
+			ANCHO_TRABAJADERA,
+			nombresBajas,
+		)
+	}
+	if (cuadrillas.b.miembros.length < ANCHO_TRABAJADERA) {
+		throw new CuadrillaDobladaSubAnchoPostBajasError(
+			"B",
+			cuadrillas.b.miembros.length,
+			ANCHO_TRABAJADERA,
+			nombresBajas,
 		)
 	}
 	const distCompleta: Distribucion = {

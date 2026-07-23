@@ -20,6 +20,7 @@ import {
 	validarDistribucionCuadrillas,
 	CuadrillaDobladaSinPrimarioError,
 	CuadrillaDobladaDistribucionInvalidaError,
+	CuadrillaDobladaSubAnchoPostBajasError,
 	type EstadoPlan,
 	type Distribucion,
 } from "./cuadrillaDoblada"
@@ -47,6 +48,12 @@ describe("cuadrillaDoblada", () => {
 		})
 		it("UMBRAL_DOBLADO es 10", () => {
 			expect(UMBRAL_DOBLADO).toBe(10)
+		})
+		// v1.2.93 #1: UMBRAL_DOBLADO = 2 * ANCHO_TRABAJADERA (relación invariante)
+		// Garantiza que si alguna vez se cambia ANCHO, el umbral escala
+		// automáticamente (sin drift en los 3 call-sites que lo usan).
+		it("UMBRAL_DOBLADO es 2 * ANCHO_TRABAJADERA (relación invariante)", () => {
+			expect(UMBRAL_DOBLADO).toBe(2 * ANCHO_TRABAJADERA)
 		})
 	})
 
@@ -1055,6 +1062,215 @@ describe("cuadrillaDoblada", () => {
 			expect(() => simularCicloConTipos(t, ["primario", "secundario"])).toThrow(
 				/disponibles|intermedio/i,
 			)
+		})
+	})
+
+	// ══════════════════════════════════════════════════════════════
+	// v1.2.93 #2 — CuadrillaDobladaSubAnchoPostBajasError
+	// El capataz necesita saber CUÁL cuadrilla quedó corta y POR QUÉ
+	// (qué bajas lo causaron). Antes el error era genérico:
+	//   "ambas cuadrillas deben tener al menos 5 miembros. A=5, B=4"
+	// — no decía qué baja dejó B en 4. Ahora: error tipado con contexto
+	// (cuadrilla, miembrosActivos, anchoRequerido, bajasAplicadas).
+	// ══════════════════════════════════════════════════════════════
+
+	describe("simularCicloConTipos — #2 CuadrillaDobladaSubAnchoPostBajasError", () => {
+		function makeTrab(
+			n: number,
+			overrides: Partial<Trabajadera> = {},
+		): Trabajadera {
+			return {
+				id: 1,
+				nombres: nombres(n),
+				roles: nombres(n).map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const })),
+				salidas: 2,
+				tramos: Array.from({ length: 3 }, (_, i) => `T${i + 1}`),
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+				...overrides,
+			}
+		}
+
+		it("lanza el nuevo error cuando B queda sub-ancho tras filter de bajas", () => {
+			// 12 costaleros, 6/6, ANCHO=5
+			// bajas: [7, 8] → c8 (idx 7) y c9 (idx 8) son baja, ambos en B
+			// Tras filter: A=6, B=4 (4 < 5) → throw
+			const t = makeTrab(12, {
+				tramos: ["T1", "T2"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+				bajas: [7, 8], // c8, c9 (en B)
+			})
+			expect(() => simularCicloConTipos(t, ["primario", "primario"])).toThrow(
+				CuadrillaDobladaSubAnchoPostBajasError,
+			)
+		})
+
+		it("lanza con context fields correctos: cuadrilla='B', miembrosActivos=4, anchoRequerido=5, bajasAplicadas=['c8','c9']", () => {
+			const t = makeTrab(12, {
+				tramos: ["T1", "T2"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+				bajas: [7, 8],
+			})
+			try {
+				simularCicloConTipos(t, ["primario", "primario"])
+				expect.fail("debería haber lanzado")
+			} catch (err) {
+				expect(err).toBeInstanceOf(CuadrillaDobladaSubAnchoPostBajasError)
+				const e = err as InstanceType<typeof CuadrillaDobladaSubAnchoPostBajasError>
+				expect(e.cuadrilla).toBe("B")
+				expect(e.miembrosActivos).toBe(4)
+				expect(e.anchoRequerido).toBe(ANCHO_TRABAJADERA)
+				expect(e.bajasAplicadas).toEqual(["c8", "c9"])
+				// Mensaje incluye cuadrilla, conteo, "baja" y nombres
+				expect(e.message).toMatch(/B/)
+				expect(e.message).toMatch(/4/)
+				expect(e.message).toMatch(/baja/i)
+				expect(e.message).toMatch(/c8/)
+				expect(e.message).toMatch(/c9/)
+			}
+		})
+
+		it("lanza con cuadrilla='A' cuando A queda sub-ancho (3 bajas en A)", () => {
+			// 12 costaleros, 6/6. Bajas: [1, 2, 3] (todos en A).
+			// A: 6 → 3, B: 6. A es sub-ancho.
+			const t = makeTrab(12, {
+				tramos: ["T1", "T2"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+				bajas: [1, 2, 3],
+			})
+			try {
+				simularCicloConTipos(t, ["primario", "primario"])
+				expect.fail("debería haber lanzado")
+			} catch (err) {
+				const e = err as InstanceType<typeof CuadrillaDobladaSubAnchoPostBajasError>
+				expect(e.cuadrilla).toBe("A")
+				expect(e.miembrosActivos).toBe(3)
+				expect(e.bajasAplicadas).toEqual(["c2", "c3", "c4"])
+			}
+		})
+
+		it("no lanza si las bajas no dejan ninguna cuadrilla sub-ancho (5 miembros en cada una)", () => {
+			// 12 costaleros, 6/6. Bajas: [1] (c2, en A). A: 6 → 5, B: 6. OK.
+			const t = makeTrab(12, {
+				tramos: ["T1", "T2"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+				bajas: [1],
+			})
+			const relevos = simularCicloConTipos(t, ["primario", "primario"])
+			expect(relevos).toHaveLength(2)
+		})
+	})
+
+	// ══════════════════════════════════════════════════════════════
+	// v1.2.93 #7 — defense in depth en el filter de bajas
+	// El filter `nombres.filter((name) => !bajas.includes(t.nombres.indexOf(name)))`
+	// deja pasar `undefined` porque `t.nombres.indexOf(undefined) === -1`
+	// y `bajas.includes(-1) === false`. Esto es latente (validación lo
+	// bloquea hoy), pero defense in depth. El test inyecta undefined en
+	// runtime bypaseando TS y confirma que el filter lo descarta y la
+	// simulación no incluye nombres undefined.
+	// ══════════════════════════════════════════════════════════════
+
+	describe("simularCicloConTipos — #7 defense in depth (filter excluye undefined)", () => {
+		function makeTrab(
+			n: number,
+			overrides: Partial<Trabajadera> = {},
+		): Trabajadera {
+			return {
+				id: 1,
+				nombres: nombres(n),
+				roles: nombres(n).map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const })),
+				salidas: 2,
+				tramos: Array.from({ length: 3 }, (_, i) => `T${i + 1}`),
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+				...overrides,
+			}
+		}
+
+		it("no crashea ni incluye undefined si t.nombres tiene un nombre inválido (bypassing validation)", () => {
+			// 14 costaleros, 7/7. Inyectar undefined en t.nombres[7] (en B).
+			// bajas: []. Filter (con fix) descarta undefined.
+			//   B post-filter: [c9, c10, c11, c12, c13, c14] (6 miembros válidos).
+			// Filter (sin fix) deja pasar undefined.
+			//   B post-filter: [undefined, c9, c10, c11, c12, c13, c14] (7 elementos con 1 undefined).
+			const t = makeTrab(14, {
+				tramos: ["T1", "T2"],
+				distribucionCuadrillas: { a: [0,1,2,3,4,5,6], b: [7,8,9,10,11,12,13] },
+				bajas: [],
+			})
+			// Inyectar undefined en runtime (bypassing TS): t.nombres[7] es undefined
+			;(t.nombres as unknown as (string | undefined)[])[7] = undefined
+			const relevos = simularCicloConTipos(t, ["primario", "primario"])
+			const allMembers = new Set<string | undefined>()
+			relevos.forEach(r => {
+				r.sale.forEach(n => allMembers.add(n))
+				r.entra.forEach(n => allMembers.add(n))
+			})
+			// Ningún relevo debe mencionar a c8 (que ahora es undefined) ni a undefined explícito
+			expect(allMembers.has(undefined)).toBe(false)
+		})
+	})
+
+	// ══════════════════════════════════════════════════════════════
+	// v1.2.93 #2 — cuadrillaDobladaATramoSlots (legacy path)
+	// El legacy path antes NO filtraba bajas (era inconsistente con el
+	// per-tramo path). Ahora también filtra y lanza el mismo error si
+	// el filter deja una cuadrilla sub-ancho.
+	// ══════════════════════════════════════════════════════════════
+
+	describe("cuadrillaDobladaATramoSlots — #2 sub-ancho post-bajas (legacy path)", () => {
+		function makeLegacy(n: number): Trabajadera {
+			return {
+				id: 1,
+				nombres: nombres(n),
+				roles: nombres(n).map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const })),
+				salidas: 1,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			}
+		}
+
+		it("lanza CuadrillaDobladaSubAnchoPostBajasError con cuadrilla B", () => {
+			const t = makeLegacy(12)
+			t.distribucionCuadrillas = { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] }
+			t.bajas = [7, 8] // c8, c9 en B → B queda con 4
+			try {
+				cuadrillaDobladaATramoSlots(t)
+				expect.fail("debería haber lanzado")
+			} catch (err) {
+				expect(err).toBeInstanceOf(CuadrillaDobladaSubAnchoPostBajasError)
+				const e = err as InstanceType<typeof CuadrillaDobladaSubAnchoPostBajasError>
+				expect(e.cuadrilla).toBe("B")
+				expect(e.miembrosActivos).toBe(4)
+			}
+		})
+
+		it("no lanza si las bajas no dejan ninguna cuadrilla sub-ancho", () => {
+			const t = makeLegacy(12)
+			t.distribucionCuadrillas = { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] }
+			t.bajas = [1] // c2 en A → A queda 5, B 6 → OK
+			const slots = cuadrillaDobladaATramoSlots(t)
+			expect(slots.length).toBeGreaterThan(0)
 		})
 	})
 

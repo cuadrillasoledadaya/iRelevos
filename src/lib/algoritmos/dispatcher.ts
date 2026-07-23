@@ -5,7 +5,7 @@
 import type { Analisis, Trabajadera, TramoSlot } from "../types";
 import { calcularCiclo, analizar } from "./rotacion";
 import { completarAuto } from "./pinned";
-import { validarDistribucionCuadrillas } from "./cuadrillaDoblada";
+import { validarDistribucionCuadrillas, UMBRAL_DOBLADO } from "./cuadrillaDoblada";
 
 /**
  * Resultado unificado de la simulación de una trabajadera. Tanto el
@@ -78,7 +78,7 @@ function buildErrorResultado(msg: string): ResultadoSimulacion {
  */
 export function dispatchSimulacion(t: Trabajadera): ResultadoSimulacion {
 	try {
-		if (t.cuadrillaDoblada === true && t.nombres.length >= 10) {
+		if (t.cuadrillaDoblada === true && t.nombres.length >= UMBRAL_DOBLADO) {
 			// v1.2.92 #3: validate distribucionCuadrillas BEFORE dispatching.
 			// The legacy path (tramosTipo absent → cuadrillaDobladaATramoSlots)
 			// also validates at the leaf (defense in depth), but doing it

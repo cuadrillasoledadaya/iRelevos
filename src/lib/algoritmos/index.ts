@@ -57,6 +57,7 @@ export {
 	CuadrillaDobladaSinPrimarioError,
 	CuadrillaDobladaSinDisponibleError,
 	CuadrillaDobladaDistribucionInvalidaError,
+	CuadrillaDobladaSubAnchoPostBajasError,
 } from "./cuadrillaDoblada";
 export type { Distribucion, Relevo } from "./cuadrillaDoblada";
 export type { TramoTipo } from "../types";
