@@ -91,6 +91,38 @@ describe("trabajaderaStore cuadrilla doblada", () => {
     });
   });
 
+  describe("REQ-MT-8: fallback when roles missing", () => {
+    it("falls back to index-based path when t.roles is undefined (legacy snapshot)", () => {
+      // Simulate a legacy Trabajadera without roles
+      datos.trabajaderas[0].roles = undefined as any;
+
+      const result = trabajaderaStore.getState().toggleCuadrillaDoblada(1);
+
+      // Should NOT throw — falls back to index-based distribution
+      expect(result.anterior).toBe(false);
+      expect(result.nuevo).toBe(true);
+      expect(result.distribucionAplicada).not.toBeNull();
+      expect(result.distribucionAplicada!.a.length).toBe(6);
+      expect(result.distribucionAplicada!.b.length).toBe(6);
+
+      const t = datos.trabajaderas[0];
+      expect(t.cuadrillaDoblada).toBe(true);
+      expect(t.distribucionCuadrillas).not.toBeNull();
+    });
+
+    it("falls back to index-based path when t.roles is empty array", () => {
+      // Empty roles array — length mismatch (0 !== 12)
+      datos.trabajaderas[0].roles = [];
+
+      const result = trabajaderaStore.getState().toggleCuadrillaDoblada(1);
+
+      // Should NOT throw — falls back to index-based distribution
+      expect(result.nuevo).toBe(true);
+      expect(result.distribucionAplicada).not.toBeNull();
+      expect(result.distribucionAplicada!.a.length + result.distribucionAplicada!.b.length).toBe(12);
+    });
+  });
+
   describe("setDistribucionCuadrillas", () => {
     it("accepts valid distribution", () => {
       const a = [0, 1, 2, 3, 4, 5];
