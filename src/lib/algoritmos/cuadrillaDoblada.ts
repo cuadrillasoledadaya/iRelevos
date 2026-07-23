@@ -2,7 +2,8 @@
 // CUADRILLA DOBLADA — lógica para trabajaderas con 10+ costaleros
 // ══════════════════════════════════════════════════════════════════
 
-import type { Trabajadera, TramoSlot, TramoTipo } from "../types";
+import type { Trabajadera, TramoSlot, TramoTipo, RolCode } from "../types";
+import { estructuraPaso } from "../roles";
 
 export const ANCHO_TRABAJADERA = 5
 /**
@@ -115,6 +116,18 @@ export class CuadrillaDobladaSubAnchoPostBajasError extends Error {
   }
 }
 
+/**
+ * Thrown when `sugerirDistribucion(t)` receives malformed input:
+ * `t.roles` is undefined or `t.roles.length !== t.nombres.length`.
+ * Partial-but-valid role coverage is NOT an error — it produces a warning.
+ */
+export class CuadrillaDobladaRolesInsuficientesError extends Error {
+  constructor(public readonly motivo: string) {
+    super(`sugerirDistribucion: ${motivo}`)
+    this.name = 'CuadrillaDobladaRolesInsuficientesError'
+  }
+}
+
 export type CuadrillaId = "A" | "B"
 export type TipoRelevo = "principal" | "intermedio"
 
@@ -126,6 +139,8 @@ export interface Cuadrilla {
 export interface Distribucion {
 	a: string[]
 	b: string[]
+	/** Ephemeral warning for partial role coverage. Never persisted. */
+	warning?: string
 }
 
 export interface Relevo {
@@ -163,10 +178,106 @@ export function requiereDecisionDoblado(costaleros: string[], ancho = ANCHO_TRAB
 }
 
 /**
- * Sugiere una distribución equitativa. A lleva el excedente si impar.
- * Ej: 13 costaleros → a=7, b=6.
+ * Returns true when `t.roles` is present and has the same length as `t.nombres`.
+ * Used as a guard before calling the role-aware `sugerirDistribucion(t)`.
  */
-export function sugerirDistribucion(costaleros: string[]): Distribucion {
+export function tieneRolesAsignados(t: Trabajadera): boolean {
+	return !!t.roles && t.roles.length === t.nombres.length
+}
+
+/**
+ * Role-aware distribution: greedy coverage pass over estructuraPaso targets,
+ * COR-only fallback for COR slot, sobrante to smaller squad, reorder by
+ * estructuraPaso (deterministic).
+ *
+ * Throws CuadrillaDobladaRolesInsuficientesError when t.roles is missing or
+ * length-mismatched. Partial-but-valid coverage returns a warning, not an error.
+ *
+ * Overload: accepts `string[]` for backward compatibility (legacy callers
+ * without a Trabajadera). Prefer `sugerirDistribucion(t)` when possible.
+ */
+export function sugerirDistribucion(t: Trabajadera): Distribucion
+export function sugerirDistribucion(costaleros: string[]): Distribucion
+export function sugerirDistribucion(input: Trabajadera | string[]): Distribucion {
+	// Legacy overload: string[] → index-based split
+	if (Array.isArray(input)) {
+		return sugerirDistribucionLegacy(input)
+	}
+
+	const t = input
+	// 1. GUARD: malformed input throws. Partial-but-valid does NOT.
+	if (!t.roles || t.roles.length !== t.nombres.length) {
+		throw new CuadrillaDobladaRolesInsuficientesError(
+			`roles.length=${t.roles?.length ?? 0}, nombres.length=${t.nombres.length}`,
+		)
+	}
+
+	// 2. Build pool as (name, pri) tuples.
+	const pool = t.nombres.map((name, i) => ({ name, pri: t.roles![i].pri }))
+
+	// 3. Coverage pass: for each target role (in estructuraPaso order),
+	//    consume the first eligible non-COR-only costalero with matching pri.
+	const targets = estructuraPaso(t.id)
+	const a: { name: string; pri: RolCode }[] = []
+	const b: { name: string; pri: RolCode }[] = []
+	const taken = new Set<string>()
+	const missing: RolCode[] = []
+
+	for (const target of targets) {
+		for (const squad of [a, b] as const) {
+			const idx = pool.findIndex(
+				(m) => !taken.has(m.name) && m.pri === target,
+			)
+			if (idx >= 0) {
+				squad.push(pool[idx])
+				taken.add(pool[idx].name)
+			} else if (target === "COR") {
+				// COR fallback: consume any available costalero
+				const corIdx = pool.findIndex((m) => !taken.has(m.name))
+				if (corIdx >= 0) {
+					squad.push(pool[corIdx])
+					taken.add(pool[corIdx].name)
+				}
+			}
+		}
+		// Track missing roles
+		const aHas = a.some((m) => m.pri === target)
+		const bHas = b.some((m) => m.pri === target)
+		if (!aHas || !bHas) {
+			if (!missing.includes(target)) missing.push(target)
+		}
+	}
+
+	// 4. Sobrante: fill smaller squad first (deterministic).
+	for (const m of pool) {
+		if (taken.has(m.name)) continue
+		if (a.length <= b.length) a.push(m)
+		else b.push(m)
+	}
+
+	// 5. Reorder by estructuraPaso — DETERMINISTIC.
+	const orderIdx = (pri: RolCode) => targets.indexOf(pri)
+	const sortByRol = (sq: typeof a) =>
+		[...sq].sort((x, y) => orderIdx(x.pri) - orderIdx(y.pri))
+	const aSorted = sortByRol(a)
+	const bSorted = sortByRol(b)
+
+	// 6. Optional warning. NEVER throw on partial coverage.
+	const result: Distribucion = {
+		a: aSorted.map((m) => m.name),
+		b: bSorted.map((m) => m.name),
+	}
+	if (missing.length > 0) {
+		result.warning = `Falta cobertura: ${missing.join(", ")}`
+	}
+	return result
+}
+
+/**
+ * Legacy index-based distribution (internal fallback when no Trabajadera
+ * with roles is available). Not exported — callers should pass t instead.
+ */
+function sugerirDistribucionLegacy(costaleros: string[]): Distribucion {
 	const total = costaleros.length
 	const mitad = Math.floor(total / 2)
 	const a = costaleros.slice(0, mitad + (total % 2))
@@ -176,13 +287,15 @@ export function sugerirDistribucion(costaleros: string[]): Distribucion {
 
 /**
  * Agrupa costaleros en cuadrillas. Si no se pasa distribución, usa la sugerida.
+ * When `t` is provided with valid roles, uses role-aware distribution.
  */
 export function agruparEnCuadrillas(
 	costaleros: string[],
 	distribucion?: Distribucion,
 	ancho = ANCHO_TRABAJADERA,
+	t?: Trabajadera,
 ): { a: Cuadrilla; b: Cuadrilla } {
-	const dist = distribucion ?? sugerirDistribucion(costaleros)
+	const dist = distribucion ?? (t && tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucion(costaleros))
 	const suma = dist.a.length + dist.b.length
 	if (suma !== costaleros.length) {
 		throw new Error(
@@ -452,9 +565,10 @@ export function simularCicloCompleto(
 	costaleros: string[],
 	distribucion?: Distribucion,
 	ancho = ANCHO_TRABAJADERA,
+	t?: Trabajadera,
 ): Relevo[] {
-	const dist = distribucion ?? sugerirDistribucion(costaleros)
-	const cuadrillas = agruparEnCuadrillas(costaleros, dist, ancho)
+	const dist = distribucion ?? (t && tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucion(costaleros))
+	const cuadrillas = agruparEnCuadrillas(costaleros, dist, ancho, t)
 	if (cuadrillas.a.miembros.length < ancho || cuadrillas.b.miembros.length < ancho) {
 		throw new Error(
 			`Para simular ciclo doblado, ambas cuadrillas deben tener al menos ${ancho} miembros. A=${cuadrillas.a.miembros.length}, B=${cuadrillas.b.miembros.length}`,
@@ -684,8 +798,8 @@ export function simularCicloConTipos(
 				b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]).filter(filterBajas),
 			}
 		: undefined;
-	const dist = distribucion ?? sugerirDistribucion(nombresActivos)
-	const cuadrillas = agruparEnCuadrillas(nombresActivos, dist)
+	const dist = distribucion ?? (tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucion(nombresActivos))
+	const cuadrillas = agruparEnCuadrillas(nombresActivos, dist, ANCHO_TRABAJADERA, t)
 	// v1.2.93 #2: error tipado con contexto (cuadrilla, count, ANCHO,
 	// nombres de las bajas). El capataz puede ver exactamente cuál
 	// cuadrilla quedó corta y qué baja lo causó. El dispatcher's
