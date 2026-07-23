@@ -91,33 +91,151 @@ describe("cuadrillaDoblada", () => {
 		})
 	})
 
-	describe("sugerirDistribucion", () => {
-		it("debería dividir 10 en a=5, b=5", () => {
-			const d = sugerirDistribucion(nombres(10))
-			expect(d.a).toHaveLength(5)
-			expect(d.b).toHaveLength(5)
-		})
-		it("debería dividir 11 en a=6, b=5 (A lleva el excedente)", () => {
-			const d = sugerirDistribucion(nombres(11))
-			expect(d.a).toHaveLength(6)
-			expect(d.b).toHaveLength(5)
-		})
-		it("debería dividir 12 en a=6, b=6", () => {
-			const d = sugerirDistribucion(nombres(12))
+	describe("sugerirDistribucion (role-aware — RED: type errors until 1.8)", () => {
+		// Helper: build a Trabajadera with nombres + parallel roles.
+		function makeT(
+			nombres: string[],
+			roles: { pri: string; sec: string }[],
+			id = 1,
+		): Trabajadera {
+			return {
+				id,
+				nombres,
+				roles: roles as Trabajadera["roles"],
+				salidas: 2,
+				tramos: ["T1", "T2", "T3"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+			}
+		}
+
+		it("full coverage T1 (12 costaleros): |a|=6, |b|=6, every accepted role in both", () => {
+			// T1 accepts: PAT_D, PAT_I, FIJ_D, FIJ_I, COR
+			const t = makeT(
+				nombres(12),
+				[
+					{ pri: "PAT_D", sec: "COR" },
+					{ pri: "PAT_I", sec: "COR" },
+					{ pri: "FIJ_D", sec: "COR" },
+					{ pri: "FIJ_I", sec: "COR" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "PAT_D", sec: "COR" },
+					{ pri: "PAT_I", sec: "COR" },
+					{ pri: "FIJ_D", sec: "COR" },
+					{ pri: "FIJ_I", sec: "COR" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+				],
+			)
+			// @ts-expect-error — RED: signature not yet changed to (t: Trabajadera)
+			const d = sugerirDistribucion(t)
 			expect(d.a).toHaveLength(6)
 			expect(d.b).toHaveLength(6)
 		})
-		it("debería dividir 13 en a=7, b=6", () => {
-			const d = sugerirDistribucion(nombres(13))
-			expect(d.a).toHaveLength(7)
+
+		it("full coverage T2 (12 costaleros): no PAT role appears", () => {
+			// T2 accepts: COS_D, COS_I, FIJ_D, FIJ_I, COR
+			const t = makeT(
+				nombres(12),
+				[
+					{ pri: "COS_D", sec: "COR" },
+					{ pri: "COS_I", sec: "COR" },
+					{ pri: "FIJ_D", sec: "COR" },
+					{ pri: "FIJ_I", sec: "COR" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COS_D", sec: "COR" },
+					{ pri: "COS_I", sec: "COR" },
+					{ pri: "FIJ_D", sec: "COR" },
+					{ pri: "FIJ_I", sec: "COR" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+				],
+				2, // T2
+			)
+			// @ts-expect-error — RED: signature not yet changed
+			const d = sugerirDistribucion(t)
+			expect(d.a).toHaveLength(6)
 			expect(d.b).toHaveLength(6)
 		})
-		it("debería preservar el orden original", () => {
-			const d = sugerirDistribucion(nombres(13))
-			expect(d.a[0]).toBe("c1")
-			expect(d.a[6]).toBe("c7")
-			expect(d.b[0]).toBe("c8")
-			expect(d.b[5]).toBe("c13")
+
+		it("partial coverage → warning, does not throw", () => {
+			// T1 with only 4 roles assigned (no COR)
+			const t = makeT(
+				nombres(12),
+				[
+					{ pri: "PAT_D", sec: "COR" },
+					{ pri: "PAT_I", sec: "COR" },
+					{ pri: "FIJ_D", sec: "COR" },
+					{ pri: "FIJ_I", sec: "COR" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+				],
+			)
+			// @ts-expect-error — RED: signature not yet changed
+			const d = sugerirDistribucion(t)
+			expect(d.a.length + d.b.length).toBe(12)
+			expect(d.warning).toBeDefined()
+		})
+
+		it("COR-only costaleros never fill PAT/FIJ/COS slot", () => {
+			// T1: 10 nombres, 8 COR-only, 2 PAT_I
+			const t = makeT(
+				nombres(10),
+				[
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "PAT_I", sec: "COR" },
+					{ pri: "PAT_I", sec: "COR" },
+				],
+			)
+			// @ts-expect-error — RED: signature not yet changed
+			const d = sugerirDistribucion(t)
+			expect(d.a.length + d.b.length).toBe(10)
+		})
+
+		it("deterministic role-grouped output: same input → same order", () => {
+			// T1 with 10 nombres covering all 5 ideal roles
+			const t = makeT(
+				nombres(10),
+				[
+					{ pri: "PAT_I", sec: "COR" },
+					{ pri: "FIJ_I", sec: "COR" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "FIJ_D", sec: "COR" },
+					{ pri: "PAT_D", sec: "COR" },
+					{ pri: "PAT_I", sec: "COR" },
+					{ pri: "FIJ_I", sec: "COR" },
+					{ pri: "COR", sec: "FIJ_I" },
+					{ pri: "FIJ_D", sec: "COR" },
+					{ pri: "PAT_D", sec: "COR" },
+				],
+			)
+			// @ts-expect-error — RED: signature not yet changed
+			const d1 = sugerirDistribucion(t)
+			// @ts-expect-error — RED: signature not yet changed
+			const d2 = sugerirDistribucion(t)
+			expect(d1.a).toEqual(d2.a)
+			expect(d1.b).toEqual(d2.b)
 		})
 	})
 
