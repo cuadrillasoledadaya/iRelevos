@@ -48,6 +48,7 @@ export {
 	puedeDoblarse,
 	requiereDecisionDoblado,
 	sugerirDistribucion,
+	sugerirDistribucionIndex,
 	simularCicloCompleto,
 	simularCicloConTipos,
 	agruparEnCuadrillas,

@@ -652,7 +652,7 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 		if (dist) {
 			setEditDist({ a: [...dist.a], b: [...dist.b] });
 		} else {
-			const suggested = sugerirDistribucion(t.nombres);
+			const suggested = sugerirDistribucion(t);
 			const a = suggested.a.map((name) => t.nombres.indexOf(name));
 			const b = suggested.b.map((name) => t.nombres.indexOf(name));
 			setEditDist({ a, b });

@@ -192,19 +192,8 @@ export function tieneRolesAsignados(t: Trabajadera): boolean {
  *
  * Throws CuadrillaDobladaRolesInsuficientesError when t.roles is missing or
  * length-mismatched. Partial-but-valid coverage returns a warning, not an error.
- *
- * Overload: accepts `string[]` for backward compatibility (legacy callers
- * without a Trabajadera). Prefer `sugerirDistribucion(t)` when possible.
  */
-export function sugerirDistribucion(t: Trabajadera): Distribucion
-export function sugerirDistribucion(costaleros: string[]): Distribucion
-export function sugerirDistribucion(input: Trabajadera | string[]): Distribucion {
-	// Legacy overload: string[] → index-based split
-	if (Array.isArray(input)) {
-		return sugerirDistribucionLegacy(input)
-	}
-
-	const t = input
+export function sugerirDistribucion(t: Trabajadera): Distribucion {
 	// 1. GUARD: malformed input throws. Partial-but-valid does NOT.
 	if (!t.roles || t.roles.length !== t.nombres.length) {
 		throw new CuadrillaDobladaRolesInsuficientesError(
@@ -274,10 +263,10 @@ export function sugerirDistribucion(input: Trabajadera | string[]): Distribucion
 }
 
 /**
- * Legacy index-based distribution (internal fallback when no Trabajadera
- * with roles is available). Not exported — callers should pass t instead.
+ * Internal index-based fallback when `t.roles` is missing.
+ * Exported for caller-guard pattern at external call sites (trabajaderaStore).
  */
-function sugerirDistribucionLegacy(costaleros: string[]): Distribucion {
+export function sugerirDistribucionIndex(costaleros: string[]): Distribucion {
 	const total = costaleros.length
 	const mitad = Math.floor(total / 2)
 	const a = costaleros.slice(0, mitad + (total % 2))
@@ -295,7 +284,7 @@ export function agruparEnCuadrillas(
 	ancho = ANCHO_TRABAJADERA,
 	t?: Trabajadera,
 ): { a: Cuadrilla; b: Cuadrilla } {
-	const dist = distribucion ?? (t && tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucion(costaleros))
+	const dist = distribucion ?? (t && tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucionIndex(costaleros))
 	const suma = dist.a.length + dist.b.length
 	if (suma !== costaleros.length) {
 		throw new Error(
@@ -567,7 +556,7 @@ export function simularCicloCompleto(
 	ancho = ANCHO_TRABAJADERA,
 	t?: Trabajadera,
 ): Relevo[] {
-	const dist = distribucion ?? (t && tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucion(costaleros))
+	const dist = distribucion ?? (t && tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucionIndex(costaleros))
 	const cuadrillas = agruparEnCuadrillas(costaleros, dist, ancho, t)
 	if (cuadrillas.a.miembros.length < ancho || cuadrillas.b.miembros.length < ancho) {
 		throw new Error(
@@ -798,7 +787,7 @@ export function simularCicloConTipos(
 				b: t.distribucionCuadrillas.b.map((i) => t.nombres[i]).filter(filterBajas),
 			}
 		: undefined;
-	const dist = distribucion ?? (tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucion(nombresActivos))
+	const dist = distribucion ?? (tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucionIndex(nombresActivos))
 	const cuadrillas = agruparEnCuadrillas(nombresActivos, dist, ANCHO_TRABAJADERA, t)
 	// v1.2.93 #2: error tipado con contexto (cuadrilla, count, ANCHO,
 	// nombres de las bajas). El capataz puede ver exactamente cuál
