@@ -122,7 +122,7 @@ describe("GET /api/import-costaleros", () => {
 		const json = await res.json();
 
 		expect(res.status).toBe(500);
-		expect(json.error).toBe("Error interno. Intentá más tarde.");
+		expect(json.error).toBe("Error inesperado: Error interno. Intentá más tarde.");
 
 		process.env.ICUADRILLA_API_URL = originalUrl;
 		process.env.ICUADRILLA_API_TOKEN = originalToken;
@@ -283,7 +283,7 @@ describe("POST /api/import-costaleros", () => {
 		const json = await res.json();
 
 		expect(res.status).toBe(500);
-		expect(json.error).toBe("Error interno. Intentá más tarde.");
+		expect(json.error).toBe("Error inesperado: Error al obtener datos externos.");
 	});
 
 	it("should return generic error when RPC fails", async () => {
@@ -323,7 +323,7 @@ describe("POST /api/import-costaleros", () => {
 		const json = await res.json();
 
 		expect(res.status).toBe(500);
-		expect(json.error).toBe("Error interno. Intentá más tarde.");
+		expect(json.error).toBe("Error al sincronizar el censo: DB transaction failed");
 	});
 
 	it("should perform full sync successfully", async () => {

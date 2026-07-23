@@ -263,9 +263,10 @@ export async function GET(request: Request) {
 				duration_ms: duration,
 			}),
 		);
+		const detail = err instanceof Error ? err.message : "Error desconocido";
 		return withCors(
 			jsonResponse(
-				{ error: "Error interno. Intentá más tarde." },
+				{ error: `Error inesperado: ${detail}` },
 				{ status: 500 },
 			),
 			request,
@@ -358,7 +359,9 @@ export async function POST(request: Request) {
 			);
 			return withCors(
 				jsonResponse(
-					{ error: "Error interno. Intentá más tarde." },
+					{
+						error: `Error al sincronizar el censo: ${error.message}`,
+					},
 					{ status: 500 },
 				),
 				request,
@@ -394,9 +397,10 @@ export async function POST(request: Request) {
 				duration_ms: duration,
 			}),
 		);
+		const detail = err instanceof Error ? err.message : "Error desconocido";
 		return withCors(
 			jsonResponse(
-				{ error: "Error interno. Intentá más tarde." },
+				{ error: `Error inesperado: ${detail}` },
 				{ status: 500 },
 			),
 			request,
