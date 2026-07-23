@@ -54,10 +54,12 @@ export {
 	validarDistribucionCuadrillas,
 	cuadrillaDobladaATramoSlots,
 	relevosATramoSlots,
+	tieneRolesAsignados,
 	CuadrillaDobladaSinPrimarioError,
 	CuadrillaDobladaSinDisponibleError,
 	CuadrillaDobladaDistribucionInvalidaError,
 	CuadrillaDobladaSubAnchoPostBajasError,
+	CuadrillaDobladaRolesInsuficientesError,
 } from "./cuadrillaDoblada";
 export type { Distribucion, Relevo } from "./cuadrillaDoblada";
 export type { TramoTipo } from "../types";
