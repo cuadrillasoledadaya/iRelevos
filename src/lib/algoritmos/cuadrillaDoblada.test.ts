@@ -136,7 +136,6 @@ describe("cuadrillaDoblada", () => {
 					{ pri: "COR", sec: "FIJ_I" },
 				],
 			)
-			// @ts-expect-error — RED: signature not yet changed to (t: Trabajadera)
 			const d = sugerirDistribucion(t)
 			expect(d.a).toHaveLength(6)
 			expect(d.b).toHaveLength(6)
@@ -162,7 +161,6 @@ describe("cuadrillaDoblada", () => {
 				],
 				2, // T2
 			)
-			// @ts-expect-error — RED: signature not yet changed
 			const d = sugerirDistribucion(t)
 			expect(d.a).toHaveLength(6)
 			expect(d.b).toHaveLength(6)
@@ -187,7 +185,6 @@ describe("cuadrillaDoblada", () => {
 					{ pri: "COR", sec: "FIJ_I" },
 				],
 			)
-			// @ts-expect-error — RED: signature not yet changed
 			const d = sugerirDistribucion(t)
 			expect(d.a.length + d.b.length).toBe(12)
 			expect(d.warning).toBeDefined()
@@ -210,7 +207,6 @@ describe("cuadrillaDoblada", () => {
 					{ pri: "PAT_I", sec: "COR" },
 				],
 			)
-			// @ts-expect-error — RED: signature not yet changed
 			const d = sugerirDistribucion(t)
 			expect(d.a.length + d.b.length).toBe(10)
 		})
@@ -232,9 +228,7 @@ describe("cuadrillaDoblada", () => {
 					{ pri: "PAT_D", sec: "COR" },
 				],
 			)
-			// @ts-expect-error — RED: signature not yet changed
 			const d1 = sugerirDistribucion(t)
-			// @ts-expect-error — RED: signature not yet changed
 			const d2 = sugerirDistribucion(t)
 			expect(d1.a).toEqual(d2.a)
 			expect(d1.b).toEqual(d2.b)
@@ -283,8 +277,7 @@ describe("cuadrillaDoblada", () => {
 					{ pri: "COR", sec: "FIJ_I" },
 				], // 10 roles, 12 nombres
 			)
-			// @ts-expect-error — RED: class and signature not yet implemented
-			expect(() => sugerirDistribucion(t)).toThrow("CuadrillaDobladaRolesInsuficientesError")
+			expect(() => sugerirDistribucion(t)).toThrow(CuadrillaDobladaRolesInsuficientesError)
 		})
 
 		it("partial coverage does NOT throw — returns warning", () => {
@@ -305,7 +298,6 @@ describe("cuadrillaDoblada", () => {
 					{ pri: "COR", sec: "FIJ_I" },
 				], // 12 roles, all COR except 4 — valid but partial
 			)
-			// @ts-expect-error — RED: signature not yet changed
 			const d = sugerirDistribucion(t)
 			expect(d.a.length + d.b.length).toBe(12)
 			expect(d.warning).toBeDefined()
@@ -406,7 +398,6 @@ describe("cuadrillaDoblada", () => {
 
 		it("agruparEnCuadrillas with t (valid roles) uses role-aware path", () => {
 			const t = makeT(nombres(12), Array(12).fill({ pri: "COR", sec: "FIJ_I" }))
-			// @ts-expect-error — RED: t param not yet added to agruparEnCuadrillas
 			const { a, b } = agruparEnCuadrillas(t.nombres, undefined, ANCHO_TRABAJADERA, t)
 			expect(a.miembros).toHaveLength(6)
 			expect(b.miembros).toHaveLength(6)
@@ -414,7 +405,6 @@ describe("cuadrillaDoblada", () => {
 
 		it("simularCicloCompleto with t (valid roles) uses role-aware path", () => {
 			const t = makeT(nombres(12), Array(12).fill({ pri: "COR", sec: "FIJ_I" }))
-			// @ts-expect-error — RED: t param not yet added to simularCicloCompleto
 			const relevos = simularCicloCompleto(t.nombres, undefined, ANCHO_TRABAJADERA, t)
 			expect(relevos.length).toBeGreaterThan(0)
 		})
