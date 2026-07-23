@@ -763,16 +763,36 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 								</span>
 							</button>
 						</div>
-						{t.cuadrillaDoblada && t.distribucionCuadrillas && (
+						{t.cuadrillaDoblada && (
 							<div className="mt2 text-[0.6rem] text-[var(--cre-o)]">
-								A: {t.distribucionCuadrillas.a.length} / B:{" "}
-								{t.distribucionCuadrillas.b.length}{" "}
-								<button
-									className="btn btn-ghost btn-xs ml1"
-									onClick={handleOpenEditor}
-								>
-									Editar distribución →
-								</button>
+								{t.distribucionCuadrillas ? (
+									<>
+										A: {t.distribucionCuadrillas.a.length} / B:{" "}
+										{t.distribucionCuadrillas.b.length}{" "}
+										<button
+											className="btn btn-ghost btn-xs ml1"
+											onClick={handleOpenEditor}
+											disabled
+										>
+											Editar distribución →
+										</button>
+										<button
+											className="btn btn-ghost btn-xs ml1 text-red-400"
+											onClick={() => {
+												setDistribucionCuadrillas(t.id, [], []);
+											}}
+										>
+											Limpiar distribución
+										</button>
+									</>
+								) : (
+									<button
+										className="btn btn-ghost btn-xs ml1"
+										onClick={handleOpenEditor}
+									>
+										Editar distribución →
+									</button>
+								)}
 							</div>
 						)}
 					</div>
