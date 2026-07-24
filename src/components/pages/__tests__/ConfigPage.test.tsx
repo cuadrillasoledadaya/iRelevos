@@ -373,28 +373,26 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 			expect(screen.getByText(/B: 6/)).toBeInTheDocument();
 		});
 
-		it("REQ-UI-CFG-3: warning renders inline when distribution has warning", () => {
-			// Create a mock that returns a distribution with warning
-			mockToggleCuadrillaDoblada.mockReturnValue({
-				anterior: false,
-				nuevo: true,
-				distribucionAplicada: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
-				pinsInvalidated: false,
-			});
-
+		it("REQ-UI-CFG-3: warning renders inline when distribution has warning", async () => {
+			// Trabajadera with all-COR roles → sugerirDistribucion produces partial-coverage warning
 			const t = makeTrabajadera({
 				cuadrillaDoblada: true,
-				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				distribucionCuadrillas: null, // No existing dist → triggers sugerirDistribucion
 			});
 			renderConfigPage({ trabajaderas: [t] });
 
-			// Warning text should be visible inline (non-blocking)
-			// The warning comes from the distribution's optional warning field
-			// When present, it should render as inline text
-			const warningText = screen.queryByText(/Falta cobertura/i);
-			// Warning is non-blocking — UI still functional
-			const editBtn = screen.queryByRole("button", { name: /Editar distribución/i });
-			expect(editBtn).toBeInTheDocument();
+			// Click "Editar distribución" → calls real sugerirDistribucion(t)
+			// All-COR roles → missing PAT_I, FIJ_I, etc. → warning text
+			const editBtn = screen.getByRole("button", { name: /Editar distribución/i });
+			fireEvent.click(editBtn);
+
+			// Warning MUST appear inline below the preview (non-blocking)
+			await waitFor(() => {
+				expect(screen.getByText(/Falta cobertura/i)).toBeInTheDocument();
+			});
+
+			// Confirm button still exists — warning does not block action
+			expect(screen.getByRole("button", { name: /Confirmar/i })).toBeInTheDocument();
 		});
 	});
 

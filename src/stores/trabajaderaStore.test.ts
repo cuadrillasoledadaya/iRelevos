@@ -147,6 +147,20 @@ describe("trabajaderaStore cuadrilla doblada", () => {
         trabajaderaStore.getState().setDistribucionCuadrillas(1, [0, 1, 2, 3, 4, 99], [5, 6, 7, 8, 9, 10]),
       ).toThrow(/fuera de rango/);
     });
+
+    it("REQ-UI-CFG-6: empty arrays ([], []) set distribution to null instead of throwing", () => {
+      // First set a valid distribution
+      const a = [0, 1, 2, 3, 4, 5];
+      const b = [6, 7, 8, 9, 10, 11];
+      trabajaderaStore.getState().setDistribucionCuadrillas(1, a, b);
+      const t = datos.trabajaderas[0];
+      expect(t.distribucionCuadrillas).toEqual({ a, b });
+
+      // Now clear with empty arrays — should NOT throw, should set to null
+      trabajaderaStore.getState().setDistribucionCuadrillas(1, [], []);
+      expect(t.distribucionCuadrillas).toBeNull();
+      expect(t.plan).toBeNull();
+    });
   });
 
   describe("setTipoTramo", () => {
