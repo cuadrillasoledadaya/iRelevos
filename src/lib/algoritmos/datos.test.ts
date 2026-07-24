@@ -396,5 +396,45 @@ describe("datos", () => {
 			const t = resultado.trabajaderas[0];
 			expect(t.tramosTipo).toEqual(["secundario", "primario", "secundario"]);
 		});
+
+		it("REQ-MT-7: ignores unknown warning key in distribucionCuadrillas", () => {
+			const datos = {
+				banco: [],
+				planes: [],
+				trabajaderas: [
+					{
+						id: 1,
+						nombres: ["A", "B", "C", "D", "E", "F"],
+						salidas: 2,
+						roles: [],
+						pinned: null,
+						bajas: [],
+						regla5costaleros: false,
+						puntuaciones: {},
+						boquilla: {},
+						tramosClaves: [],
+						tramos: ["T1", "T2", "T3"],
+						tramosTipo: ["primario", "primario", "primario"],
+						plan: null,
+						obj: null,
+						analisis: null,
+						cuadrillaDoblada: true,
+						distribucionCuadrillas: {
+							a: [0, 1, 2],
+							b: [3, 4, 5],
+							warning: "Falta cobertura: PAT_I", // should be ignored, not crash
+						},
+					},
+				],
+			};
+			const resultado = migrarDatos(datos as unknown as DatosPerfil);
+			const t = resultado.trabajaderas[0];
+			// Migration does NOT crash; distribucionCuadrillas passes through as-is
+			expect(t.distribucionCuadrillas).toEqual({
+				a: [0, 1, 2],
+				b: [3, 4, 5],
+				warning: "Falta cobertura: PAT_I",
+			});
+		});
 	});
 });

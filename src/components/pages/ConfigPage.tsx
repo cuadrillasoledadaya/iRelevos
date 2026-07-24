@@ -550,7 +550,7 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [planSel, setPlanSel] = useState("");
 	const [showEditor, setShowEditor] = useState(false);
-	const [editDist, setEditDist] = useState<{ a: number[]; b: number[] } | null>(null);
+	const [editDist, setEditDist] = useState<{ a: number[]; b: number[]; warning?: string } | null>(null);
 	const [allSecError, setAllSecError] = useState<string | null>(null);
 
 	const total = t.nombres.length;
@@ -655,7 +655,7 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 			const suggested = sugerirDistribucion(t);
 			const a = suggested.a.map((name) => t.nombres.indexOf(name));
 			const b = suggested.b.map((name) => t.nombres.indexOf(name));
-			setEditDist({ a, b });
+			setEditDist({ a, b, warning: suggested.warning });
 		}
 		setShowEditor(true);
 	}
@@ -985,6 +985,13 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 						onConfirm={handleEditorConfirm}
 						onCancel={handleEditorCancel}
 					/>
+				)}
+
+				{/* REQ-UI-CFG-3: Warning inline below preview (non-blocking) */}
+				{showEditor && editDist?.warning && (
+					<div className="mt2 text-[0.65rem] text-[var(--cre-o)] font-bold text-center">
+						⚠ {editDist.warning}
+					</div>
 				)}
 
 				{hayPlan && an && (

@@ -430,6 +430,14 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
     setDistribucionCuadrillas: (tid, a, b) => {
       _mutar(d => {
         const t = _getTrab(d, tid)
+        // REQ-UI-CFG-6: empty arrays from "Limpiar distribución" → set to null
+        if (a.length === 0 && b.length === 0) {
+          t.distribucionCuadrillas = null
+          t.plan = null
+          t.obj = null
+          t.analisis = null
+          return
+        }
         const n = t.nombres.length
         const allIndices = new Set([...a, ...b])
         if (a.length + b.length !== n) {
