@@ -903,23 +903,19 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						<button
 							className="btn btn-oro f1"
 							onClick={() =>
-								hasPins && !t.cuadrillaDoblada
-									? completarPlan(t.id)
-									: calcularTrab(t.id)
+								hasPins ? completarPlan(t.id) : calcularTrab(t.id)
 							}
 							disabled={erroresPinned.length > 0}
 							style={{ opacity: erroresPinned.length ? 0.5 : 1 }}
 							title={
-								t.cuadrillaDoblada
-									? "En cuadrilla doblada la rotación es determinística; los pins individuales no se aplican. Usá 'Calcular Auto' para regenerar."
-									: hasPins
-										? "Completar el plan respetando los pins fijados"
-										: "Calcular el plan automáticamente"
+								hasPins
+									? t.cuadrillaDoblada
+										? "Completar el plan respetando los pins; si contradicen la rotación A/B intentará reorganizar la distribución automáticamente"
+										: "Completar el plan respetando los pins fijados"
+									: "Calcular el plan automáticamente"
 							}
 						>
-							{hasPins && !t.cuadrillaDoblada
-								? "🪄 Completar"
-								: "⚙ Calcular Auto"}
+							{hasPins ? "� Completar" : "⚙ Calcular Auto"}
 						</button>
 
 						<button

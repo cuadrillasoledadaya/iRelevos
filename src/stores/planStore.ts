@@ -148,11 +148,20 @@ export const planStore = create<PlanStore>()((set, get) => ({
 				// helper decide entre rotación (cuadrilla doblada) y
 				// greedy con pins (estándar) y devuelve un shape unificado
 				// — el caller no tiene que ramificar.
-				const { plan, objetivo, analisis, error } = dispatchSimulacion(t);
+				// v1.3.1: el dispatcher puede retornar `distribucion`
+				// modificada cuando reorganizó A↔B para satisfacer pines.
+				const { plan, objetivo, analisis, error, distribucion } =
+					dispatchSimulacion(t);
 				ordenarDentroFisico(t, plan);
 				t.plan = plan;
 				t.obj = objetivo;
 				t.analisis = error ? { ...analisis, error } : analisis;
+				if (distribucion) {
+					t.distribucionCuadrillas = {
+						a: [...distribucion.a],
+						b: [...distribucion.b],
+					};
+				}
 			});
 		},
 
