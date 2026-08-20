@@ -465,9 +465,16 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 			const confirmBtn = screen.getByRole("button", { name: /Confirmar/i });
 			fireEvent.click(confirmBtn);
 
-			// The store was called with new arrays
-			expect(mockSetDistribucionCuadrillas).toHaveBeenCalled();
+			// The store was called with new arrays (the user's manual edit, NOT the
+			// pre-edit snapshot from the parent). This guards the double-call bug
+			// where handleEditorConfirm re-persisted the stale `editDist` and overwrote
+			// the user's modification.
+			expect(mockSetDistribucionCuadrillas).toHaveBeenCalledTimes(1);
 			const callArgs = mockSetDistribucionCuadrillas.mock.calls[0];
+			// Alice (index 0) was in A; after the move she should be in B.
+			// The store received the EDITOR's localA/localB, not the parent's editDist.
+			expect(callArgs[1]).not.toContain(0);
+			expect(callArgs[2]).toContain(0);
 			// Invariant: a.length + b.length === nombres.length
 			expect(callArgs[1].length + callArgs[2].length).toBe(t.nombres.length);
 		});

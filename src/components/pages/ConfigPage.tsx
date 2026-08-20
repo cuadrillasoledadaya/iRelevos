@@ -661,9 +661,10 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 	}
 
 	function handleEditorConfirm() {
-		if (editDist) {
-			setDistribucionCuadrillas(t.id, editDist.a, editDist.b);
-		}
+		// DistributionEditor.handleConfirm already persists via
+		// setDistribucionCuadrillas(tid, localA, localB) with the user's modified indices.
+		// Re-calling it here with the parent's stale `editDist` snapshot would overwrite
+		// the user's manual edits with the original distribution. Just close the editor.
 		setShowEditor(false);
 		setEditDist(null);
 	}
