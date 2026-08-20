@@ -865,4 +865,85 @@ describe("MiPlanPersonal — costalero plan view", () => {
 			).toBeInTheDocument();
 		});
 	});
+
+	// ═════════════════════════════════════════════════════════════
+	// REQ-UI-PLAN-6: Collapsible names on plan page
+	// ═════════════════════════════════════════════════════════════
+
+	describe("REQ-UI-PLAN-6: collapsible names on plan page", () => {
+		it("renders A/B counts and a collapsed <details> when distribution exists", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4], b: [5, 6, 7, 8, 9] },
+			});
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			const { container } = render(<PlanPage />);
+
+			// Counts should be visible
+			expect(screen.getByText("A:")).toBeInTheDocument();
+			expect(screen.getByText("B:")).toBeInTheDocument();
+
+			// A <details> element should exist and be collapsed
+			const details = container.querySelector("details");
+			expect(details).not.toBeNull();
+			expect(details?.open).toBe(false);
+
+			// Names inside the details should NOT be visible (collapsed)
+			const detailsBody = details?.querySelector(".mt1.pl2");
+			expect(detailsBody).not.toBeNull();
+			expect(detailsBody).not.toBeVisible();
+		});
+
+		it("expanding the <details> reveals names grouped by cuadrilla", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2], b: [3, 4] },
+			});
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			const { container } = render(<PlanPage />);
+
+			const details = container.querySelector("details");
+			expect(details).not.toBeNull();
+
+			// Expand the details (jsdom doesn't auto-toggle, so set manually)
+			details!.open = true;
+
+			// Now names inside the details should be visible, grouped by cuadrilla
+			const detailsBody = details?.querySelector(".mt1.pl2");
+			expect(detailsBody).toBeVisible();
+			expect(detailsBody?.textContent).toContain("Cuadrilla A");
+			expect(detailsBody?.textContent).toContain("Cuadrilla B");
+			expect(detailsBody?.textContent).toContain("Alice");
+			expect(detailsBody?.textContent).toContain("Bob");
+			expect(detailsBody?.textContent).toContain("Charlie");
+			expect(detailsBody?.textContent).toContain("Dana");
+			expect(detailsBody?.textContent).toContain("Eve");
+		});
+	});
 });

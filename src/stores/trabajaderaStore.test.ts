@@ -225,4 +225,34 @@ describe("trabajaderaStore cuadrilla doblada", () => {
       expect(t.tramosTipo).toEqual(["primario", "primario", "primario"]);
     });
   });
+
+  // ═════════════════════════════════════════════════════════════
+  // REQ-UI-CFG-1: Toggle preserves manual distribution
+  // ═════════════════════════════════════════════════════════════
+
+  describe("REQ-UI-CFG-1: toggle preserves manual distribution", () => {
+    it("preserves a manually-edited distribution across toggle OFF + ON", () => {
+      // Set a manual distribution (simulating what setDistribucionCuadrillas would do)
+      const manualA = [0, 1, 2, 9, 10, 11];
+      const manualB = [3, 4, 5, 6, 7, 8];
+      datos.trabajaderas[0].cuadrillaDoblada = true;
+      datos.trabajaderas[0].distribucionCuadrillas = { a: manualA, b: manualB };
+
+      // Toggle OFF
+      const resOff = trabajaderaStore.getState().toggleCuadrillaDoblada(1);
+      expect(resOff.anterior).toBe(true);
+      expect(resOff.nuevo).toBe(false);
+
+      // Toggle ON again
+      const resOn = trabajaderaStore.getState().toggleCuadrillaDoblada(1);
+      expect(resOn.anterior).toBe(false);
+      expect(resOn.nuevo).toBe(true);
+
+      // The manual distribution should be PRESERVED, not regenerated
+      const t = datos.trabajaderas[0];
+      expect(t.distribucionCuadrillas).toEqual({ a: manualA, b: manualB });
+      // distribucionAplicada should be null because we didn't auto-apply anything
+      expect(resOn.distribucionAplicada).toBeNull();
+    });
+  });
 });

@@ -314,7 +314,7 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 	// ═════════════════════════════════════════════════════════════
 
 	describe("REQ-UI-CFG-3/6: Button disabled guard + Limpiar + preview", () => {
-		it("REQ-UI-CFG-3: 'Editar distribución' button is disabled when distribution exists", () => {
+		it("REQ-UI-CFG-3: 'Editar distribución' button is enabled when distribution exists (manual re-edit allowed)", () => {
 			const t = makeTrabajadera({
 				cuadrillaDoblada: true,
 				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
@@ -322,7 +322,7 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 			renderConfigPage({ trabajaderas: [t] });
 
 			const editBtn = screen.getByRole("button", { name: /Editar distribución/i });
-			expect(editBtn).toBeDisabled();
+			expect(editBtn).not.toBeDisabled();
 		});
 
 		it("REQ-UI-CFG-3: 'Editar distribución' button is enabled when distribution is null", () => {
@@ -596,6 +596,60 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 			expect(screen.getByText("Doblada")).toBeInTheDocument();
 			expect(screen.getByText("P")).toBeInTheDocument();
 			expect(screen.getByText("S")).toBeInTheDocument();
+		});
+	});
+
+	// ═════════════════════════════════════════════════════════════
+	// REQ-UI-CFG-7: Collapsible costalero names
+	// ═════════════════════════════════════════════════════════════
+
+	describe("REQ-UI-CFG-7: collapsible costalero names", () => {
+		it("renders A/B counts and a collapsed <details> when distribution exists", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+			});
+			const { container } = renderConfigPage({ trabajaderas: [t] });
+
+			// Counts should be visible
+			expect(screen.getByText(/A:\s*6/)).toBeInTheDocument();
+			expect(screen.getByText(/B:\s*6/)).toBeInTheDocument();
+
+			// A <details> element should exist and be collapsed
+			const details = container.querySelector("details");
+			expect(details).not.toBeNull();
+			expect(details?.open).toBe(false);
+
+			// Names inside the details should NOT be visible (collapsed)
+			const detailsBody = details?.querySelector(".mt1.pl2");
+			expect(detailsBody).not.toBeNull();
+			expect(detailsBody).not.toBeVisible();
+		});
+
+		it("expanding the <details> reveals names grouped by cuadrilla", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2], b: [6, 7, 8] },
+			});
+			const { container } = renderConfigPage({ trabajaderas: [t] });
+
+			const details = container.querySelector("details");
+			expect(details).not.toBeNull();
+
+			// Expand the details (jsdom doesn't auto-toggle, so set manually)
+			details!.open = true;
+
+			// Now names inside the details should be visible, grouped by cuadrilla
+			const detailsBody = details?.querySelector(".mt1.pl2");
+			expect(detailsBody).toBeVisible();
+			expect(detailsBody?.textContent).toContain("Cuadrilla A");
+			expect(detailsBody?.textContent).toContain("Cuadrilla B");
+			expect(detailsBody?.textContent).toContain("Alice");
+			expect(detailsBody?.textContent).toContain("Bob");
+			expect(detailsBody?.textContent).toContain("Charlie");
+			expect(detailsBody?.textContent).toContain("Grace");
+			expect(detailsBody?.textContent).toContain("Hank");
+			expect(detailsBody?.textContent).toContain("Ivy");
 		});
 	});
 });

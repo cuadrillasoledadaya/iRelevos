@@ -386,11 +386,14 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
           if (!t.tramosTipo) {
             t.tramosTipo = Array(t.tramos.length).fill('primario')
           }
-          const dist = tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucionIndex(t.nombres)
-          const a = dist.a.map((name) => t.nombres.indexOf(name))
-          const b = dist.b.map((name) => t.nombres.indexOf(name))
-          t.distribucionCuadrillas = { a, b }
-          result.distribucionAplicada = { a, b }
+          // AD-1: Preserve manually-edited distribution across toggle OFF → ON
+          if (!t.distribucionCuadrillas) {
+            const dist = tieneRolesAsignados(t) ? sugerirDistribucion(t) : sugerirDistribucionIndex(t.nombres)
+            const a = dist.a.map((name) => t.nombres.indexOf(name))
+            const b = dist.b.map((name) => t.nombres.indexOf(name))
+            t.distribucionCuadrillas = { a, b }
+            result.distribucionAplicada = { a, b }
+          }
         } else {
           // Deactivate: clear flag, keep distribution
           t.cuadrillaDoblada = false

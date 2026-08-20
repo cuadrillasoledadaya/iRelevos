@@ -772,7 +772,6 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 										<button
 											className="btn btn-ghost btn-xs ml1"
 											onClick={handleOpenEditor}
-											disabled
 										>
 											Editar distribución →
 										</button>
@@ -784,6 +783,25 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 										>
 											Limpiar distribución
 										</button>
+										<details className="mt1">
+											<summary className="cursor-pointer text-[0.6rem] text-[var(--cre-o)]">
+												Ver nombres
+											</summary>
+											<div className="mt1 pl2">
+												<div className="text-[0.6rem] text-[var(--cre-o)]">
+													<div className="font-bold">Cuadrilla A</div>
+													{t.distribucionCuadrillas.a.map((idx: number) => (
+														<div key={idx}>{t.nombres[idx]}</div>
+													))}
+												</div>
+												<div className="text-[0.6rem] text-[var(--cre-o)] mt1">
+													<div className="font-bold">Cuadrilla B</div>
+													{t.distribucionCuadrillas.b.map((idx: number) => (
+														<div key={idx}>{t.nombres[idx]}</div>
+													))}
+												</div>
+											</div>
+										</details>
 									</>
 								) : (
 									<button

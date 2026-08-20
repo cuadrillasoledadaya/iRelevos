@@ -1637,4 +1637,105 @@ describe("cuadrillaDoblada", () => {
 			})
 		})
 	})
+
+	// ═════════════════════════════════════════════════════════════
+	// REQ-ACD-9: Manual distribution override wins
+	// ═════════════════════════════════════════════════════════════
+
+	describe("REQ-ACD-9: manual beats suggested", () => {
+		it("honors a manual override that disagrees with sugerirDistribucion end-to-end", () => {
+			// Build a Trabajadera with 12 names and roles
+			const names = nombres(12)
+			const roles = names.map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const }))
+
+			// Manual distribution that intentionally swaps c5 and c6 vs. the
+			// index-based suggestion [0..5] / [6..11]
+			const manualDist = {
+				a: [0, 1, 2, 3, 4, 6],  // c7 (idx 6) moved to A
+				b: [5, 7, 8, 9, 10, 11], // c6 (idx 5) moved to B
+			}
+
+			const tManual: Trabajadera = {
+				id: 1,
+				nombres: names,
+				roles,
+				salidas: 2,
+				tramos: ["T1", "T2", "T3"],
+				tramosTipo: ["primario", "secundario", "primario"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+				distribucionCuadrillas: manualDist,
+			}
+
+			// Same Trabajadera but with DEFAULT distribution (no manual override)
+			const tDefault: Trabajadera = {
+				...tManual,
+				distribucionCuadrillas: null,
+			}
+
+			const slotsManual = cuadrillaDobladaATramoSlots(tManual)
+			const slotsDefault = cuadrillaDobladaATramoSlots(tDefault)
+
+			// Both should produce slots
+			expect(slotsManual.length).toBeGreaterThan(0)
+			expect(slotsDefault.length).toBeGreaterThan(0)
+
+			// Slots contain INDICES (not names). The first slot has B's first 5 members
+			// as "dentro" (after the A→B relevo).
+			// Manual B = {5,7,8,9,10,11} → first 5 = {5,7,8,9,10}
+			// Default B = {6,7,8,9,10,11} → first 5 = {6,7,8,9,10}
+			// Key difference: index 5 (c6) is in manual B's first-5 but NOT in default B's.
+			const firstManualDentro = new Set(slotsManual[0].dentro)
+			const firstDefaultDentro = new Set(slotsDefault[0].dentro)
+
+			// Index 5 (c6) is in manual B → should be in first slot's dentro
+			expect(firstManualDentro.has(5)).toBe(true)
+			// Index 5 (c6) is in default A → should NOT be in first slot's dentro
+			expect(firstDefaultDentro.has(5)).toBe(false)
+			// Index 6 (c7) is in default B → should be in default first slot's dentro
+			expect(firstDefaultDentro.has(6)).toBe(true)
+
+			// The two distributions produce different first-slot assignments
+			expect(firstManualDentro).not.toEqual(firstDefaultDentro)
+		})
+
+		it("falls back to sugerirDistribucion when distribution is null", () => {
+			const names = nombres(12)
+			const roles = names.map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const }))
+			const t: Trabajadera = {
+				id: 1,
+				nombres: names,
+				roles,
+				salidas: 2,
+				tramos: ["T1", "T2", "T3"],
+				tramosTipo: ["primario", "secundario", "primario"],
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+				distribucionCuadrillas: null,
+			}
+
+			// With null distribution, the algorithm should use sugerirDistribucion
+			// and produce a valid plan (regression guard — this path must remain unchanged)
+			const salidas = 2
+			const relevos = simularCicloConTipos(t, t.tramosTipo!, salidas)
+
+			expect(relevos.length).toBeGreaterThan(0)
+			// Each relevo should have 5 members entering (ANCHO_TRABAJADERA)
+			for (const relevo of relevos) {
+				expect(relevo.entra.length).toBeGreaterThan(0)
+			}
+		})
+	})
 })
