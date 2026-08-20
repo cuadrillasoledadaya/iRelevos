@@ -915,7 +915,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 									: "Calcular el plan automáticamente"
 							}
 						>
-							{hasPins ? "� Completar" : "⚙ Calcular Auto"}
+							{hasPins ? "🪄 Completar" : "⚙ Calcular Auto"}
 						</button>
 
 						<button

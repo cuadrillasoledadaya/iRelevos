@@ -154,7 +154,6 @@ function intentarSwapParaPines(
 		for (const fallido of fallidosActuales) {
 			const { ci, esperado, ti } = fallido;
 			const dentro = new Set(planActual[ti].dentro);
-			const fuera = new Set(planActual[ti].fuera);
 
 			// Identificar cuadrilla actual del costalero pineado
 			const enA = dist.a.includes(ci);
