@@ -298,30 +298,29 @@ describe("rotacion", () => {
 			expect(plan).toHaveLength(4); // 1 salida × 4 tramos
 		});
 
-		it("cuadrilla doblada salida 2 S swap differs from salida 1 (rotation actually advances)", () => {
-			// Con [P,S,P,S] × 2 y A=5, B=7: la S en salida 1 (T2) y la S
-			// en salida 2 (T6) NO deben proponer el mismo swap. La
-			// rotación FIFO avanza porque B tiene más miembros (7) que
-			// los 5 que carga cada vez, así el back va rotando.
+		it("v1.3.3: rotación avanza entre ciclos con B grande", () => {
+			// v1.3.3: con [P,S,P,S] × 2 reagrupado a [P×2, S×2] por ciclo
+			// y A=7, B=7 (ambas con 2 extras). El EstadoPlan persiste
+			// entre ciclos y la FIFO realmente avanza: el primer S
+			// de cada ciclo entra nombres distintos.
 			const t = makeTrabajadera(
-				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				Array.from({ length: 14 }, (_, i) => `c${i + 1}`),
 				["T1", "T2", "T3", "T4"],
 				2,
 			);
 			t.cuadrillaDoblada = true;
 			t.tramosTipo = ["primario", "secundario", "primario", "secundario"];
 			t.distribucionCuadrillas = {
-				a: [0, 1, 2, 3, 4],
-				b: [5, 6, 7, 8, 9, 10, 11],
+				a: [0, 1, 2, 3, 4, 5, 6],
+				b: [7, 8, 9, 10, 11, 12, 13],
 			};
 			const { plan } = calcularCiclo(t);
 			expect(plan).toHaveLength(8);
-			// Salida 1 T2 (S, B load): dentro=[c6..c10]
-			// Salida 2 T2 (S, B load): la FIFO rotó — dentro=[c9..c10, c11..c12, c6]
-			const salida1S = [...plan[1].dentro].sort((a, b) => a - b);
-			const salida2S = [...plan[5].dentro].sort((a, b) => a - b);
-			expect(salida1S).not.toEqual(salida2S);
-		});
+			// R3 (S, B load): dentro primeros 5 de B
+			expect(plan[2].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
+			// R7 (S, B load con disp rotada): entra distinto
+			expect(plan[6].dentro).not.toEqual(plan[2].dentro);
+		})
 
 		// ══════════════════════════════════════════════════════════════
 		// Alternating P/S pattern integration (bug fix v1.2.88)
@@ -332,14 +331,14 @@ describe("rotacion", () => {
 		// persists the rotation, so c7 SALE in T2 and c8 SALE in T6.
 		// ══════════════════════════════════════════════════════════════
 
-		it("alternating P/S pattern: cada cuadrilla rota dentro (Regla 1 + intra)", () => {
-			// v1.3.2: con [P,S,P,S,P,S] y A=6, B=6, ya NO hay cruces A�B.
-			// Cada tramo es un relevo intra-cuadrilla. La rotación
-			// intra-cuadrilla avanza con cada swap.
+		it("v1.3.3: patrón agrupado A→B respeta Regla 1 (sin cruce) y rota intra-cuadrilla", () => {
+			// v1.3.3: con [P,S,P,S,P,S] reagrupado a [P×3, S×3] y A=6,
+			// B=6, A hace su ciclo entero (load + 1 swap) ANTES de B.
+			// Cada slot tiene 5 dentro de UNA sola cuadrilla.
 			const t = makeTrabajadera(
 				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
 				["T1", "T2", "T3", "T4", "T5", "T6"],
-				1, // single salida to focus on the alternation
+				1, // single salida
 			);
 			t.cuadrillaDoblada = true;
 			t.tramosTipo = ["primario", "secundario", "primario", "secundario", "primario", "secundario"];
@@ -349,28 +348,21 @@ describe("rotacion", () => {
 			};
 			const { plan } = calcularCiclo(t);
 			expect(plan).toHaveLength(6);
-			// T1 P (A load): A.dentro = {c1..c5}, A.fuera = {c6}.
+			// A's full cycle: R1 load + R2 swap + R3 swap (A=6 → 2 swaps)
 			expect(plan[0].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 4]));
-			expect(plan[0].fuera).toContain(5);
-			// T2 S (TRANSITION + B load): B.dentro = {c7..c11}, A fuera.
-			expect(plan[1].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
-			expect(plan[1].fuera).toContain(0); // c1 fuera en T2
-			// T3 P (TRANSITION + A load): A.dentro rotada = {c6, c1..c4}.
-			expect(plan[2].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 5]));
-			// T4 S (TRANSITION + B load): B.dentro rotada = {c12, c7..c10}.
-			expect(plan[3].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 11]));
-			// T5 P (TRANSITION + A load): A.dentro = {c5, c6, c1..c3}.
-			expect(plan[4].dentro).toEqual(expect.arrayContaining([0, 1, 2, 4, 5]));
-			// T6 S (TRANSITION + B load): B.dentro = {c11, c12, c7..c9}.
-			expect(plan[5].dentro).toEqual(expect.arrayContaining([6, 7, 8, 10, 11]));
+			expect(plan[1].dentro).toEqual(expect.arrayContaining([1, 2, 3, 4, 5]));
+			expect(plan[2].dentro).toEqual(expect.arrayContaining([0, 2, 3, 4, 5]));
+			// B's full cycle: R4 load + R5 swap + R6 swap
+			expect(plan[3].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
+			expect(plan[4].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
+			expect(plan[5].dentro).toEqual(expect.arrayContaining([6, 8, 9, 10, 11]));
 			// Regla 1: ningún plan incluye personas de A y B simultáneamente.
 			for (const slot of plan) {
-				const dentro = new Set(slot.dentro)
-				const aCount = [...dentro].filter(i => i < 6).length
-				const bCount = [...dentro].filter(i => i >= 6).length
-				// Cada slot tiene 5 dentro, todos de UNA cuadrilla
-				expect(aCount === 5 || bCount === 5).toBe(true)
-				expect(aCount + bCount).toBe(5)
+				const dentro = new Set(slot.dentro);
+				const aCount = [...dentro].filter(i => i < 6).length;
+				const bCount = [...dentro].filter(i => i >= 6).length;
+				expect(aCount === 5 || bCount === 5).toBe(true);
+				expect(aCount + bCount).toBe(5);
 			}
 		});
 

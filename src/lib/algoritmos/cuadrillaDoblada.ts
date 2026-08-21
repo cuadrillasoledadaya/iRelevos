@@ -569,6 +569,14 @@ export function aplicarRelevoIntermedio(
 		for (const p of restantes) {
 			streaks.set(p, (streaks.get(p) ?? 0) + 1)
 		}
+		// v1.3.3 Regla 2 cross-cuadrilla: la cuadrilla INACTIVA también
+		// acumula streaks en su disp durante este slot. Sin esto, los
+		// costaleros de la cuadrilla opuesta quedan "congelados" en su
+		// streak y pueden llegar a 4+ mientras la activa rota.
+		const inactiveLoad: CuadrillaId = activa === "A" ? "B" : "A"
+		for (const p of estado.estados[inactiveLoad].disponibles) {
+			streaks.set(p, (streaks.get(p) ?? 0) + 1)
+		}
 
 		const relevo: Relevo = {
 			tipo: "intra",
@@ -625,6 +633,13 @@ export function aplicarRelevoIntermedio(
 	}
 	for (const p of restoCargando) {
 		streaks.set(p, 0)
+	}
+	// v1.3.3 Regla 2 cross-cuadrilla: la INACTIVA también acumula en
+	// su disp (estos costaleros están fuera en este slot, deben
+	// acumular su racha).
+	const inactiveSwap: CuadrillaId = activa === "A" ? "B" : "A"
+	for (const p of estado.estados[inactiveSwap].disponibles) {
+		streaks.set(p, (streaks.get(p) ?? 0) + 1)
 	}
 
 	const relevo: Relevo = {
@@ -955,9 +970,23 @@ export function simularCicloConTipos(
 	// siguiente `aplicarRelevoIntermedio` carga la nueva cuadrilla
 	// desde disp (sale=[], entra=primeros 5) o rota si ya estaba
 	// cargada. Esto garantiza que ningún relevo cruza A�B.
+	// v1.3.3: REAGRUPAR respetando el orden del primer tipo. Si el
+	// primer tramo es P, todos los P's van primero (A hace su
+	// ciclo entero), luego los S's (B hace el suyo). Si el primer
+	// tramo es S, lo inverso. Así [P,S,P,S,P,S] → [P,P,P,S,S,S] y
+	// [S,P,S] → [S,S,P].
+	const primerTipo: TramoTipo = tramosTipo[0]
+	const segundoTipo: TramoTipo =
+		primerTipo === "primario" ? "secundario" : "primario"
+	const count1 = tramosTipo.filter((tt) => tt === primerTipo).length
+	const count2 = tramosTipo.filter((tt) => tt === segundoTipo).length
+	const groupedTipo: TramoTipo[] = [
+		...Array(count1).fill(primerTipo),
+		...Array(count2).fill(segundoTipo),
+	]
 	for (let ciclo = 0; ciclo < salidas; ciclo++) {
-		for (let ti = 0; ti < tramosTipo.length; ti++) {
-			const tipo = tramosTipo[ti]
+		for (let ti = 0; ti < groupedTipo.length; ti++) {
+			const tipo = groupedTipo[ti]
 			const required: CuadrillaId = tipo === "primario" ? "A" : "B"
 			try {
 				if (estado.cuadrillaActiva !== required) {
@@ -967,12 +996,9 @@ export function simularCicloConTipos(
 				estado = r.estado
 				relevos.push({ ...r.relevo, numero: n++ })
 			} catch (err) {
-				// v1.2.90 B3: si el error es "no disponibles",
-				// re-throw con el índice de tramo real para que
-				// el dispatcher surface un mensaje útil al usuario.
 				if (err instanceof CuadrillaDobladaSinDisponibleError) {
 					throw new CuadrillaDobladaSinDisponibleError(
-						ciclo * tramosTipo.length + ti,
+						ciclo * groupedTipo.length + ti,
 						err.cuadrilla,
 					)
 				}

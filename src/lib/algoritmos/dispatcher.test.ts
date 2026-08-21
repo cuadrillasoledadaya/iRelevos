@@ -69,11 +69,10 @@ describe("dispatchSimulacion (M4)", () => {
 		});
 	});
 
-	it("cuadrilla doblada: respeta la rotación P/S (Regla 1 + intra-cuadrilla)", () => {
-		// v1.3.2: con A=6, B=6 y [P,S,P,S,P,S], ningún plan tiene
-		// personas de A y B simultáneamente dentro. Cada slot tiene 5
-		// dentro, todos de UNA cuadrilla. La rotación intra-cuadrilla
-		// avanza con cada swap.
+	it("v1.3.3: cuadrilla doblada respeta la rotación agrupada (A→B)", () => {
+		// v1.3.3: con A=6, B=6 y [P,S,P,S,P,S] (reagrupado a [P×3,
+		// S×3]) A hace su ciclo entero (load + 1 swap) ANTES de B.
+		// Cada slot tiene 5 dentro de UNA sola cuadrilla (Regla 1).
 		const t = makeCuadrillaDoblada();
 		const { plan } = dispatchSimulacion(t);
 		expect(plan).toHaveLength(6);
@@ -81,16 +80,17 @@ describe("dispatchSimulacion (M4)", () => {
 			const dentro = new Set(slot.dentro);
 			const aCount = [...dentro].filter((i) => i < 6).length;
 			const bCount = [...dentro].filter((i) => i >= 6).length;
-			// Regla 1: 5 dentro, todos de la misma cuadrilla
 			expect(aCount === 5 || bCount === 5).toBe(true);
 			expect(aCount + bCount).toBe(5);
 		}
-		// Verificamos que la rotación intra-cuadrilla avanza: el primer
-		// S de B (T2) tiene dentro = {c7..c11}, y el segundo S de B
-		// (T6) tiene dentro ≠ {c7..c11}.
-		expect(plan[1].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
-		const t6Dentro = new Set(plan[5].dentro);
-		expect([...t6Dentro]).not.toEqual([6, 7, 8, 9, 10]);
+		// A's full cycle: R1 load + R2 swap + R3 swap (A=6 → 2 swaps)
+		expect(plan[0].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 4]));
+		expect(plan[1].dentro).toEqual(expect.arrayContaining([1, 2, 3, 4, 5]));
+		expect(plan[2].dentro).toEqual(expect.arrayContaining([0, 2, 3, 4, 5]));
+		// B's full cycle: R4 load + R5 swap + R6 swap
+		expect(plan[3].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
+		expect(plan[4].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
+		expect(plan[5].dentro).toEqual(expect.arrayContaining([6, 8, 9, 10, 11]));
 	});
 
 	it("estándar (sin flag doblado) usa el camino greedy de completarAuto", () => {
