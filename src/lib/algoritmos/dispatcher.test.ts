@@ -69,14 +69,28 @@ describe("dispatchSimulacion (M4)", () => {
 		});
 	});
 
-	it("cuadrilla doblada: respeta la rotación P/S (c7 sale en T2, c8 en T6)", () => {
+	it("cuadrilla doblada: respeta la rotación P/S (Regla 1 + intra-cuadrilla)", () => {
+		// v1.3.2: con A=6, B=6 y [P,S,P,S,P,S], ningún plan tiene
+		// personas de A y B simultáneamente dentro. Cada slot tiene 5
+		// dentro, todos de UNA cuadrilla. La rotación intra-cuadrilla
+		// avanza con cada swap.
 		const t = makeCuadrillaDoblada();
 		const { plan } = dispatchSimulacion(t);
-		// T2 (S de B): c7 en F
-		expect(plan[1].fuera).toContain(6);
-		// T6 (S de B): c8 en F (rotación avanza, NO c7)
-		expect(plan[5].fuera).toContain(7);
-		expect(plan[5].fuera).not.toContain(6);
+		expect(plan).toHaveLength(6);
+		for (const slot of plan) {
+			const dentro = new Set(slot.dentro);
+			const aCount = [...dentro].filter((i) => i < 6).length;
+			const bCount = [...dentro].filter((i) => i >= 6).length;
+			// Regla 1: 5 dentro, todos de la misma cuadrilla
+			expect(aCount === 5 || bCount === 5).toBe(true);
+			expect(aCount + bCount).toBe(5);
+		}
+		// Verificamos que la rotación intra-cuadrilla avanza: el primer
+		// S de B (T2) tiene dentro = {c7..c11}, y el segundo S de B
+		// (T6) tiene dentro ≠ {c7..c11}.
+		expect(plan[1].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
+		const t6Dentro = new Set(plan[5].dentro);
+		expect([...t6Dentro]).not.toEqual([6, 7, 8, 9, 10]);
 	});
 
 	it("estándar (sin flag doblado) usa el camino greedy de completarAuto", () => {
@@ -118,11 +132,12 @@ describe("dispatchSimulacion (M4)", () => {
 
 	it("cuadrilla doblada con S sin disp: devuelve error claro (no throw)", () => {
 		const t = makeCuadrillaDoblada();
-		// 10 costaleros con distribución 5/5: B sin disp después de P
+		// v1.3.2: con A=5, B=5 y [P,S,S], el primer S carga B (sin
+		// disp aún), el segundo S sobre B falla porque B.d está vacío.
 		t.nombres = Array.from({ length: 10 }, (_, i) => `c${i + 1}`);
 		t.roles = Array.from({ length: 10 }, () => ({ pri: "COR" as const, sec: "FIJ_I" as const }));
-		t.tramos = ["T1", "T2"];
-		t.tramosTipo = ["primario", "secundario"];
+		t.tramos = ["T1", "T2", "T3"];
+		t.tramosTipo = ["primario", "secundario", "secundario"];
 		t.distribucionCuadrillas = { a: [0, 1, 2, 3, 4], b: [5, 6, 7, 8, 9] };
 		const { plan, error } = dispatchSimulacion(t);
 		expect(error).toBeDefined();

@@ -299,24 +299,25 @@ describe("rotacion", () => {
 		});
 
 		it("cuadrilla doblada salida 2 S swap differs from salida 1 (rotation actually advances)", () => {
-			// Con [P,S,S,P] × 2 con 12 costaleros: la S en salida 1 (T2) y
-			// la S en salida 2 (T6) NO deben proponer el mismo swap
-			// porque el estado de la cuadrilla activa cambió entremedio.
+			// Con [P,S,P,S] × 2 y A=5, B=7: la S en salida 1 (T2) y la S
+			// en salida 2 (T6) NO deben proponer el mismo swap. La
+			// rotación FIFO avanza porque B tiene más miembros (7) que
+			// los 5 que carga cada vez, así el back va rotando.
 			const t = makeTrabajadera(
 				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
 				["T1", "T2", "T3", "T4"],
 				2,
 			);
 			t.cuadrillaDoblada = true;
-			t.tramosTipo = ["primario", "secundario", "secundario", "primario"];
+			t.tramosTipo = ["primario", "secundario", "primario", "secundario"];
 			t.distribucionCuadrillas = {
-				a: [0, 1, 2, 3, 4, 5],
-				b: [6, 7, 8, 9, 10, 11],
+				a: [0, 1, 2, 3, 4],
+				b: [5, 6, 7, 8, 9, 10, 11],
 			};
 			const { plan } = calcularCiclo(t);
 			expect(plan).toHaveLength(8);
-			// Salida 1 T2 (S) y Salida 2 T6 (S): el swap debe ser distinto
-			// (al menos uno de los 5 dentro cambió)
+			// Salida 1 T2 (S, B load): dentro=[c6..c10]
+			// Salida 2 T2 (S, B load): la FIFO rotó — dentro=[c9..c10, c11..c12, c6]
 			const salida1S = [...plan[1].dentro].sort((a, b) => a - b);
 			const salida2S = [...plan[5].dentro].sort((a, b) => a - b);
 			expect(salida1S).not.toEqual(salida2S);
@@ -331,7 +332,10 @@ describe("rotacion", () => {
 		// persists the rotation, so c7 SALE in T2 and c8 SALE in T6.
 		// ══════════════════════════════════════════════════════════════
 
-		it("alternating P/S pattern: c7 SALEs in T2 but NOT in T6 (rotation advances)", () => {
+		it("alternating P/S pattern: cada cuadrilla rota dentro (Regla 1 + intra)", () => {
+			// v1.3.2: con [P,S,P,S,P,S] y A=6, B=6, ya NO hay cruces A�B.
+			// Cada tramo es un relevo intra-cuadrilla. La rotación
+			// intra-cuadrilla avanza con cada swap.
 			const t = makeTrabajadera(
 				Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
 				["T1", "T2", "T3", "T4", "T5", "T6"],
@@ -345,13 +349,29 @@ describe("rotacion", () => {
 			};
 			const { plan } = calcularCiclo(t);
 			expect(plan).toHaveLength(6);
-			// T2 (S de B) — c7 SALE → c7 está en F
-			expect(plan[1].fuera).toContain(6); // c7 (idx 6) in F
-			// T4 (S de A) — c1 SALE → c1 está en F
-			expect(plan[3].fuera).toContain(0); // c1 (idx 0) in F
-			// T6 (S de B) — c8 SALE (rotación avanza) → c8 en F, c7 NO en F
-			expect(plan[5].fuera).toContain(7); // c8 (idx 7) in F
-			expect(plan[5].fuera).not.toContain(6); // c7 NOT in F
+			// T1 P (A load): A.dentro = {c1..c5}, A.fuera = {c6}.
+			expect(plan[0].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 4]));
+			expect(plan[0].fuera).toContain(5);
+			// T2 S (TRANSITION + B load): B.dentro = {c7..c11}, A fuera.
+			expect(plan[1].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
+			expect(plan[1].fuera).toContain(0); // c1 fuera en T2
+			// T3 P (TRANSITION + A load): A.dentro rotada = {c6, c1..c4}.
+			expect(plan[2].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 5]));
+			// T4 S (TRANSITION + B load): B.dentro rotada = {c12, c7..c10}.
+			expect(plan[3].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 11]));
+			// T5 P (TRANSITION + A load): A.dentro = {c5, c6, c1..c3}.
+			expect(plan[4].dentro).toEqual(expect.arrayContaining([0, 1, 2, 4, 5]));
+			// T6 S (TRANSITION + B load): B.dentro = {c11, c12, c7..c9}.
+			expect(plan[5].dentro).toEqual(expect.arrayContaining([6, 7, 8, 10, 11]));
+			// Regla 1: ningún plan incluye personas de A y B simultáneamente.
+			for (const slot of plan) {
+				const dentro = new Set(slot.dentro)
+				const aCount = [...dentro].filter(i => i < 6).length
+				const bCount = [...dentro].filter(i => i >= 6).length
+				// Cada slot tiene 5 dentro, todos de UNA cuadrilla
+				expect(aCount === 5 || bCount === 5).toBe(true)
+				expect(aCount + bCount).toBe(5)
+			}
 		});
 
 		// ══════════════════════════════════════════════════════════════
@@ -363,22 +383,21 @@ describe("rotacion", () => {
 
 		it("S sobre cuadrilla sin disp: calcularCiclo devuelve error claro (no throw)", () => {
 			// 10 costaleros, distribución 5/5. Cada cuadrilla tiene 5
-			// miembros exactos = ANCHO. Después del primer P, B queda con
-			// cargando=5, disp=0. Un S sobre B falla — el dispatcher
-			// debe capturar y devolver un error en lugar de throw.
+			// miembros exactos = ANCHO. v1.3.2: dos S consecutivos
+			// sobre la misma cuadrilla sin recargar falla (B.d queda
+			// vacío tras el primer S). El dispatcher debe capturar y
+			// devolver un error en lugar de throw.
 			const t = makeTrabajadera(
 				Array.from({ length: 10 }, (_, i) => `c${i + 1}`),
-				["T1", "T2"],
+				["T1", "T2", "T3"],
 				1, // single salida
 			);
 			t.cuadrillaDoblada = true;
-			t.tramosTipo = ["primario", "secundario"]; // T1 P, T2 S — B sin disp
+			t.tramosTipo = ["primario", "secundario", "secundario"]; // P, S, S — B sin disp tras T2
 			t.distribucionCuadrillas = {
 				a: [0, 1, 2, 3, 4],
 				b: [5, 6, 7, 8, 9],
 			};
-			// calcularCiclo debe devolver { plan: [], objetivo: {}, error: ... }
-			// en lugar de throw (que rompería el forEach en calcularTodo).
 			const result = calcularCiclo(t);
 			expect(result.error).toBeDefined();
 			expect(result.error).toMatch(/disponibles|intermedio|secundario/i);

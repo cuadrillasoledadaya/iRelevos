@@ -11,8 +11,8 @@ import {
 	sugerirDistribucion,
 	agruparEnCuadrillas,
 	crearEstadoInicial,
-	aplicarRelevoPrincipal,
 	aplicarRelevoIntermedio,
+	transicionActiva,
 	simularCicloCompleto,
 	cuadrillaDobladaATramoSlots,
 	simularCicloConTipos,
@@ -31,15 +31,13 @@ import type { Trabajadera } from "../types"
 const nombres = (n: number): string[] =>
 	Array.from({ length: n }, (_, i) => `c${i + 1}`)
 
-// Helper: devuelve un estado con A activa y cargando (los primeros 5 de su
-// distribución). Para llegar ahí: estado inicial → A→B → intermedios de B → B→A.
+// Helper v1.3.2: devuelve un estado con A activa y cargando (los primeros 5
+// de su distribución). Antes se llegaba con principal A→B + intermedios de
+// B + principal B→A; ahora se carga directo (sin cruce A�B).
 function setupACargando(aSize: number, bSize: number): EstadoPlan {
 	let estado = crearEstadoInicial({ a: nombres(aSize), b: nombres(bSize) })
-	estado = aplicarRelevoPrincipal(estado).estado // A → B
-	for (let i = 0; i < bSize - 5; i++) {
-		estado = aplicarRelevoIntermedio(estado).estado
-	}
-	estado = aplicarRelevoPrincipal(estado).estado // B → A
+	// A activa, cargando vacía → load desde disp
+	estado = aplicarRelevoIntermedio(estado).estado
 	return estado
 }
 
@@ -456,74 +454,79 @@ describe("cuadrillaDoblada", () => {
 		})
 	})
 
-	describe("aplicarRelevoPrincipal", () => {
-		it("debería cambiar de A a B con A=7, B=6", () => {
+	describe("transicionActiva (v1.3.2 Regla 1 — sin cruce de personas)", () => {
+		it("idempotente si la activa ya es la pedida", () => {
 			const estado = crearEstadoInicial({ a: nombres(7), b: nombres(6) })
-			const { estado: nuevo, relevo } = aplicarRelevoPrincipal(estado)
-			expect(nuevo.cuadrillaActiva).toBe("B")
-			expect(relevo.tipo).toBe("principal")
-			expect(relevo.cuadrilla).toBe("B")
-			expect(relevo.sale).toEqual([])
-			expect(relevo.entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			const t = transicionActiva(estado, "A")
+			expect(t).toBe(estado)
 		})
-		it("los que salen deberían ir al final de disponibles de la saliente", () => {
+		it("cambia el flag de activa sin tocar cargando de la NUEVA cuadrilla", () => {
+			// A está activa con cargando vacío y 7 miembros en disp.
+			// transicionar a B no debe cargar B todavía — eso lo hace el
+			// siguiente aplicarRelevoIntermedio (Regla 1: el sale/entra
+			// son siempre de la misma cuadrilla).
 			const estado = crearEstadoInicial({ a: nombres(7), b: nombres(6) })
-			const { estado: nuevo } = aplicarRelevoPrincipal(estado)
-			// A sale con [] (cargando vacío en estado inicial), disponibles original = [c1..c7]
-			expect(nuevo.estados.A.cargando).toEqual([])
-			expect(nuevo.estados.A.disponibles).toEqual(nombres(7))
+			const t = transicionActiva(estado, "B")
+			expect(t.cuadrillaActiva).toBe("B")
+			// A.cargando (vacío) → A.disponibles (sin cambios estructurales)
+			expect(t.estados.A.cargando).toEqual([])
+			expect(t.estados.A.disponibles).toEqual(nombres(7))
+			// B sigue intacto — la carga ocurre en el siguiente relevo
+			expect(t.estados.B.cargando).toEqual([])
+			expect(t.estados.B.disponibles).toEqual(nombres(6))
 		})
-		it("la entrante debería tener los primeros 5 de sus disponibles en cargando", () => {
-			const estado = crearEstadoInicial({ a: nombres(7), b: nombres(6) })
-			const { estado: nuevo } = aplicarRelevoPrincipal(estado)
-			expect(nuevo.estados.B.cargando).toEqual(["c1", "c2", "c3", "c4", "c5"])
-			expect(nuevo.estados.B.disponibles).toEqual(["c6"])
-		})
-		it("debería cambiar de B a A con B cargando", () => {
-			// Simular B ya cargando: A→B primero
-			const estadoInicial = crearEstadoInicial({ a: nombres(7), b: nombres(6) })
-			const { estado: e1 } = aplicarRelevoPrincipal(estadoInicial)
-			const { estado: e2, relevo } = aplicarRelevoPrincipal(e1)
-			expect(e2.cuadrillaActiva).toBe("A")
-			expect(relevo.cuadrilla).toBe("A")
-			expect(relevo.sale).toEqual(["c1", "c2", "c3", "c4", "c5"])
-			expect(relevo.entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
+		it("preserva la cuadrilla que estaba cargando y la pasa al final de su disp", () => {
+			// Setup: A activa con cargando=[c1..c5], disp=[c6, c7]
+			const estado: EstadoPlan = {
+				cuadrillaActiva: "A",
+				estados: {
+					A: { cargando: ["c1", "c2", "c3", "c4", "c5"], disponibles: ["c6", "c7"] },
+					B: { cargando: [], disponibles: ["c8", "c9", "c10", "c11", "c12", "c13"] },
+				},
+			}
+			const t = transicionActiva(estado, "B")
+			expect(t.cuadrillaActiva).toBe("B")
+			// A.cargando va al FINAL de A.disponibles (los más recientes
+			// esperan más — coherente con el swap path de
+			// aplicarRelevoIntermedio que también pone sale al final).
+			expect(t.estados.A.disponibles).toEqual(["c6", "c7", "c1", "c2", "c3", "c4", "c5"])
+			expect(t.estados.A.cargando).toEqual([])
 		})
 	})
 
-	describe("aplicarRelevoIntermedio", () => {
-		it("debería rotar uno de cargando por uno de disponibles (A=7)", () => {
+	describe("aplicarRelevoIntermedio (v1.3.2)", () => {
+		it("regla 1: swap intra-cuadrilla (A=7, B=6)", () => {
+			// Setup: A activa con 5 en cargando + 2 en disp
 			const estado = setupACargando(7, 6)
 			const { estado: nuevo, relevo } = aplicarRelevoIntermedio(estado)
 			expect(nuevo.cuadrillaActiva).toBe("A")
-			expect(relevo.tipo).toBe("intermedio")
+			// v1.3.2: tipo colapsa a "intra"
+			expect(relevo.tipo).toBe("intra")
 			expect(relevo.cuadrilla).toBe("A")
+			// Regla 1: sale y entra son SIEMPRE de la misma cuadrilla.
+			expect(relevo.sale.every((p) => ["c1", "c2", "c3", "c4", "c5", "c6", "c7"].includes(p))).toBe(true)
+			expect(relevo.entra.every((p) => ["c1", "c2", "c3", "c4", "c5", "c6", "c7"].includes(p))).toBe(true)
 			expect(relevo.sale).toEqual(["c1"])
 			expect(relevo.entra).toEqual(["c6"])
-			// Verificamos el set (miembros), no el orden del array.
-			// El modelo FIFO pone al que entra al final de cargando.
 			expect(nuevo.estados.A.cargando).toHaveLength(5)
 			expect(nuevo.estados.A.cargando).toEqual(expect.arrayContaining(["c2", "c3", "c4", "c5", "c6"]))
 			expect(nuevo.estados.A.cargando).not.toContain("c1")
 			expect(nuevo.estados.A.disponibles).toEqual(["c7", "c1"])
 		})
-		it("dos intermedios consecutivos deberían rotar dos distintos", () => {
+		it("dos swaps consecutivos rotan dos distintos", () => {
 			const estado = setupACargando(7, 6)
 			const { estado: e1 } = aplicarRelevoIntermedio(estado)
 			const { estado: e2, relevo } = aplicarRelevoIntermedio(e1)
 			expect(relevo.sale).toEqual(["c2"])
 			expect(relevo.entra).toEqual(["c7"])
-			expect(e2.estados.A.cargando).toHaveLength(5)
 			expect(e2.estados.A.cargando).toEqual(expect.arrayContaining(["c3", "c4", "c5", "c6", "c7"]))
 			expect(e2.estados.A.cargando).not.toContain("c1")
 			expect(e2.estados.A.cargando).not.toContain("c2")
 			expect(e2.estados.A.disponibles).toEqual(["c1", "c2"])
 		})
-		it("S swap con cargando vacío debe cargar desde disp (no corromper con undefined)", () => {
-			// B2: si la cuadrilla activa está vacía (cargando=[]) y hay
-			// disponibles, el S swap debe "cargar" la cuadrilla desde disp
-			// (mover primeros ANCHO al cargando) en vez de corromper el
-			// state con `sale!` undefined.
+		it("load: cargando vacío + disp con >= ancho → sale=[], entra=primeros 5", () => {
+			// B2 preservado en v1.3.2: si la cuadrilla activa está vacía y
+			// hay disponibles, se "carga" desde disp sin corromper state.
 			const estadoInicial: EstadoPlan = {
 				cuadrillaActiva: "A",
 				estados: {
@@ -532,19 +535,56 @@ describe("cuadrillaDoblada", () => {
 				},
 			}
 			const { estado: nuevo, relevo } = aplicarRelevoIntermedio(estadoInicial)
-			// No debe haber undefined en disp (era el bug B2)
 			expect(nuevo.estados.A.disponibles).not.toContain(undefined)
 			expect(nuevo.estados.A.disponibles).toEqual(["c6"])
-			// A queda cargada con los primeros 5 de disp
 			expect(nuevo.estados.A.cargando).toEqual(["c1", "c2", "c3", "c4", "c5"])
-			// Sale está vacío (nadie salía — es un load, no un swap)
+			expect(relevo.tipo).toBe("intra")
 			expect(relevo.sale).toEqual([])
-			// Entra son los 5 que entraron
 			expect(relevo.entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
 		})
-		it("S swap con cuadrilla completamente vacía (sin cargando ni disp) debe lanzar error claro", () => {
-			// Edge case: si tanto cargando como disp están vacíos, no hay
-			// nada que cargar — error claro.
+		it("load + regla 2 override: la ventana se corre para incluir al streak=3", () => {
+			// Setup: A vacía, disp=[c1..c7]. c7 está a streak 3
+			// (quedaría fuera en la ventana natural [c1..c5]).
+			// Regla 2 corre la ventana: bestIdx=6, entraIdx=6-4=2 → entra=disp[2..7]
+			// = [c3, c4, c5, c6, c7]. c7 queda adentro → su streak resetea a 0.
+			const estadoInicial: EstadoPlan = {
+				cuadrillaActiva: "A",
+				estados: {
+					A: { cargando: [], disponibles: ["c1", "c2", "c3", "c4", "c5", "c6", "c7"] },
+					B: { cargando: [], disponibles: [] },
+				},
+			}
+			const streaks = new Map<string, number>([
+				["c1", 0], ["c2", 0], ["c3", 0], ["c4", 0], ["c5", 0], ["c6", 0], ["c7", 3],
+			])
+			const { relevo } = aplicarRelevoIntermedio(estadoInicial, ANCHO_TRABAJADERA, true, streaks)
+			// La ventana corre para incluir c7 al final
+			expect(relevo.entra).toEqual(["c3", "c4", "c5", "c6", "c7"])
+			// c1 y c2 quedan en disp (su streak += 1)
+			expect(streaks.get("c1")).toBe(1)
+			expect(streaks.get("c2")).toBe(1)
+			// c7 entra (streak = 0)
+			expect(streaks.get("c7")).toBe(0)
+		})
+
+		it("load + regla 2 (caso más estrecho): ventana cubre al streak=3 al final del disp", () => {
+			// Setup: A vacía, disp=[c1..c6]. c6 está a streak 3.
+			// bestIdx=5, entraIdx=5-4=1 → entra=disp[1..6] = [c2..c6].
+			const estadoInicial: EstadoPlan = {
+				cuadrillaActiva: "A",
+				estados: {
+					A: { cargando: [], disponibles: ["c1", "c2", "c3", "c4", "c5", "c6"] },
+					B: { cargando: [], disponibles: [] },
+				},
+			}
+			const streaks = new Map<string, number>([
+				["c1", 0], ["c2", 0], ["c3", 0], ["c4", 0], ["c5", 0], ["c6", 3],
+			])
+			const { relevo } = aplicarRelevoIntermedio(estadoInicial, ANCHO_TRABAJADERA, true, streaks)
+			expect(relevo.entra).toEqual(["c2", "c3", "c4", "c5", "c6"])
+			expect(streaks.get("c6")).toBe(0)
+		})
+		it("lanza error claro si la cuadrilla está completamente vacía", () => {
 			const estadoInicial: EstadoPlan = {
 				cuadrillaActiva: "A",
 				estados: {
@@ -556,8 +596,7 @@ describe("cuadrillaDoblada", () => {
 				/vac[ií]a|disponibles|intermedio/i,
 			)
 		})
-		it("debería lanzar error si no hay disponibles", () => {
-			// Estado: A está activa con cargando=[a1..a5] y disponibles=[].
+		it("lanza CuadrillaDobladaSinDisponibleError si cargando lleno y disp vacío", () => {
 			const estado: EstadoPlan = {
 				cuadrillaActiva: "A",
 				estados: {
@@ -565,62 +604,71 @@ describe("cuadrillaDoblada", () => {
 					B: { cargando: [], disponibles: ["c1", "c2", "c3", "c4", "c5"] },
 				},
 			}
-			// v1.2.90: el error ahora es CuadrillaDobladaSinDisponibleError
-			// con contexto (tramoIdx=-1 para llamada directa).
 			expect(() => aplicarRelevoIntermedio(estado)).toThrow(/disponibles/i)
 		})
 	})
 
-	describe("simularCicloCompleto", () => {
-		it("con 10 (A=5, B=5) debería generar 2 relevos (sin intermedios)", () => {
+	describe("simularCicloCompleto (v1.3.2 — Regla 1: sin cruce)", () => {
+		it("con 10 (A=5, B=5) genera 2 relevos (1 load A + 1 load B)", () => {
+			// 1 load de A + 0 swaps A + 1 load de B + 0 swaps B = 2
 			const relevos = simularCicloCompleto(nombres(10))
-			// 1 principal A→B + 0 intermedios B + 1 principal B→A + 0 intermedios A
 			expect(relevos).toHaveLength(2)
-			expect(relevos.every((r) => r.tipo === "principal")).toBe(true)
+			expect(relevos.every((r) => r.tipo === "intra")).toBe(true)
 		})
-		it("con 13 (A=7, B=6) debería generar 5 relevos (3 intermedios)", () => {
+		it("con 13 (A=7, B=6) genera 5 relevos (3 A + 2 B)", () => {
+			// 1 load A + 2 swaps A + 1 load B + 1 swap B = 5
 			const relevos = simularCicloCompleto(nombres(13))
-			// 1 A→B + 1 intermedio B + 1 B→A + 2 intermedios A = 5
 			expect(relevos).toHaveLength(5)
-			const intermedios = relevos.filter((r) => r.tipo === "intermedio")
-			expect(intermedios).toHaveLength(3) // 1 de B + 2 de A
+			expect(relevos.every((r) => r.tipo === "intra")).toBe(true)
 		})
-		it("con 11 (A=6, B=5) debería generar 3 relevos (1 intermedio)", () => {
+		it("con 11 (A=6, B=5) genera 3 relevos (2 A + 1 B)", () => {
 			const relevos = simularCicloCompleto(nombres(11))
-			// 1 A→B + 0 intermedios B + 1 B→A + 1 intermedio A = 3
 			expect(relevos).toHaveLength(3)
-			const intermedios = relevos.filter((r) => r.tipo === "intermedio")
-			expect(intermedios).toHaveLength(1)
+			expect(relevos.every((r) => r.tipo === "intra")).toBe(true)
 		})
-		it("los intermedios deberían corresponder a la cuadrilla activa correcta", () => {
+		it("regla 1: ningún relevo cruza personas entre A y B (n=13)", () => {
+			const dist = { a: nombres(13).slice(0, 7), b: nombres(13).slice(7) }
+			const relevos = simularCicloCompleto(nombres(13), dist)
+			// Para cada relevo, su sale y su entra tienen que estar en la
+			// MISMA cuadrilla que su flag `cuadrilla`.
+			for (const r of relevos) {
+				const expectedSet = new Set(r.cuadrilla === "A" ? dist.a : dist.b)
+				for (const p of r.sale) {
+					expect(expectedSet.has(p)).toBe(true)
+				}
+				for (const p of r.entra) {
+					expect(expectedSet.has(p)).toBe(true)
+				}
+			}
+		})
+		it("regla 1: las activas correctas se respetan en orden P/S sintetizado", () => {
+			// Para n=13 (A=7, B=6) tramosTipo sintetizado = [P,P,P,S,S]
+			// → primeros 3 relevos son de A (cuadrilla="A"), últimos 2 son de B.
 			const relevos = simularCicloCompleto(nombres(13))
-			// Rele 1: principal A→B (entra B)
-			// Rele 2: intermedio de B
-			// Rele 3: principal B→A (entra A)
-			// Rele 4: intermedio de A
-			// Rele 5: intermedio de A
-			expect(relevos[0].tipo).toBe("principal")
-			expect(relevos[0].cuadrilla).toBe("B")
-			expect(relevos[1].tipo).toBe("intermedio")
-			expect(relevos[1].cuadrilla).toBe("B")
-			expect(relevos[2].tipo).toBe("principal")
+			expect(relevos[0].cuadrilla).toBe("A")
+			expect(relevos[1].cuadrilla).toBe("A")
 			expect(relevos[2].cuadrilla).toBe("A")
-			expect(relevos[3].tipo).toBe("intermedio")
-			expect(relevos[3].cuadrilla).toBe("A")
-			expect(relevos[4].tipo).toBe("intermedio")
-			expect(relevos[4].cuadrilla).toBe("A")
+			expect(relevos[3].cuadrilla).toBe("B")
+			expect(relevos[4].cuadrilla).toBe("B")
 		})
 		it("debería respetar distribución manual", () => {
-			const relevos = simularCicloCompleto(
-				nombres(13),
-				{ a: ["x1", "x2", "x3", "x4", "x5", "x6", "x7"], b: ["y1", "y2", "y3", "y4", "y5", "y6"] },
-			)
-			// Relevos: 1) A→B (entra [y1..y5]), 2) intermedio B (sale y1, entra y6), 3) B→A (entra [x1..x5]), 4) intermedio A, 5) intermedio A
-			expect(relevos[0].entra).toEqual(["y1", "y2", "y3", "y4", "y5"])
-			expect(relevos[1].entra).toEqual(["y6"])
-			expect(relevos[2].entra).toEqual(["x1", "x2", "x3", "x4", "x5"])
-			expect(relevos[3].entra).toEqual(["x6"])
-			expect(relevos[4].entra).toEqual(["x7"])
+			const dist = {
+				a: ["x1", "x2", "x3", "x4", "x5", "x6", "x7"],
+				b: ["y1", "y2", "y3", "y4", "y5", "y6"],
+			}
+			const relevos = simularCicloCompleto(nombres(13), dist)
+			// Tramos sintetizados: [P,P,P,S,S] para A=7, B=6
+			// Relevos:
+			//   1) P (A): load → entra=[x1..x5], sale=[]
+			//   2) P (A): swap → sale=x1, entra=x6
+			//   3) P (A): swap → sale=x2, entra=x7
+			//   4) S (B): load → entra=[y1..y5], sale=[]
+			//   5) S (B): swap → sale=y1, entra=y6
+			expect(relevos[0].entra).toEqual(["x1", "x2", "x3", "x4", "x5"])
+			expect(relevos[1].entra).toEqual(["x6"])
+			expect(relevos[2].entra).toEqual(["x7"])
+			expect(relevos[3].entra).toEqual(["y1", "y2", "y3", "y4", "y5"])
+			expect(relevos[4].entra).toEqual(["y6"])
 		})
 		it("los relevos deberían estar numerados secuencialmente desde 1", () => {
 			const relevos = simularCicloCompleto(nombres(13))
@@ -1047,36 +1095,68 @@ describe("cuadrillaDoblada", () => {
 			}
 		}
 
-		it("mixed P/S: 3 tramos [P, S, P] generates 3 relevos", () => {
+		it("mixed P/S: 3 tramos [P, S, P] genera 3 relevos intra-cuadrilla", () => {
 			const t = makeTrab(12, {
 				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
 			})
 			const relevos = simularCicloConTipos(t, ["primario", "secundario", "primario"])
 			expect(relevos).toHaveLength(3)
-			expect(relevos[0].tipo).toBe("principal")
-			expect(relevos[1].tipo).toBe("intermedio")
-			expect(relevos[2].tipo).toBe("principal")
+			// v1.3.2 Regla 1: todos "intra" — sale y entra siempre de la
+			// misma cuadrilla.
+			expect(relevos.every((r) => r.tipo === "intra")).toBe(true)
+			// T1 P: A load → entra=[c1..c5]
+			expect(relevos[0].cuadrilla).toBe("A")
+			expect(relevos[0].sale).toEqual([])
+			expect(relevos[0].entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			// T2 S: TRANSITION A→B + load B → entra=[c7..c11]
+			expect(relevos[1].cuadrilla).toBe("B")
+			expect(relevos[1].sale).toEqual([])
+			expect(relevos[1].entra).toEqual(["c7", "c8", "c9", "c10", "c11"])
+			// T3 P: TRANSITION B→A + load A. Como el just-unloaded (B's
+			// cargando [c7..c11]) fue al BACK de B.disp, A.disp al volver
+			// tiene [c6, c1..c5] → carga [c6, c1, c2, c3, c4]. La rotación
+			// avanza: c5 queda fuera (ya pasó por cargando una vez).
+			expect(relevos[2].cuadrilla).toBe("A")
+			expect(relevos[2].sale).toEqual([])
+			expect(relevos[2].entra).toEqual(["c6", "c1", "c2", "c3", "c4"])
 		})
 
-		it("all-primario [P, P, P] generates 3 principal relevos", () => {
+		it("all-primario [P, P, P] genera 3 relevos todos en A (intra)", () => {
 			const t = makeTrab(12, {
 				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
 			})
 			const relevos = simularCicloConTipos(t, ["primario", "primario", "primario"])
 			expect(relevos).toHaveLength(3)
-			expect(relevos.every((r) => r.tipo === "principal")).toBe(true)
+			// Todos en A — la cuadrilla nunca cambia
+			expect(relevos.every((r) => r.tipo === "intra" && r.cuadrilla === "A")).toBe(true)
+			// T1: load A
+			expect(relevos[0].sale).toEqual([])
+			expect(relevos[0].entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			// T2: swap (sale=c1, entra=c6) — c1 va al back de A.disp
+			expect(relevos[1].sale).toEqual(["c1"])
+			expect(relevos[1].entra).toEqual(["c6"])
+			// T3: swap (sale=c2, entra=c1) — c1 vuelve, sale al frente
+			expect(relevos[2].sale).toEqual(["c2"])
+			expect(relevos[2].entra).toEqual(["c1"])
 		})
 
-		it("all-primario produces same output as legacy simularCicloCompleto", () => {
-			const dist = { a: nombres(12).slice(0, 6), b: nombres(12).slice(6) }
-			const legacy = simularCicloCompleto(nombres(12), dist)
+		it("regla 1: cada relevo tiene sale y entra de la MISMA cuadrilla", () => {
 			const t = makeTrab(12, {
-				tramos: ["T1", "T2", "T3", "T4"],
+				tramos: ["T1", "T2", "T3", "T4", "T5"],
 				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
 			})
-			const perTramo = simularCicloConTipos(t, ["primario", "primario", "primario", "primario"])
-			expect(perTramo).toHaveLength(4)
-			expect(perTramo.every((r) => r.tipo === "principal")).toBe(true)
+			const namesOf = (idxs: number[]) => idxs.map((i) => `c${i + 1}`)
+			const relevos = simularCicloConTipos(t, [
+				"primario", "secundario", "primario",
+				"secundario", "primario",
+			])
+			for (const r of relevos) {
+				const set = new Set(
+					r.cuadrilla === "A" ? namesOf([0,1,2,3,4,5]) : namesOf([6,7,8,9,10,11]),
+				)
+				for (const p of r.sale) expect(set.has(p)).toBe(true)
+				for (const p of r.entra) expect(set.has(p)).toBe(true)
+			}
 		})
 
 		it("all-secundario throws CuadrillaDobladaSinPrimarioError", () => {
@@ -1154,32 +1234,37 @@ describe("cuadrillaDoblada", () => {
 			expect(r2.slice(0, 3)).toEqual(r1)
 		})
 
-		it("second cycle S swap differs from first cycle S swap (rotation actually advances)", () => {
-			// With [P,S,S,P] × 2 with 12 costaleros (A=6, B=6):
-			//   - Salida 1 T2 (S): sale=[c7], entra=[c12]  (first b-slot vacated, last fills)
-			//   - Salida 2 T6 (S): sale=[c9], entra=[c8]   (rotation advanced by 2)
-			// Note: with v1.2.88 fix (sale goes to FRONT of disp on P),
-			// the rotation advances by 2 (c7→c8→c9 across T2→T3→end-of-cycle-1).
-			// Before the v1.2.88 fix this was only c7→c8 across the same span.
+		it("regla 2: rotación avanza entre ciclos (state persiste)", () => {
+			// v1.3.2: con [P,S,P,S] × 2 y A=5, B=7, el EstadoPlan
+			// persiste entre ciclos y la FIFO realmente avanza.
+			// Antes (con principal que cruzaba A↔B), los S swaps
+			// internos siempre tenían sale=c6 fijo; ahora el algoritmo
+			// intra-cuadrilla produce cargas distintas por ciclo.
 			const t = makeTrab(12, {
 				tramos: ["T1", "T2", "T3", "T4"],
-				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
+				distribucionCuadrillas: { a: [0,1,2,3,4], b: [5,6,7,8,9,10,11] },
 			})
 			const relevos = simularCicloConTipos(
 				t,
-				["primario", "secundario", "secundario", "primario"],
+				["primario", "secundario", "primario", "secundario"],
 				2,
 			)
-			// Salida 1 T2 (S) — index 1
-			expect(relevos[1].tipo).toBe("intermedio")
-			expect(relevos[1].sale).toEqual(["c7"])
-			expect(relevos[1].entra).toEqual(["c12"])
-			// Salida 2 T6 (S) — index 5
-			expect(relevos[5].tipo).toBe("intermedio")
-			expect(relevos[5].sale).toEqual(["c9"])
-			expect(relevos[5].entra).toEqual(["c8"])
-			// Rotation must actually advance — the S swaps must differ
-			expect(relevos[1].sale).not.toEqual(relevos[5].sale)
+			expect(relevos).toHaveLength(8)
+			// Salida 1 T2 (S, B load) — entra=[c6..c10]
+			expect(relevos[1].cuadrilla).toBe("B")
+			expect(relevos[1].sale).toEqual([])
+			expect(relevos[1].entra).toEqual(["c6", "c7", "c8", "c9", "c10"])
+			// Salida 2 T2 (S, B load) — la FIFO rotó 4 posiciones
+			// (c6→c9 en el primer slot). El orden exacto depende de
+			// la secuencia de TRANS+swap del ciclo 1.
+			expect(relevos[5].cuadrilla).toBe("B")
+			expect(relevos[5].sale).toEqual([])
+			expect(relevos[5].entra).toEqual(["c9", "c10", "c11", "c12", "c6"])
+			// Garantía: la rotación avanza entre ciclos — el primer entra
+			// ya no es c6 (es c9), y se metió c12 al final (no estaba
+			// en el primer load).
+			expect(relevos[5].entra).not.toEqual(relevos[1].entra)
+			expect(relevos[5].entra).toContain("c12")
 		})
 
 		it("relevos are numbered sequentially across cycles (1..S*N)", () => {
@@ -1221,15 +1306,14 @@ describe("cuadrillaDoblada", () => {
 		// the rotation by one (c7, c8, c9, ...).
 		// ══════════════════════════════════════════════════════════════
 
-		it("alternating P/S pattern: S swaps of B rotate c7, c8, c9, ... (not always c7)", () => {
+		it("alternating P/S pattern: cada carga de B avanza (Regla 1 + FIFO)", () => {
 			// Con 6 tramos [P, S, P, S, P, S] y 12 costaleros (A=6, B=6):
-			//   T1 P: A→B (B activa)
-			//   T2 S: B swap — sale=c7, entra=c12  (rotación inicial)
-			//   T3 P: B→A (A activa)
-			//   T4 S: A swap — sale=c1, entra=c6   (rotación de A)
-			//   T5 P: A→B (B activa)
-			//   T6 S: B swap — debe ser sale=c8, entra=c7 (rotación avanza)
-			//                            (sin el fix sería sale=c7, entra=c12)
+			//   T1 P: A load → entra=[c1..c5]
+			//   T2 S: TRANSITION + B load → entra=[c7..c11]
+			//   T3 P: TRANSITION + A load (con disp rotada) → entra=[c2..c6]
+			//   T4 S: TRANSITION + B load → entra=[c8..c12]
+			//   T5 P: TRANSITION + A load → entra=[c3..c7]
+			//   T6 S: TRANSITION + B load → entra=[c9..c12, c7]
 			const t = makeTrab(12, {
 				tramos: ["T1", "T2", "T3", "T4", "T5", "T6"],
 				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
@@ -1239,45 +1323,41 @@ describe("cuadrillaDoblada", () => {
 				["primario", "secundario", "primario", "secundario", "primario", "secundario"],
 			)
 			expect(relevos).toHaveLength(6)
-			// T2 (índice 1) — primer S de B
-			expect(relevos[1].tipo).toBe("intermedio")
+			// Todos son intra (Regla 1)
+			expect(relevos.every((r) => r.tipo === "intra")).toBe(true)
+			// Cuadrillas alternadas P/S
+			expect(relevos[0].cuadrilla).toBe("A")
 			expect(relevos[1].cuadrilla).toBe("B")
-			expect(relevos[1].sale).toEqual(["c7"])
-			expect(relevos[1].entra).toEqual(["c12"])
-			// T4 (índice 3) — S de A (porque T3 P dejó A activa)
-			expect(relevos[3].tipo).toBe("intermedio")
-			expect(relevos[3].cuadrilla).toBe("A")
-			expect(relevos[3].sale).toEqual(["c1"])
-			expect(relevos[3].entra).toEqual(["c6"])
-			// T6 (índice 5) — segundo S de B, debe rotar a c8 (NO c7)
-			expect(relevos[5].tipo).toBe("intermedio")
+			expect(relevos[2].cuadrilla).toBe("A")
+			expect(relevos[3].cuadrilla).toBe("B")
+			expect(relevos[4].cuadrilla).toBe("A")
 			expect(relevos[5].cuadrilla).toBe("B")
-			expect(relevos[5].sale).toEqual(["c8"])
-			expect(relevos[5].entra).toEqual(["c7"])
-			// Garantía explícita: c7 no se repite en los S swaps de B
-			expect(relevos[5].sale).not.toEqual(relevos[1].sale)
+			// Las cargas de B difieren entre sí (rotación avanza)
+			expect(relevos[1].entra).not.toEqual(relevos[3].entra)
+			expect(relevos[3].entra).not.toEqual(relevos[5].entra)
 		})
 
-		it("after a P swap, the just-left members go to the FRONT of the disp queue", () => {
-			// Test unitario del comportamiento de aplicarRelevoPrincipal
-			// relevante al bug. Setup: A activa con cargando=[c1..c5].
+		it("transicionActiva: el just-left va al FINAL del disp (los antiguos del disp cargan primero)", () => {
+			// Test unitario del invariante clave para que la rotación
+			// NO se resetee entre transiciones. Setup: A activa con
+			// cargando=[c1..c5], disp=[c6]. Al transicionar a B,
+			// A.cargando va al FINAL de A.disponibles (igual que un
+			// swap normal). Si fuera al FRENTE, cuando A volviera a
+			// activarse, los recién-descargados cargarían primero y la
+			// rotación se rompería.
 			const estadoInicial = crearEstadoInicial({
 				a: ["c1", "c2", "c3", "c4", "c5", "c6"],
 				b: ["c7", "c8", "c9", "c10", "c11", "c12"],
 			})
-			// A→B primero: A.sale=[], B.entra=[c7..c11]
-			const { estado: e1 } = aplicarRelevoPrincipal(estadoInicial)
-			// S en B: sale=c7, entra=c12
-			const { estado: e2 } = aplicarRelevoIntermedio(e1)
-			// Ahora: B.cargando=[c8..c12], B.disp=[c7]
-			expect(e2.estados.B.cargando).toEqual(["c8", "c9", "c10", "c11", "c12"])
-			expect(e2.estados.B.disponibles).toEqual(["c7"])
-			// B→A: sale=[c8..c12]
-			const { estado: e3 } = aplicarRelevoPrincipal(e2)
-			// A.entra = A.disp.slice(0,5) = [c1..c5]
-			expect(e3.estados.A.cargando).toEqual(["c1", "c2", "c3", "c4", "c5"])
-			// B.disp debe tener c8 primero (sale al frente) para que la rotación avance
-			expect(e3.estados.B.disponibles[0]).toBe("c8")
+			// A está vacía (estado inicial). Cargamos A primero.
+			const { estado: conACargada } = aplicarRelevoIntermedio(estadoInicial)
+			expect(conACargada.estados.A.cargando).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			expect(conACargada.estados.A.disponibles).toEqual(["c6"])
+			// TRANSITION A→B
+			const t = transicionActiva(conACargada, "B")
+			// A.cargando va al FINAL de A.disponibles (igual que un swap)
+			expect(t.estados.A.disponibles).toEqual(["c6", "c1", "c2", "c3", "c4", "c5"])
+			expect(t.estados.A.cargando).toEqual([])
 		})
 
 		// ══════════════════════════════════════════════════════════════
@@ -1322,21 +1402,21 @@ describe("cuadrillaDoblada", () => {
 			})
 			const relevos = simularCicloConTipos(t, ["secundario", "primario", "secundario"])
 			expect(relevos).toHaveLength(3)
-			// T1 S: load de A (sale=[], entra=primeros 5 de A)
-			expect(relevos[0].tipo).toBe("intermedio")
-			expect(relevos[0].cuadrilla).toBe("A")
+			// T1 S: B load (sale=[], entra=[c7..c11])
+			expect(relevos[0].tipo).toBe("intra")
+			expect(relevos[0].cuadrilla).toBe("B")
 			expect(relevos[0].sale).toEqual([])
-			expect(relevos[0].entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
-			// T2 P: A→B (ahora A tiene 5 cargando, sale completo)
-			expect(relevos[1].tipo).toBe("principal")
-			expect(relevos[1].cuadrilla).toBe("B")
-			expect(relevos[1].sale).toEqual(["c1", "c2", "c3", "c4", "c5"])
-			expect(relevos[1].entra).toEqual(["c7", "c8", "c9", "c10", "c11"])
-			// T3 S: B swap (sale=c7, entra=c12)
-			expect(relevos[2].tipo).toBe("intermedio")
+			expect(relevos[0].entra).toEqual(["c7", "c8", "c9", "c10", "c11"])
+			// T2 P: TRANSITION B→A + A load → entra=[c1..c5]
+			expect(relevos[1].tipo).toBe("intra")
+			expect(relevos[1].cuadrilla).toBe("A")
+			expect(relevos[1].sale).toEqual([])
+			expect(relevos[1].entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			// T3 S: TRANSITION A→B + B load (con disp rotada)
+			expect(relevos[2].tipo).toBe("intra")
 			expect(relevos[2].cuadrilla).toBe("B")
-			expect(relevos[2].sale).toEqual(["c7"])
-			expect(relevos[2].entra).toEqual(["c12"])
+			expect(relevos[2].sale).toEqual([])
+			expect(relevos[2].entra.length).toBe(5)
 		})
 
 		// ══════════════════════════════════════════════════════════════
@@ -1347,14 +1427,17 @@ describe("cuadrillaDoblada", () => {
 
 		it("S swap sobre cuadrilla con tamaño = ANCHO (sin disp) lanza error claro", () => {
 			// 10 costaleros, distribución 5/5. Cada cuadrilla tiene 5
-			// miembros exactos = ANCHO. Después del primer P, la cuadrilla
-			// inactiva tiene 0 en disp. Un S swap sobre ella falla.
+			// miembros exactos = ANCHO. Un [P, S] funciona (load B sin
+			// disp). Pero dos S seguidos sobre la misma cuadrilla sin
+			// recargar falla — el segundo swap intenta mover 1 de B.c
+			// pero B.d está vacío (todos cargando).
 			const t = makeTrab(10, {
-				tramos: ["T1", "T2"],
+				tramos: ["T1", "T2", "T3"],
 				distribucionCuadrillas: { a: [0,1,2,3,4], b: [5,6,7,8,9] },
 			})
-			// TramosTipo inválido: S después de P sin disp en B
-			expect(() => simularCicloConTipos(t, ["primario", "secundario"])).toThrow(
+			// [P, S, S]: T1 carga A, T2 transiciona + carga B, T3 quiere
+			// swap intra B pero B.disp=[] (todos cargando) → error.
+			expect(() => simularCicloConTipos(t, ["primario", "secundario", "secundario"])).toThrow(
 				/disponibles|intermedio/i,
 			)
 		})
@@ -1452,12 +1535,15 @@ describe("cuadrillaDoblada", () => {
 
 		it("no lanza si las bajas no dejan ninguna cuadrilla sub-ancho (5 miembros en cada una)", () => {
 			// 12 costaleros, 6/6. Bajas: [1] (c2, en A). A: 6 → 5, B: 6. OK.
+			// v1.3.2: con [P, S] (no [P,P]) porque A=5 no admite swaps
+			// intra-A (Regla 1: no se puede ir a B a swapear). T1 carga A,
+			// T2 transiciona + carga B → funciona sin disp en A.
 			const t = makeTrab(12, {
 				tramos: ["T1", "T2"],
 				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
 				bajas: [1],
 			})
-			const relevos = simularCicloConTipos(t, ["primario", "primario"])
+			const relevos = simularCicloConTipos(t, ["primario", "secundario"])
 			expect(relevos).toHaveLength(2)
 		})
 	})
@@ -1686,23 +1772,32 @@ describe("cuadrillaDoblada", () => {
 			expect(slotsManual.length).toBeGreaterThan(0)
 			expect(slotsDefault.length).toBeGreaterThan(0)
 
-			// Slots contain INDICES (not names). The first slot has B's first 5 members
-			// as "dentro" (after the A→B relevo).
-			// Manual B = {5,7,8,9,10,11} → first 5 = {5,7,8,9,10}
-			// Default B = {6,7,8,9,10,11} → first 5 = {6,7,8,9,10}
-			// Key difference: index 5 (c6) is in manual B's first-5 but NOT in default B's.
-			const firstManualDentro = new Set(slotsManual[0].dentro)
-			const firstDefaultDentro = new Set(slotsDefault[0].dentro)
-
-			// Index 5 (c6) is in manual B → should be in first slot's dentro
-			expect(firstManualDentro.has(5)).toBe(true)
-			// Index 5 (c6) is in default A → should NOT be in first slot's dentro
-			expect(firstDefaultDentro.has(5)).toBe(false)
-			// Index 6 (c7) is in default B → should be in default first slot's dentro
-			expect(firstDefaultDentro.has(6)).toBe(true)
-
-			// The two distributions produce different first-slot assignments
-			expect(firstManualDentro).not.toEqual(firstDefaultDentro)
+			// v1.3.2 Regla 1: el primer slot es A (P primero, no se cruza
+			// A↔B). Manual A = {0,1,2,3,4,6} → first 5 = {0,1,2,3,4}.
+			// Default A = {0,1,2,3,4,5} → first 5 = {0,1,2,3,4}.
+			// Ambos coinciden en el primer slot, pero DIFEREN en algún
+			// slot posterior cuando la rotación los va separando.
+			const allDentroManual = new Set<number>()
+			const allDentroDefault = new Set<number>()
+			slotsManual.forEach(s => s.dentro.forEach(i => allDentroManual.add(i)))
+			slotsDefault.forEach(s => s.dentro.forEach(i => allDentroDefault.add(i)))
+			// Manual incluye c7 (idx 6) en algún dentro (porque A lo tiene);
+			// Default incluye c7 en algún dentro (porque B lo tiene).
+			// La diferencia: manual pone c7 desde el principio (A.first5
+			// lo incluye eventualmente), default pone c7 desde el segundo
+			// ciclo (B.first5 lo incluye).
+			// Verificación clave: las distribuciones producen planes con
+			// dentro distintos en algún slot (no en el primero siempre).
+			let diffFound = false
+			for (let i = 0; i < Math.min(slotsManual.length, slotsDefault.length); i++) {
+				const a = new Set(slotsManual[i].dentro)
+				const b = new Set(slotsDefault[i].dentro)
+				if (a.size !== b.size || ![...a].every(x => b.has(x))) {
+					diffFound = true
+					break
+				}
+			}
+			expect(diffFound).toBe(true)
 		})
 
 		it("falls back to sugerirDistribucion when distribution is null", () => {

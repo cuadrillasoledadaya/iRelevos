@@ -110,9 +110,10 @@ describe("planStore completarPlan dispatch", () => {
   }
 
   it("completarPlan with cuadrillaDoblada=true uses rotation (P/S semantics), not greedy", () => {
-    // Con [P,S,P,S,P,S] alternado, el S de B en T2 debe SALE c7, T6 debe SALE c8
-    // (rotación avanza a través de los P swaps). El greedy de completarAuto
-    // ignoraría la cuadrilla doblada y produciría un plan arbitrario.
+    // v1.3.2 Regla 1: con [P,S,P,S,P,S] y A=6, B=6, ningún plan tiene
+    // personas de A y B simultáneamente dentro. Cada slot tiene 5
+    // dentro, todos de UNA cuadrilla. La rotación intra-cuadrilla
+    // avanza con cada swap.
     datos = makeCuadrillaDobladaData();
     setPlanDeps(
       (fn) => fn(datos),
@@ -123,13 +124,19 @@ describe("planStore completarPlan dispatch", () => {
     const t = datos.trabajaderas[0];
     expect(t.plan).not.toBeNull();
     expect(t.plan).toHaveLength(6);
-    // T2 (S de B): c7 en F (sale)
-    expect(t.plan![1].fuera).toContain(6); // c7 (idx 6)
-    // T4 (S de A): c1 en F (sale)
-    expect(t.plan![3].fuera).toContain(0); // c1 (idx 0)
-    // T6 (S de B): c8 en F (rotación avanza, NO c7)
-    expect(t.plan![5].fuera).toContain(7); // c8 (idx 7)
-    expect(t.plan![5].fuera).not.toContain(6); // c7 NO en F en T6
+    // Regla 1: 5 dentro, todos de UNA cuadrilla en cada slot
+    for (const slot of t.plan!) {
+      const dentro = new Set(slot.dentro);
+      const aCount = [...dentro].filter((i) => i < 6).length;
+      const bCount = [...dentro].filter((i) => i >= 6).length;
+      expect(aCount === 5 || bCount === 5).toBe(true);
+      expect(aCount + bCount).toBe(5);
+    }
+    // T2 (S, B load): c7..c11 dentro (c7-c11 son idx 6-10)
+    expect(t.plan![1].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
+    // T6 (S, B load con disp rotada): la rotación avanza, dentro ≠ T2
+    const t6Dentro = new Set(t.plan![5].dentro);
+    expect([...t6Dentro].sort()).not.toEqual([6, 7, 8, 9, 10]);
   });
 
   it("completarPlan with cuadrillaDoblada=false still uses greedy (backward compat)", () => {
