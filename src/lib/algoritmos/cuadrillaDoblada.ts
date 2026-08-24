@@ -696,10 +696,15 @@ export function simularCicloCompleto(
 		),
 	]
 
-	// Reusamos el core de simularCicloConTipos vía una mini-réplica: el
-	// legacy path no valida `distribucionCuadrillas` por índices, así
-	// que sintetizar un Trabajadera entero sería overhead. Solo
-	// necesitamos el estado + el orquestador.
+	// v1.4.0: el legacy path replica el comportamiento agrupado que
+	// existía antes del fix de cadencia mini-ciclo. Como
+	// `simularCicloConTipos` ya no agrupa por tipo, este loop
+	// itera directo sobre el array sintetizado (que de por sí ya
+	// está agrupado: todos los P primero, luego todos los S). El
+	// resultado es el mismo que la v1.3.3: una rotación por
+	// cuadrilla, sin alternancia. NO usamos el orquestador nuevo
+	// porque la cadencia legacy es exactamente lo que el capataz
+	// cambió en v1.4.0 — preservarla acá es deliberado.
 	const distCompleta: Distribucion = {
 		a: cuadrillas.a.miembros,
 		b: cuadrillas.b.miembros,
@@ -964,46 +969,67 @@ export function simularCicloConTipos(
 	let n = 1
 	const streaks = new Map<string, number>()
 
-	// v1.3.2 Regla 1 + Regla 2: cada tramo es un relevo intra-cuadrilla.
-	// Si el tipo cambia entre tramos consecutivos, primero
-	// `transicionActiva` cambia el flag (sin generar relevo) — el
-	// siguiente `aplicarRelevoIntermedio` carga la nueva cuadrilla
-	// desde disp (sale=[], entra=primeros 5) o rota si ya estaba
-	// cargada. Esto garantiza que ningún relevo cruza A�B.
-	// v1.3.3: REAGRUPAR respetando el orden del primer tipo. Si el
-	// primer tramo es P, todos los P's van primero (A hace su
-	// ciclo entero), luego los S's (B hace el suyo). Si el primer
-	// tramo es S, lo inverso. Así [P,S,P,S,P,S] → [P,P,P,S,S,S] y
-	// [S,P,S] → [S,S,P].
-	const primerTipo: TramoTipo = tramosTipo[0]
-	const segundoTipo: TramoTipo =
-		primerTipo === "primario" ? "secundario" : "primario"
-	const count1 = tramosTipo.filter((tt) => tt === primerTipo).length
-	const count2 = tramosTipo.filter((tt) => tt === segundoTipo).length
-	const groupedTipo: TramoTipo[] = [
-		...Array(count1).fill(primerTipo),
-		...Array(count2).fill(segundoTipo),
-	]
+	// v1.4.0: cadencia mini-ciclo alternada (capataz, feedback
+	// 2026-08-21). Reemplaza el reagrupamiento por tipo de v1.3.3.
+	//
+	// Reglas de negocio (versión ESTRICTA, decisión del capataz):
+	//   1. 1er SWAP obligatorio después del LOAD (mínimo 2 relevos
+	//      por turno, sin importar el tipo del slot).
+	//   2. Regla laxa: cualquier cuadrilla puede hacer relevo en
+	//      cualquier slot — el tipo P/S del slot es metadata, no
+	//      restricción de quién hace el relevo. La cuadrilla que
+	//      "toma" cada slot se decide por cadencia (turn-based).
+	//   3. Estricta 2-2: cada cuadrilla hace EXACTAMENTE 2 relevos
+	//      por turno (1 LOAD + 1 SWAP) y cede. NO hay SWAP
+	//      elástico. Si la cuadrilla puede hacer más swaps, no los
+	//      hace — cede el turno.
+	//   4. Si la cuadrilla activa se queda sin disponibles para el
+	//      1er SWAP obligatorio, se lanza
+	//      `CuadrillaDobladaSinDisponibleError` con el `tramoIdx`
+	//      correspondiente. El catch-all en `dispatcher.ts` lo
+	//      surfacea al usuario como mensaje claro. NO cede
+	//      silenciosamente.
+	// Contador de turno: 0=A, 1=B, 2=A, 3=B, ... (alternancia
+	// estricta 2-2). NO depende del tipo de slot — la cadencia es
+	// forzada por la posición del turno, no por P/S.
+	let turno = 0
 	for (let ciclo = 0; ciclo < salidas; ciclo++) {
-		for (let ti = 0; ti < groupedTipo.length; ti++) {
-			const tipo = groupedTipo[ti]
-			const required: CuadrillaId = tipo === "primario" ? "A" : "B"
-			try {
-				if (estado.cuadrillaActiva !== required) {
-					estado = transicionActiva(estado, required)
-				}
-				const r = aplicarRelevoIntermedio(estado, ANCHO_TRABAJADERA, true, streaks)
-				estado = r.estado
-				relevos.push({ ...r.relevo, numero: n++ })
-			} catch (err) {
-				if (err instanceof CuadrillaDobladaSinDisponibleError) {
-					throw new CuadrillaDobladaSinDisponibleError(
-						ciclo * groupedTipo.length + ti,
-						err.cuadrilla,
-					)
-				}
-				throw err
+		let tramoIdx = 0
+		while (tramoIdx < tramosTipo.length) {
+			const cuadrillaTurno: CuadrillaId = turno % 2 === 0 ? "A" : "B"
+
+			// 1. Transición si hace falta (NO genera relevo). Es
+			//    esperable que SIEMPRE se transicione acá, porque
+			//    cada turno cambia de cuadrilla.
+			if (estado.cuadrillaActiva !== cuadrillaTurno) {
+				estado = transicionActiva(estado, cuadrillaTurno)
 			}
+
+			// 2. Primer relevo del turno: LOAD si la cuadrilla
+			//    está vacía, SWAP si ya estaba cargada de un relevo
+			//    anterior (caso de salidas > 1 con la misma
+			//    cuadrilla volviendo a entrar).
+			const rLoad = aplicarRelevoIntermedio(estado, ANCHO_TRABAJADERA, true, streaks)
+			estado = rLoad.estado
+			relevos.push({ ...rLoad.relevo, numero: n++ })
+			tramoIdx += 1
+
+			// 3. 1er SWAP obligatorio si hay slot siguiente. Si
+			//    falla por `CuadrillaDobladaSinDisponibleError`, el
+			//    error se PROPAGA (regla 4 estricta) — el catch-all
+			//    en `dispatcher.ts` lo surfacea al usuario como
+			//    mensaje claro. NO cede silenciosamente.
+			if (tramoIdx < tramosTipo.length) {
+				const rSwap = aplicarRelevoIntermedio(estado, ANCHO_TRABAJADERA, true, streaks)
+				estado = rSwap.estado
+				relevos.push({ ...rSwap.relevo, numero: n++ })
+				tramoIdx += 1
+			}
+
+			// 4. Cede el turno. La siguiente iteración usará la
+			//    otra cuadrilla. SIN elástico: cada cuadrilla hace
+			//    EXACTAMENTE 2 relevos (LOAD + 1er SWAP) por turno.
+			turno += 1
 		}
 	}
 

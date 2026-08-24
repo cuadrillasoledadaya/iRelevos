@@ -69,10 +69,13 @@ describe("dispatchSimulacion (M4)", () => {
 		});
 	});
 
-	it("v1.3.3: cuadrilla doblada respeta la rotación agrupada (A→B)", () => {
-		// v1.3.3: con A=6, B=6 y [P,S,P,S,P,S] (reagrupado a [P×3,
-		// S×3]) A hace su ciclo entero (load + 1 swap) ANTES de B.
-		// Cada slot tiene 5 dentro de UNA sola cuadrilla (Regla 1).
+	it("v1.4.0: cuadrilla doblada respeta cadencia mini-ciclo alternada", () => {
+		// v1.4.0 (estricta 2-2 sin elástico): con A=6, B=6 y
+		// [P,S,P,S,P,S], turno 0=A (T0,T1), turno 1=B (T2,T3),
+		// turno 2=A (T4,T5). A hace LOAD+1er SWAP, cede; B hace
+		// LOAD+1er SWAP, cede; A hace LOAD+1er SWAP. 6 relevos en
+		// cadencia [A,A,B,B,A,A]. Cada slot tiene 5 dentro de UNA
+		// sola cuadrilla (Regla 1).
 		const t = makeCuadrillaDoblada();
 		const { plan } = dispatchSimulacion(t);
 		expect(plan).toHaveLength(6);
@@ -83,14 +86,18 @@ describe("dispatchSimulacion (M4)", () => {
 			expect(aCount === 5 || bCount === 5).toBe(true);
 			expect(aCount + bCount).toBe(5);
 		}
-		// A's full cycle: R1 load + R2 swap + R3 swap (A=6 → 2 swaps)
+		// Turno 0 (A): R1 LOAD + R2 SWAP
 		expect(plan[0].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 4]));
 		expect(plan[1].dentro).toEqual(expect.arrayContaining([1, 2, 3, 4, 5]));
-		expect(plan[2].dentro).toEqual(expect.arrayContaining([0, 2, 3, 4, 5]));
-		// B's full cycle: R4 load + R5 swap + R6 swap
-		expect(plan[3].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
-		expect(plan[4].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
-		expect(plan[5].dentro).toEqual(expect.arrayContaining([6, 8, 9, 10, 11]));
+		// Turno 1 (B): R3 LOAD + R4 SWAP
+		expect(plan[2].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
+		expect(plan[3].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
+		// Turno 2 (A): R5 LOAD + R6 SWAP. A.disp tras la trans
+		// A→B = [c1, c2..c6] (sólo c1 quedó en disp tras el SWAP
+		// de T1). LOAD toma los primeros 5: [c1..c5]. Después del
+		// SWAP de R6, A.cargando = [c2..c6].
+		expect(plan[4].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 4]));
+		expect(plan[5].dentro).toEqual(expect.arrayContaining([1, 2, 3, 4, 5]));
 	});
 
 	it("estándar (sin flag doblado) usa el camino greedy de completarAuto", () => {
