@@ -456,8 +456,16 @@ export function transicionActiva(
 			...estado.estados,
 			[activa]: {
 				cargando: [],
-				// just-unloaded van al final del disp (esperan más).
-				disponibles: [...eActiva.disponibles, ...eActiva.cargando],
+				// v1.4.1: just-unloaded (los que estaban en cargando) van
+				// al FRENTE del disp, y el "sale" anterior (que ya
+				// estaba en disp) va al FINAL. Esto es la inversión del
+				// invariante de v1.3.2 — pero la intención es la misma:
+				// que el costalero que acaba de salir espere más antes
+				// de volver a cargar. Antes el "sale anterior" iba al
+				// frente y trapaba la rotación (siempre salía y entraba
+				// el mismo). Ahora va al final y deja que otros miembros
+				// de la cuadrilla roten primero.
+				disponibles: [...eActiva.cargando, ...eActiva.disponibles],
 			},
 		},
 	}

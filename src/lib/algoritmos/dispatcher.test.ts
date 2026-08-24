@@ -92,12 +92,14 @@ describe("dispatchSimulacion (M4)", () => {
 		// Turno 1 (B): R3 LOAD + R4 SWAP
 		expect(plan[2].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
 		expect(plan[3].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
-		// Turno 2 (A): R5 LOAD + R6 SWAP. A.disp tras la trans
-		// A→B = [c1, c2..c6] (sólo c1 quedó en disp tras el SWAP
-		// de T1). LOAD toma los primeros 5: [c1..c5]. Después del
-		// SWAP de R6, A.cargando = [c2..c6].
-		expect(plan[4].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 4]));
-		expect(plan[5].dentro).toEqual(expect.arrayContaining([1, 2, 3, 4, 5]));
+		// Turno 2 (A): R5 LOAD + R6 SWAP. v1.4.1: A.disp tras la
+		// trans A→B (V2 invertido) = [c2..c6, c1] (cargando al
+		// frente, sale anterior al final). Regla 2 detecta c1
+		// con streak=3 y corre la ventana: nuevosCargando =
+		// slice(1, 6) = [c3,c4,c5,c6,c1]. R6 (SWAP): sale=[c3]
+		// entra=[c2]. cargando=[c4,c5,c6,c1,c2].
+		expect(plan[4].dentro).toEqual(expect.arrayContaining([0, 2, 3, 4, 5]));
+		expect(plan[5].dentro).toEqual(expect.arrayContaining([0, 1, 3, 4, 5]));
 	});
 
 	it("estándar (sin flag doblado) usa el camino greedy de completarAuto", () => {

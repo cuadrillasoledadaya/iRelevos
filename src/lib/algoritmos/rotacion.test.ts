@@ -321,10 +321,10 @@ describe("rotacion", () => {
 			expect(plan).toHaveLength(8);
 			// R3 (B LOAD salida 1, turno 1 T2): dentro=[c8..c12] (índices 7..11)
 			expect(plan[2].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
-			// R7 (B LOAD salida 2, turno 3 T2): FIFO rotó, c14 entró
-			// primero (era el más antiguo del disp de B). dentro
-			// incluye c14 en lugar de c12.
-			expect(plan[6].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 13]));
+			// R7 (B LOAD salida 2, turno 3 T0): FIFO rotó. c10..c14
+			// ya cargaron, c8 y c9 quedaron en disp. turno es
+			// continuo (turno 3 = B en salida 2).
+			expect(plan[6].dentro).toEqual(expect.arrayContaining([9, 10, 11, 12, 13]));
 			expect(plan[6].dentro).not.toEqual(plan[2].dentro);
 		})
 
@@ -364,13 +364,13 @@ describe("rotacion", () => {
 			expect(plan[2].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
 			expect(plan[3].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
 			// Turno 2 (A): R5 LOAD + R6 SWAP
-			// A.disp tras trans A→B = [c1, c2..c6] (sólo c1 quedó
-			// en disp tras el SWAP de T1; c2..c6 eran el cargando y
-			// se concatenan al final). LOAD toma los primeros 5:
-			// [c1, c2, c3, c4, c5] = índices [0, 1, 2, 3, 4].
-			// Después del SWAP de R6, A.cargando = [c2..c6].
-			expect(plan[4].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 4]));
-			expect(plan[5].dentro).toEqual(expect.arrayContaining([1, 2, 3, 4, 5]));
+			// v1.4.1: A.disp tras la trans A→B (V2 invertido) =
+			// [c2..c6, c1] (cargando al frente, sale anterior al
+			// final). Regla 2 detecta c1 con streak=3 y corre la
+			// ventana: nuevosCargando = slice(1, 6) = [c3,c4,c5,c6,c1].
+			// R6 (SWAP): sale=[c3] entra=[c2]. cargando=[c4,c5,c6,c1,c2].
+			expect(plan[4].dentro).toEqual(expect.arrayContaining([0, 2, 3, 4, 5]));
+			expect(plan[5].dentro).toEqual(expect.arrayContaining([0, 1, 3, 4, 5]));
 			// Regla 1: ningún plan incluye personas de A y B simultáneamente.
 			for (const slot of plan) {
 				const dentro = new Set(slot.dentro);

@@ -476,8 +476,15 @@ describe("cuadrillaDoblada", () => {
 			expect(t.estados.B.cargando).toEqual([])
 			expect(t.estados.B.disponibles).toEqual(nombres(6))
 		})
-		it("preserva la cuadrilla que estaba cargando y la pasa al final de su disp", () => {
-			// Setup: A activa con cargando=[c1..c5], disp=[c6, c7]
+		it("preserva la cuadrilla que estaba cargando y la pasa al FRENTE de su disp", () => {
+			// v1.4.1: el orden se invirtió respecto a v1.3.2. Setup:
+			// A activa con cargando=[c1..c5], disp=[c6, c7]. Al
+			// transicionar a B, los just-unloaded (c1..c5) van al
+			// FRENTE del disp (esperan menos) y el disp anterior
+			// (c6, c7) va al FINAL (esperan más). Esto es la
+			// inversión que rompe la rotación atrapada de v1.3.2 —
+			// ver test "transicionActiva: el just-left va al FRENTE
+			// del disp" más abajo.
 			const estado: EstadoPlan = {
 				cuadrillaActiva: "A",
 				estados: {
@@ -487,10 +494,10 @@ describe("cuadrillaDoblada", () => {
 			}
 			const t = transicionActiva(estado, "B")
 			expect(t.cuadrillaActiva).toBe("B")
-			// A.cargando va al FINAL de A.disponibles (los más recientes
-			// esperan más — coherente con el swap path de
-			// aplicarRelevoIntermedio que también pone sale al final).
-			expect(t.estados.A.disponibles).toEqual(["c6", "c7", "c1", "c2", "c3", "c4", "c5"])
+			// v1.4.1: just-unloaded (c1..c5) al frente, disp anterior
+			// (c6, c7) al final. El "sale" del último SWAP (c1)
+			// tendrá que esperar más antes de volver a cargar.
+			expect(t.estados.A.disponibles).toEqual(["c1", "c2", "c3", "c4", "c5", "c6", "c7"])
 			expect(t.estados.A.cargando).toEqual([])
 		})
 	})
@@ -1261,25 +1268,26 @@ describe("cuadrillaDoblada", () => {
 				2,
 			)
 			// 2 salidas × 4 relevos (A LOAD+SWAP, B LOAD+SWAP) = 8.
+			// v1.4.1: turno es continuo entre ciclos, así que
+			// turno 0=A, 1=B, 2=A, 3=B (no se resetea).
 			expect(relevos).toHaveLength(8)
-			// Salida 1 R3 (B LOAD, turno 1 cubre T2+T3): entra=[c8..c12]
+			// Salida 1 R3 (B LOAD turno 1, T2): entra=[c8..c12]
 			expect(relevos[2].cuadrilla).toBe("B")
 			expect(relevos[2].sale).toEqual([])
 			expect(relevos[2].entra).toEqual(["c8", "c9", "c10", "c11", "c12"])
+			// Salida 1 R4 (B SWAP turno 1, T3): sale=[c8] entra=[c13]
 			expect(relevos[3].cuadrilla).toBe("B")
 			expect(relevos[3].sale).toEqual(["c8"])
 			expect(relevos[3].entra).toEqual(["c13"])
-			// Salida 2 R7 (B LOAD, turno 3): entra DISTINTO a R3
-			// (c14 entró al ciclo, c13 quedó en disp, FIFO rotó).
-			// OJO: en B.disp después de trans B→A, el orden es
-			// [c14, c8, c9..c13] (c14 era el más antiguo, va al
-			// frente; c8 se agregó al final tras el SWAP de T3).
+			// Salida 2 R7 (B LOAD turno 3, T0): entra distinto a R3
+			// (FIFO rotó: c10..c14 ya cargaron, c8 quedó en disp).
 			expect(relevos[6].cuadrilla).toBe("B")
 			expect(relevos[6].sale).toEqual([])
-			expect(relevos[6].entra).toEqual(["c14", "c8", "c9", "c10", "c11"])
+			expect(relevos[6].entra).toEqual(["c10", "c11", "c12", "c13", "c14"])
+			// Salida 2 R8 (B SWAP turno 3, T1): sale=[c10] entra=[c9]
 			expect(relevos[7].cuadrilla).toBe("B")
-			expect(relevos[7].sale).toEqual(["c14"])
-			expect(relevos[7].entra).toEqual(["c12"])
+			expect(relevos[7].sale).toEqual(["c10"])
+			expect(relevos[7].entra).toEqual(["c9"])
 		})
 
 		it("relevos are numbered sequentially across cycles (1..S*N)", () => {
@@ -1352,22 +1360,30 @@ describe("cuadrillaDoblada", () => {
 			expect(relevos[3].sale).toEqual(["c7"])
 			expect(relevos[3].entra).toEqual(["c12"])
 			// Turno 2 (A): R5 LOAD + R6 SWAP
+			// v1.4.1: A.disp tras la trans A→B (V2, orden invertido)
+			// = [c2..c6, c1] (cargando al frente, sale anterior al
+			// final). La Regla 2 detecta que c1 tiene streak=3 y
+			// corre la ventana de carga para incluirlo al final:
+			// nuevosCargando = slice(1, 6) = [c3, c4, c5, c6, c1].
+			// Después del SWAP, A.cargando = [c4, c5, c6, c1, c2].
 			expect(relevos[4].cuadrilla).toBe("A")
 			expect(relevos[4].sale).toEqual([])
-			expect(relevos[4].entra).toEqual(["c1", "c2", "c3", "c4", "c5"])
+			expect(relevos[4].entra).toEqual(["c3", "c4", "c5", "c6", "c1"])
 			expect(relevos[5].cuadrilla).toBe("A")
-			expect(relevos[5].sale).toEqual(["c1"])
-			expect(relevos[5].entra).toEqual(["c6"])
+			expect(relevos[5].sale).toEqual(["c3"])
+			expect(relevos[5].entra).toEqual(["c2"])
 		})
 
-		it("transicionActiva: el just-left va al FINAL del disp (los antiguos del disp cargan primero)", () => {
-			// Test unitario del invariante clave para que la rotación
-			// NO se resetee entre transiciones. Setup: A activa con
-			// cargando=[c1..c5], disp=[c6]. Al transicionar a B,
-			// A.cargando va al FINAL de A.disponibles (igual que un
-			// swap normal). Si fuera al FRENTE, cuando A volviera a
-			// activarse, los recién-descargados cargarían primero y la
-			// rotación se rompería.
+		it("transicionActiva: el just-left va al FRENTE del disp (los antiguos del disp esperan al final)", () => {
+			// v1.4.1: el orden del disp en la transición se invirtió
+			// respecto a v1.3.2. Antes el "sale anterior" (c6) iba al
+			// frente del disp, lo que hacía que c6 SIEMPRE cargara
+			// primero y saliera en el siguiente turno de A (rotación
+			// atrapada: c1 y c6 fijos en sus papeles, c2..c5 nunca
+			// salían). Ahora los "just-unloaded" (c1..c5) van al
+			// frente y el "sale anterior" (c6) al final, así c6
+			// espera más antes de volver a cargar y la rotación fluye
+			// entre todos los miembros de la cuadrilla.
 			const estadoInicial = crearEstadoInicial({
 				a: ["c1", "c2", "c3", "c4", "c5", "c6"],
 				b: ["c7", "c8", "c9", "c10", "c11", "c12"],
@@ -1378,8 +1394,8 @@ describe("cuadrillaDoblada", () => {
 			expect(conACargada.estados.A.disponibles).toEqual(["c6"])
 			// TRANSITION A→B
 			const t = transicionActiva(conACargada, "B")
-			// A.cargando va al FINAL de A.disponibles (igual que un swap)
-			expect(t.estados.A.disponibles).toEqual(["c6", "c1", "c2", "c3", "c4", "c5"])
+			// v1.4.1: cargando al frente, disp anterior (sale) al final
+			expect(t.estados.A.disponibles).toEqual(["c1", "c2", "c3", "c4", "c5", "c6"])
 			expect(t.estados.A.cargando).toEqual([])
 		})
 
@@ -1542,12 +1558,23 @@ describe("cuadrillaDoblada", () => {
 			expect(relevos[2].cuadrilla).toBe("B")
 			expect(relevos[2].sale).toEqual([])
 			expect(relevos[2].entra).toEqual(["c8", "c9", "c10", "c11", "c12"])
+			// Salida 1 R4 (B SWAP turno 1, T3): sale=[c8] entra=[c13]
+			expect(relevos[3].cuadrilla).toBe("B")
+			expect(relevos[3].sale).toEqual(["c8"])
+			expect(relevos[3].entra).toEqual(["c13"])
 			// Salida 2 R7 (B LOAD turno 3, T0): entra distinto a R3
-			// (FIFO rotó: c14 ya cargó, c13 quedó en disp; c14 va al
-			// frente del disp porque es el más antiguo de B).
+			// (FIFO rotó: c10..c14 ya cargaron, c8 y c9 quedaron en
+			// disp). turno es continuo (no se resetea por ciclo),
+			// así que turno 3 = B, turno 4 = A, turno 5 = B.
 			expect(relevos[6].cuadrilla).toBe("B")
 			expect(relevos[6].sale).toEqual([])
-			expect(relevos[6].entra).toEqual(["c14", "c8", "c9", "c10", "c11"])
+			expect(relevos[6].entra).toEqual(["c10", "c11", "c12", "c13", "c14"])
+			// Salida 2 R9 (A LOAD turno 4, T2): entra con Regla 2
+			// (c1 con streak alto) — corre la ventana y mete c1 al
+			// final del entra.
+			expect(relevos[8].cuadrilla).toBe("A")
+			expect(relevos[8].sale).toEqual([])
+			expect(relevos[8].entra).toEqual(["c5", "c6", "c7", "c2", "c1"])
 		})
 
 		it("v1.4.0: SWAP elástico NO aplica cuando siguientes tramos son de tipo distinto", () => {
@@ -1611,17 +1638,17 @@ describe("cuadrillaDoblada", () => {
 			expect(relevos[3].cuadrilla).toBe("B")
 			expect(relevos[3].sale).toEqual(["c8"])
 			expect(relevos[3].entra).toEqual(["c13"])
-			// Turno 2 (A): R5 LOAD + R6 SWAP. OJO: A.disp después
-			// de la trans A→B tiene orden [c7, c1, c2..c6] (c7 al
-			// frente porque es el más antiguo — se quedó en disp
-			// desde el inicio sin transicionar; c1 quedó al final
-			// tras el SWAP de T1).
+			// Turno 2 (A): R5 LOAD + R6 SWAP. v1.4.1: A.disp tras
+			// la trans A→B (V2 invertido) = [c2..c6, c7, c1]. La
+			// Regla 2 detecta c7 con streak=4 y corre la ventana:
+			// nuevosCargando = slice(1, 6) = [c3, c4, c5, c6, c7].
+			// Después del SWAP, A.cargando = [c4, c5, c6, c7, c2].
 			expect(relevos[4].cuadrilla).toBe("A")
 			expect(relevos[4].sale).toEqual([])
-			expect(relevos[4].entra).toEqual(["c7", "c1", "c2", "c3", "c4"])
+			expect(relevos[4].entra).toEqual(["c3", "c4", "c5", "c6", "c7"])
 			expect(relevos[5].cuadrilla).toBe("A")
-			expect(relevos[5].sale).toEqual(["c7"])
-			expect(relevos[5].entra).toEqual(["c5"])
+			expect(relevos[5].sale).toEqual(["c3"])
+			expect(relevos[5].entra).toEqual(["c2"])
 		})
 
 		it("v1.4.0: todos los tramos del mismo tipo produce cadencia [A,A,B]", () => {
