@@ -109,10 +109,12 @@ describe("planStore completarPlan dispatch", () => {
     };
   }
 
-  it("completarPlan with cuadrillaDoblada=true uses grouped rotation (A→B), not greedy", () => {
-    // v1.3.3: con [P,S,P,S,P,S] reagrupado a [P×3, S×3] y A=6, B=6,
-    // A hace su ciclo entero (load + 1 swap) ANTES de B. Cada slot
-    // tiene 5 dentro, todos de UNA sola cuadrilla (Regla 1).
+  it("completarPlan with cuadrillaDoblada=true uses mini-ciclo alternado (AABB AABB), not grouped", () => {
+    // v1.4.0/v1.4.1: con [P,S,P,S,P,S] y A=6, B=6, cadencia mini-ciclo
+    // (capataz, feedback 2026-08-21): cada cuadrilla hace LOAD+SWAP y cede.
+    // Turno 0 (A): R1 LOAD + R2 SWAP. Turno 1 (B): R3 LOAD + R4 SWAP.
+    // Turno 2 (A): R5 LOAD + R6 SWAP. Resultado: A,A,B,B,A,A en 6 slots.
+    // Cada slot tiene 5 dentro, todos de UNA sola cuadrilla (Regla 1).
     datos = makeCuadrillaDobladaData();
     setPlanDeps(
       (fn) => fn(datos),
@@ -131,14 +133,18 @@ describe("planStore completarPlan dispatch", () => {
       expect(aCount === 5 || bCount === 5).toBe(true);
       expect(aCount + bCount).toBe(5);
     }
-    // A's full cycle: R1 load + R2 swap + R3 swap (A=6 → 2 swaps)
+    // Turno 0 (A): R1 LOAD + R2 SWAP (c1 sale, c6 entra)
     expect(t.plan![0].dentro).toEqual(expect.arrayContaining([0, 1, 2, 3, 4]));
     expect(t.plan![1].dentro).toEqual(expect.arrayContaining([1, 2, 3, 4, 5]));
-    expect(t.plan![2].dentro).toEqual(expect.arrayContaining([0, 2, 3, 4, 5]));
-    // B's full cycle: R4 load + R5 swap + R6 swap
-    expect(t.plan![3].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
-    expect(t.plan![4].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
-    expect(t.plan![5].dentro).toEqual(expect.arrayContaining([6, 8, 9, 10, 11]));
+    // Turno 1 (B): R3 LOAD + R4 SWAP (c7 sale, c12 entra)
+    expect(t.plan![2].dentro).toEqual(expect.arrayContaining([6, 7, 8, 9, 10]));
+    expect(t.plan![3].dentro).toEqual(expect.arrayContaining([7, 8, 9, 10, 11]));
+    // Turno 2 (A): R5 LOAD + R6 SWAP
+    // v1.4.1: la ventana de carga se corre para evitar streak=3 (Regla 2).
+    // R5 LOAD: nuevosCargando = [c3, c4, c5, c6, c1] (orden set interno)
+    // R6 SWAP: sale c3, entra c2 → cargando = [c4, c5, c6, c1, c2]
+    expect(t.plan![4].dentro).toEqual(expect.arrayContaining([0, 2, 3, 4, 5]));
+    expect(t.plan![5].dentro).toEqual(expect.arrayContaining([0, 1, 3, 4, 5]));
   });
 
   it("completarPlan with cuadrillaDoblada=false still uses greedy (backward compat)", () => {
