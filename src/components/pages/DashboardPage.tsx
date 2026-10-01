@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import { uiStore } from "@/stores";
+import { uiStore, temporadaStore } from "@/stores";
 import type { ActivePage } from "@/lib/types";
 import packageJson from "../../../package.json";
 
@@ -152,6 +152,7 @@ function AttentionList({
 export default function DashboardPage() {
 	const { profile } = useAuth();
 	const setActivePage = uiStore.getState().setActivePage;
+	const activeTemporadaId = temporadaStore((s) => s.activeTemporadaId);
 
 	const [stats, setStats] = useState({
 		censados: 0,
@@ -169,15 +170,25 @@ export default function DashboardPage() {
 	useEffect(() => {
 		async function fetchStats() {
 			try {
-				const { count: censusCount } = await supabase
-					.from("census")
-					.select("*", { count: "exact", head: true });
-				const { count: pasosCount } = await supabase
-					.from("proyectos")
-					.select("*", { count: "exact", head: true });
+				let censusCount = 0;
+				if (activeTemporadaId) {
+					const { count } = await supabase
+						.from("census")
+						.select("*", { count: "exact", head: true })
+						.eq("temporada_id", activeTemporadaId);
+					censusCount = count ?? 0;
+				}
+				let pasosCount = 0;
+				if (activeTemporadaId) {
+					const { count } = await supabase
+						.from("proyectos")
+						.select("*", { count: "exact", head: true })
+						.eq("temporada_id", activeTemporadaId);
+					pasosCount = count ?? 0;
+				}
 
 				setStats({
-					censados: censusCount || 0,
+					censados: censusCount,
 					pasos: pasosCount || 0,
 					trabajaderas: 0,
 				});
@@ -260,20 +271,23 @@ export default function DashboardPage() {
 					}
 				}
 
-				// 3. Costaleros sin contacto
-				const { count: noContactCount, error: contactErr } = await supabase
-					.from("census")
-					.select("*", { count: "exact", head: true })
-					.or("email.is.null,email.eq.,telefono.is.null,telefono.eq.");
+				// 3. Costaleros sin contacto (filtered by active temporada)
+				if (activeTemporadaId) {
+					const { count: noContactCount, error: contactErr } = await supabase
+						.from("census")
+						.select("*", { count: "exact", head: true })
+						.eq("temporada_id", activeTemporadaId)
+						.or("email.is.null,email.eq.,telefono.is.null,telefono.eq.");
 
-				if (!contactErr && noContactCount && noContactCount > 0) {
-					alerts.push({
-						id: "no-contact",
-						emoji: "📱",
-						message: `${noContactCount} costalero${noContactCount > 1 ? "s" : ""} sin email o teléfono`,
-						action: "Ir al censo",
-						targetPage: "carga",
-					});
+					if (!contactErr && noContactCount && noContactCount > 0) {
+						alerts.push({
+							id: "no-contact",
+							emoji: "📱",
+							message: `${noContactCount} costalero${noContactCount > 1 ? "s" : ""} sin email o teléfono`,
+							action: "Ir al censo",
+							targetPage: "carga",
+						});
+					}
 				}
 			} catch (e) {
 				console.error("Error checking attention alerts:", e);
@@ -284,7 +298,7 @@ export default function DashboardPage() {
 		fetchStats();
 		fetchActivity();
 		fetchAttention();
-	}, []);
+	}, [activeTemporadaId]);
 
 	// Pick a quote that rotates daily based on day-of-year
 	const quoteIndex =
