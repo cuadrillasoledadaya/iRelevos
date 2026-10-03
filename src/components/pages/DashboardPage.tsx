@@ -171,25 +171,39 @@ export default function DashboardPage() {
 		async function fetchStats() {
 			try {
 				let censusCount = 0;
-				if (activeTemporadaId) {
-					const { count } = await supabase
-						.from("census")
-						.select("*", { count: "exact", head: true })
-						.eq("temporada_id", activeTemporadaId);
-					censusCount = count ?? 0;
-				}
 				let pasosCount = 0;
 				if (activeTemporadaId) {
-					const { count } = await supabase
+					// Mirror useAdminData.ts: census rows are owned by a temporada
+					// either directly (temporada_id set) OR transitively via
+					// their proyecto's temporada_id. Without the OR fallback,
+					// legacy rows with temporada_id NULL are dropped.
+					const { data: projIds } = await supabase
 						.from("proyectos")
-						.select("*", { count: "exact", head: true })
+						.select("id")
 						.eq("temporada_id", activeTemporadaId);
-					pasosCount = count ?? 0;
+					const validPids = (projIds || []).map((p) => p.id);
+					pasosCount = (projIds || []).length;
+
+					let censusQuery = supabase
+						.from("census")
+						.select("*", { count: "exact", head: true });
+					if (validPids.length > 0) {
+						censusQuery = censusQuery.or(
+							`temporada_id.eq.${activeTemporadaId},proyecto_id.in.(${validPids.join(",")})`,
+						);
+					} else {
+						censusQuery = censusQuery.eq(
+							"temporada_id",
+							activeTemporadaId,
+						);
+					}
+					const { count } = await censusQuery;
+					censusCount = count ?? 0;
 				}
 
 				setStats({
 					censados: censusCount,
-					pasos: pasosCount || 0,
+					pasos: pasosCount,
 					trabajaderas: 0,
 				});
 			} catch (e) {
@@ -271,13 +285,35 @@ export default function DashboardPage() {
 					}
 				}
 
-				// 3. Costaleros sin contacto (filtered by active temporada)
+				// 3. Costaleros sin contacto (filtered by active temporada, OR fallback via proyecto_id)
 				if (activeTemporadaId) {
-					const { count: noContactCount, error: contactErr } = await supabase
+					const { data: projIds } = await supabase
+						.from("proyectos")
+						.select("id")
+						.eq("temporada_id", activeTemporadaId);
+					const validPids = (projIds || []).map((p) => p.id);
+
+					let noContactQuery = supabase
 						.from("census")
-						.select("*", { count: "exact", head: true })
-						.eq("temporada_id", activeTemporadaId)
-						.or("email.is.null,email.eq.,telefono.is.null,telefono.eq.");
+						.select("*", { count: "exact", head: true });
+					if (validPids.length > 0) {
+						noContactQuery = noContactQuery
+							.or(
+								`temporada_id.eq.${activeTemporadaId},proyecto_id.in.(${validPids.join(",")})`,
+							)
+							.or(
+								"email.is.null,email.eq.,telefono.is.null,telefono.eq.",
+							);
+					} else {
+						noContactQuery = noContactQuery
+							.eq("temporada_id", activeTemporadaId)
+							.or(
+								"email.is.null,email.eq.,telefono.is.null,telefono.eq.",
+							);
+					}
+
+					const { count: noContactCount, error: contactErr } =
+						await noContactQuery;
 
 					if (!contactErr && noContactCount && noContactCount > 0) {
 						alerts.push({
