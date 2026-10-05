@@ -8,9 +8,11 @@ import type {
   PinState, RolCode, SwapState, Temporada,
 } from '@/lib/types'
 import type { SugerenciaRes } from '@/lib/algoritmos'
+import type { SaveError } from './saveCloud'
 
 export type { ActivePage, ActiveSheet, CellTarget, CensusTarget, DatosPerfil, PasoDB, PinState, RolCode, SwapState, Temporada }
 export type { SugerenciaRes }
+export type { SaveError }
 
 // ── UI Slice ───────────────────────────────────────────────────────
 
@@ -150,7 +152,7 @@ export interface RootState extends UIState, ProjectState, TemporadaState {
 export interface RootActions
   extends UIActions, ProjectActions, TemporadaActions, TrabajaderaActions, PlanActions, BancoActions {
   mutar: (fn: (draft: DatosPerfil) => void) => void
-  saveCloud: (content: DatosPerfil, targetPid: string) => void
+  saveCloud: (content: DatosPerfil, targetPid: string, onSaveError?: (reason: SaveError) => void) => void
   vaciarCenso: () => Promise<void>
 }
 
