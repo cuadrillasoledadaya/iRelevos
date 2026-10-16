@@ -139,19 +139,19 @@ describe("dispatchSimulacion (M4)", () => {
 		expect(objetivo).toEqual({});
 	});
 
-	it("cuadrilla doblada con S sin disp: devuelve error claro (no throw)", () => {
+	it("cuadrilla doblada con S sin disp: plan completo sin error (v1.5.0 SWAP opcional)", () => {
 		const t = makeCuadrillaDoblada();
-		// v1.3.2: con A=5, B=5 y [P,S,S], el primer S carga B (sin
-		// disp aún), el segundo S sobre B falla porque B.d está vacío.
+		// v1.5.0: antes devolvía error. AHORA el SWAP es opcional —
+		// cede el turno sin error y el plan se genera completo
+		// (3 LOADs: A, B, A).
 		t.nombres = Array.from({ length: 10 }, (_, i) => `c${i + 1}`);
 		t.roles = Array.from({ length: 10 }, () => ({ pri: "COR" as const, sec: "FIJ_I" as const }));
 		t.tramos = ["T1", "T2", "T3"];
 		t.tramosTipo = ["primario", "secundario", "secundario"];
 		t.distribucionCuadrillas = { a: [0, 1, 2, 3, 4], b: [5, 6, 7, 8, 9] };
 		const { plan, error } = dispatchSimulacion(t);
-		expect(error).toBeDefined();
-		expect(error).toMatch(/disponibles|intermedio|secundario/i);
-		expect(plan).toEqual([]);
+		expect(error).toBeUndefined();
+		expect(plan.length).toBeGreaterThan(0);
 	});
 
 	it("estándar con validación de pins fallida: devuelve error (no throw)", () => {

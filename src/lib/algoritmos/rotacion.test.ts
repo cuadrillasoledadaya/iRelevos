@@ -392,23 +392,23 @@ describe("rotacion", () => {
 			// 10 costaleros, distribución 5/5. Cada cuadrilla tiene 5
 			// miembros exactos = ANCHO. v1.3.2: dos S consecutivos
 			// sobre la misma cuadrilla sin recargar falla (B.d queda
-			// vacío tras el primer S). El dispatcher debe capturar y
-			// devolver un error en lugar de throw.
+			// v1.5.0: antes devolvía error. AHORA el SWAP es
+			// opcional — cede el turno sin error y el plan se
+			// genera completo (3 LOADs: A, B, A).
 			const t = makeTrabajadera(
 				Array.from({ length: 10 }, (_, i) => `c${i + 1}`),
 				["T1", "T2", "T3"],
 				1, // single salida
 			);
 			t.cuadrillaDoblada = true;
-			t.tramosTipo = ["primario", "secundario", "secundario"]; // P, S, S — B sin disp tras T2
+			t.tramosTipo = ["primario", "secundario", "secundario"];
 			t.distribucionCuadrillas = {
 				a: [0, 1, 2, 3, 4],
 				b: [5, 6, 7, 8, 9],
 			};
 			const result = calcularCiclo(t);
-			expect(result.error).toBeDefined();
-			expect(result.error).toMatch(/disponibles|intermedio|secundario/i);
-			expect(result.plan).toEqual([]);
+			expect(result.error).toBeUndefined();
+			expect(result.plan.length).toBeGreaterThan(0);
 		});
 
 		// ══════════════════════════════════════════════════════════════
