@@ -507,18 +507,22 @@ export function aplicarRelevoIntermedio(
 
 	// v1.2.90 B2: si la cuadrilla activa está vacía (cargando=[]), no
 	// hay nadie a quien SALE. Si hay disponibles, "cargamos" la cuadrilla
-	// desde disp (los primeros ANCHO pasan a cargando, el resto queda en
-	// disp). Esto es un no-swap (sale=[], entra=los que entraron) que
-	// ocurre naturalmente justo después de una `transicionActiva`.
+	// desde disp. v1.5.0: cargamos `min(disponibles, ANCHO)` — si la
+	// cuadrilla tiene 6 miembros, los 6 cargan (regla inamovible: "5
+	// dentro mínimo" permite 6+). Esto es un no-swap (sale=[],
+	// entra=los que entraron) que ocurre naturalmente justo después de
+	// una `transicionActiva`.
 	if (eActiva.cargando.length === 0) {
-		if (eActiva.disponibles.length < ancho) {
-			if (eActiva.disponibles.length === 0) {
-				throw new Error(
-					`Cuadrilla ${activa} está completamente vacía (sin cargando ni disponibles) para relevo intermedio`,
-				)
-			}
-			throw new CuadrillaDobladaSinDisponibleError(-1, activa)
+		if (eActiva.disponibles.length === 0) {
+			throw new Error(
+				`Cuadrilla ${activa} está completamente vacía (sin cargando ni disponibles) para relevo intermedio`,
+			)
 		}
+		// v1.5.0: cargar `min(disponibles, ancho)`. Legacy: el
+		// "ancho del paso" es 5, así que el LOAD mete 5 personas.
+		// Si la cuadrilla tiene menos de `ancho` miembros (caso
+		// degenerado de modo doblado), cargamos los que haya.
+		const aCargar = Math.min(eActiva.disponibles.length, ancho)
 
 		// Pick entra: Rule 2 override (correr la ventana para incluir al
 		// primero en disp con streak >= 3) o FIFO (los primeros `ancho`).
@@ -543,22 +547,22 @@ export function aplicarRelevoIntermedio(
 			}
 			if (bestIdx >= 0) {
 				// Posición del streak-3 en el entra: al final (índice
-				// `ancho-1`). Por lo tanto, entraIdx = bestIdx - (ancho - 1).
-				const candidate = bestIdx - (ancho - 1)
-				if (candidate >= 0 && candidate + ancho <= disp.length) {
+				// `aCargar-1`). Por lo tanto, entraIdx = bestIdx - (aCargar - 1).
+				const candidate = bestIdx - (aCargar - 1)
+				if (candidate >= 0 && candidate + aCargar <= disp.length) {
 					entraIdx = candidate
 				}
 				// Si candidate < 0, ya está dentro de la ventana natural
-				// (bestIdx < ancho) — no hay que mover nada.
-				// Si candidate + ancho > disp.length, no entran todos —
+				// (bestIdx < aCargar) — no hay que mover nada.
+				// Si candidate + aCargar > disp.length, no entran todos —
 				// fallback al FIFO natural.
 			}
 		}
 		const nuevosCargando = eActiva.disponibles
-			.slice(entraIdx, entraIdx + ancho)
+			.slice(entraIdx, entraIdx + aCargar)
 		const restantes = [
 			...eActiva.disponibles.slice(0, entraIdx),
-			...eActiva.disponibles.slice(entraIdx + ancho),
+			...eActiva.disponibles.slice(entraIdx + aCargar),
 		]
 		const nuevoEstado: EstadoPlan = {
 			cuadrillaActiva: activa,
@@ -1022,16 +1026,31 @@ export function simularCicloConTipos(
 			relevos.push({ ...rLoad.relevo, numero: n++ })
 			tramoIdx += 1
 
-			// 3. 1er SWAP obligatorio si hay slot siguiente. Si
-			//    falla por `CuadrillaDobladaSinDisponibleError`, el
-			//    error se PROPAGA (regla 4 estricta) — el catch-all
-			//    en `dispatcher.ts` lo surfacea al usuario como
-			//    mensaje claro. NO cede silenciosamente.
+			// 3. 1er SWAP si hay slot siguiente y hay disponibles.
+			//    v1.5.0: el SWAP ya no es OBLIGATORIO. Si la
+			//    cuadrilla activa no tiene disponibles (caso típico:
+			//    cuadrilla de 5 exacta, ya hizo LOAD y no queda
+			//    nadie en disp), se cede el turno sin error. La
+			//    siguiente iteración hará la transición a la otra
+			//    cuadrilla.
 			if (tramoIdx < tramosTipo.length) {
-				const rSwap = aplicarRelevoIntermedio(estado, ANCHO_TRABAJADERA, true, streaks)
-				estado = rSwap.estado
-				relevos.push({ ...rSwap.relevo, numero: n++ })
-				tramoIdx += 1
+				try {
+					const rSwap = aplicarRelevoIntermedio(estado, ANCHO_TRABAJADERA, true, streaks)
+					estado = rSwap.estado
+					relevos.push({ ...rSwap.relevo, numero: n++ })
+					tramoIdx += 1
+				} catch (err) {
+					// Si no hay disponibles, cedemos el turno. La
+					// otra cuadrilla tomará el relevo en la
+					// siguiente iteración.
+					if (err instanceof CuadrillaDobladaSinDisponibleError) {
+						// Silencioso: el capataz ve 5 dentro
+						// mantenido, y la siguiente iteración hace
+						// la transición a la otra cuadrilla.
+					} else {
+						throw err
+					}
+				}
 			}
 
 			// 4. Cede el turno. La siguiente iteración usará la

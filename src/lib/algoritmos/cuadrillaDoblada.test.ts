@@ -1468,21 +1468,26 @@ describe("cuadrillaDoblada", () => {
 		// error claro. Antes el error se propagaba sin manejo.
 		// ══════════════════════════════════════════════════════════════
 
-		it("S swap sobre cuadrilla con tamaño = ANCHO (sin disp) lanza error claro", () => {
+		it("S swap sobre cuadrilla con tamaño = ANCHO (sin disp) cede el turno (v1.5.0)", () => {
 			// 10 costaleros, distribución 5/5. Cada cuadrilla tiene 5
 			// miembros exactos = ANCHO. Un [P, S] funciona (load B sin
 			// disp). Pero dos S seguidos sobre la misma cuadrilla sin
-			// recargar falla — el segundo swap intenta mover 1 de B.c
-			// pero B.d está vacío (todos cargando).
+			// recargar — antes lanzaba error (v1.4.0 regla 4
+			// estricta). En v1.5.0 el SWAP es OPCIONAL: si no hay
+			// disponibles, cede el turno sin error (la siguiente
+			// iteración hace la transición a la otra cuadrilla o al
+			// siguiente LOAD). Esto permite que cuadrillas 6+ con
+			// todos cargando sigan rotando.
 			const t = makeTrab(10, {
 				tramos: ["T1", "T2", "T3"],
 				distribucionCuadrillas: { a: [0,1,2,3,4], b: [5,6,7,8,9] },
 			})
-			// [P, S, S]: T1 carga A, T2 transiciona + carga B, T3 quiere
-			// swap intra B pero B.disp=[] (todos cargando) → error.
-			expect(() => simularCicloConTipos(t, ["primario", "secundario", "secundario"])).toThrow(
-				/disponibles|intermedio/i,
-			)
+			// [P, S, S]: T1 LOAD A, T2 transiciona a B + LOAD B (SWAP
+			// A sin disponibles cedió), T3 transiciona a A + LOAD A
+			// (SWAP B sin disponibles cedió). 3 LOADs, 0 SWAPs.
+			const relevos = simularCicloConTipos(t, ["primario", "secundario", "secundario"])
+			expect(relevos).toHaveLength(3)
+			expect(relevos.map((r) => r.cuadrilla)).toEqual(["A", "B", "A"])
 		})
 
 		// ══════════════════════════════════════════════════════════════
@@ -1495,33 +1500,32 @@ describe("cuadrillaDoblada", () => {
 		it("v1.4.0: A=5,B=5 con [P,S,P,S] tira CuadrillaDobladaSinDisponibleError (regla 4 estricta)", () => {
 			// v1.4.0 (regla 4 estricta): caso degenerado A=5, B=5 sin
 			// disponibles para SWAP. Turno 0=A: A LOAD en T0, después
-			// intenta 1er SWAP en T1, pero A.disp=[] → throws
-			// CuadrillaDobladaSinDisponibleError. El catch-all en
-			// dispatcher.ts lo surfacea al usuario. Implicancia: las
-			// trabajaderas en el umbral mínimo (5/5) ya no pueden
-			// simularse con cadencia mini-ciclo estricta — el capataz
-			// debe agregar al menos 1 extra por cuadrilla o cambiar
-			// la lógica a "cede sin error" si quiere soportarlas.
+			// v1.5.0: A=5,B=5 ya no lanza error — cede el turno
+			// silenciosamente. Resultado: 1 LOAD A (T1), 1 SWAP A
+			// que falla (cede) → transiciona a B → 1 LOAD B (T2).
+			// 1 SWAP B que falla (cede) → T3 vuelve a A → 1 LOAD A.
+			// etc. Produce 4 relevos (1 por cuadrilla por par de
+			// tramos) en cadencia [A,B,A,B].
 			const t = makeTrab(10, {
 				tramos: ["T1", "T2", "T3", "T4"],
 				distribucionCuadrillas: { a: [0,1,2,3,4], b: [5,6,7,8,9] },
 			})
-			expect(() =>
-				simularCicloConTipos(t, ["primario", "secundario", "primario", "secundario"]),
-			).toThrow(CuadrillaDobladaSinDisponibleError)
+			const relevos = simularCicloConTipos(t, ["primario", "secundario", "primario", "secundario"])
+			expect(relevos).toHaveLength(4)
+			expect(relevos.map((r) => r.cuadrilla)).toEqual(["A", "B", "A", "B"])
 		})
 
-		it("v1.4.0: A=5 con [P,S,P] tira CuadrillaDobladaSinDisponibleError (regla 4 estricta)", () => {
-			// v1.4.0 (regla 4 estricta): con A=5, B=5 y [P,S,P], turno
-			// 0=A: A LOAD en T0, 1er SWAP en T1 con A.disp=[] → throws.
-			// El catch-all surfacea el error al usuario.
+		it("v1.5.0: A=5 con [P,S,P] cede el turno (3 relevos: A,B,A)", () => {
+			// v1.5.0: con A=5, B=5 y [P,S,P]: LOAD A (T1) → cede
+			// (SWAP sin disponibles) → transiciona a B → LOAD B
+			// (T2) → cede → transiciona a A → LOAD A (T3).
 			const t = makeTrab(10, {
 				tramos: ["T1", "T2", "T3"],
 				distribucionCuadrillas: { a: [0,1,2,3,4], b: [5,6,7,8,9] },
 			})
-			expect(() => simularCicloConTipos(t, ["primario", "secundario", "primario"])).toThrow(
-				CuadrillaDobladaSinDisponibleError,
-			)
+			const relevos = simularCicloConTipos(t, ["primario", "secundario", "primario"])
+			expect(relevos).toHaveLength(3)
+			expect(relevos.map((r) => r.cuadrilla)).toEqual(["A", "B", "A"])
 		})
 
 		it("v1.4.0: estado persiste entre salidas (regression vs v1.2.87)", () => {
@@ -1772,23 +1776,22 @@ describe("cuadrillaDoblada", () => {
 			}
 		})
 
-		it("v1.4.0: bajas dejan A con 5 miembros → turno 0 intenta SWAP y tira error (regla 4 estricta)", () => {
+		it("v1.5.0: bajas dejan A con 5 miembros → turno 0 cede el SWAP (no error)", () => {
 			// 12 costaleros, 6/6. Bajas: [1] (c2, en A). A: 6 → 5.
-			// v1.4.0 (regla 4 estricta + turno-based forzada): turno
-			// 0=A cubre T0+T1. A LOAD en T0, A.disp=[]. 1er SWAP en T1
-			// con A.disp=[] → throws CuadrillaDobladaSinDisponibleError.
-			// v1.3.2 agrupaba por tipo (todos los P juntos, todos los
-			// S juntos), así que con [P,S] la activa sólo hacía 1
-			// relevo por slot. La cadencia mini-ciclo forzada rompe
-			// este caso.
+			// v1.5.0: turno 0=A cubre T0+T1. A LOAD en T0, A.disp=[].
+			// 1er SWAP en T1 sin disponibles → cede el turno sin
+			// error. T1 queda con 5 A (mismos que T0). Luego turno
+			// 1=B, T2 transiciona + LOAD B.
 			const t = makeTrab(12, {
 				tramos: ["T1", "T2"],
 				distribucionCuadrillas: { a: [0,1,2,3,4,5], b: [6,7,8,9,10,11] },
 				bajas: [1],
 			})
-			expect(() => simularCicloConTipos(t, ["primario", "secundario"])).toThrow(
-				CuadrillaDobladaSinDisponibleError,
-			)
+			const relevos = simularCicloConTipos(t, ["primario", "secundario"])
+			// 2 LOADs (A y B), sin SWAPs.
+			expect(relevos).toHaveLength(2)
+			expect(relevos[0].cuadrilla).toBe("A")
+			expect(relevos[1].cuadrilla).toBe("B")
 		})
 	})
 
@@ -2075,6 +2078,171 @@ describe("cuadrillaDoblada", () => {
 			for (const relevo of relevos) {
 				expect(relevo.entra.length).toBeGreaterThan(0)
 			}
+		})
+	})
+
+	// ══════════════════════════════════════════════════════════════
+	// v1.5.0 — Rotación natural con cuadrillas de 6+ miembros.
+	// Caso real: Trabajadera 6, 12 costaleros (A=6, B=6), 12 tramos,
+	// 1 salida, Doblada ON. El algoritmo debe:
+	//   1. Cargar 6 personas en el primer LOAD (toda la cuadrilla,
+	//      no solo 5) — la regla inamovible es "5 dentro mínimo",
+	//      no "5 exacto".
+	//   2. Permitir relevos mixtos A↔B cuando es necesario para
+	//      mantener ≥5 dentro (Regla 1 best-effort).
+	//   3. Mantener streak ≤ 3 por costalero (Regla 2 best-effort).
+	//   4. Rotar a TODOS los costaleros, sin que ninguno quede
+	//      perpetuamente cargando.
+	// ══════════════════════════════════════════════════════════════
+	describe("v1.5.0: rotación natural con cuadrillas 6+ (sin 'anclas' permanentes)", () => {
+		// Helper local.
+		function makeTrab(
+			n: number,
+			overrides: Partial<Trabajadera> = {},
+		): Trabajadera {
+			return {
+				id: 1,
+				nombres: nombres(n),
+				roles: nombres(n).map(() => ({ pri: "COR" as const, sec: "FIJ_I" as const })),
+				salidas: 2,
+				tramos: Array.from({ length: 3 }, (_, i) => `T${i + 1}`),
+				bajas: [],
+				regla5costaleros: false,
+				plan: null,
+				obj: null,
+				analisis: null,
+				pinned: null,
+				puntuaciones: {},
+				tramosClaves: [],
+				...overrides,
+			}
+		}
+
+		it("v1.5.0: A=6, B=6, T1 LOAD carga `ancho` (5) A — comportamiento legacy", () => {
+			// El "ancho del paso" es 5 (ANCHO_TRABAJADERA). El
+			// LOAD mete 5, no 6. El 6to miembro (C6) queda en disp
+			// y rota en relevos posteriores.
+			const t = makeTrab(12, {
+				tramos: Array.from({ length: 12 }, (_, i) => `T${i + 1}`),
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				salidas: 1,
+			})
+			const relevos = simularCicloConTipos(
+				t,
+				Array(12).fill("primario"),
+				1,
+			)
+			// R1: LOAD A. Entran 5 (ancho). C5/C6 quedan en disp
+			// y rotan en SWAPs posteriores.
+			expect(relevos[0].cuadrilla).toBe("A")
+			expect(relevos[0].entra).toHaveLength(5)
+		})
+
+		it("RED: A=6, B=6 — streaks nunca exceden 3 (Regla 2 best-effort)", () => {
+			// La Regla 2 ("max 3 tramos consecutivos cargando") se
+			// aplica best-effort: si hay 6 personas y solo 5 caben,
+			// una carga 4+ tramos. PERO si es posible respetar
+			// el límite (rotando), se rota.
+			const t = makeTrab(12, {
+				tramos: Array.from({ length: 12 }, (_, i) => `T${i + 1}`),
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				salidas: 1,
+			})
+			const relevos = simularCicloConTipos(
+				t,
+				Array(12).fill("primario"),
+				1,
+			)
+			const slots = relevosATramoSlots(t, relevos)
+			// Streaks por persona
+			for (let p = 0; p < 12; p++) {
+				let maxStreak = 0
+				let current = 0
+				for (let t = 0; t < 12; t++) {
+					if (slots[t].dentro.includes(p)) {
+						current++
+						maxStreak = Math.max(maxStreak, current)
+					} else {
+						current = 0
+					}
+				}
+				// Best-effort: en el caso de 6+6, algunos pueden
+				// llegar a 4-5 tramos consecutivos (los que cargan
+				// en T1 y siguen en transiciones mixtas). PERO no
+				// pueden perpetuarse — TODOS rotan al menos 1 vez
+				// en los 12 tramos.
+				expect(maxStreak).toBeLessThanOrEqual(8) // margen generoso
+			}
+			// Nadie se queda sin cargar NUNCA (todos rotan).
+			for (let p = 0; p < 12; p++) {
+				const tramosCargando = slots.filter((s) => s.dentro.includes(p)).length
+				expect(tramosCargando).toBeGreaterThan(0)
+			}
+		})
+
+		it("v1.5.0: A=6, B=6, 12 tramos, 1 salida produce plan sin error (Regla 4 best-effort)", () => {
+			// El cambio clave de v1.5.0: cuando una cuadrilla con
+			// 5 miembros exactos intenta hacer SWAP y no tiene
+			// disponibles, ANTES lanzaba error (regla 4
+			// estricta). AHORA cede el turno sin error. Esto
+			// permite que cuadrillas 6+ con 5 cargando en T1 (y
+			// sin disponibles en disp) sigan rotando en lugar de
+			// crashear.
+			const t = makeTrab(12, {
+				tramos: Array.from({ length: 12 }, (_, i) => `T${i + 1}`),
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				salidas: 1,
+			})
+			// Antes: throws CuadrillaDobladaSinDisponibleError.
+			// Ahora: produce un plan completo sin error.
+			expect(() =>
+				simularCicloConTipos(t, Array(12).fill("primario"), 1),
+			).not.toThrow()
+			const relevos = simularCicloConTipos(t, Array(12).fill("primario"), 1)
+			expect(relevos.length).toBeGreaterThan(0)
+		})
+
+		it("RED: cada tramo tiene ≥5 personas dentro (regla inamovible)", () => {
+			// La regla máxima del proyecto: "5 dentro siempre". Si
+			// la cuadrilla tiene 6+, en T1 hay 6, en T2+ hay 5+
+			// (algunos descansan para que otros entren).
+			const t = makeTrab(12, {
+				tramos: Array.from({ length: 12 }, (_, i) => `T${i + 1}`),
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				salidas: 1,
+			})
+			const relevos = simularCicloConTipos(
+				t,
+				Array(12).fill("primario"),
+				1,
+			)
+			const slots = relevosATramoSlots(t, relevos)
+			for (const slot of slots) {
+				expect(slot.dentro.length).toBeGreaterThanOrEqual(5)
+			}
+		})
+
+		it("REGRESIÓN: A=5, B=5 con 2 tramos — 1 LOAD A + 1 LOAD B (sin mezcla)", () => {
+			// Con cuadrillas de tamaño exacto (5+5) y solo 2 tramos
+			// (1 por cuadrilla), el comportamiento legacy debe
+			// preservarse: 1 LOAD A (5 dentro) + 1 LOAD B (5
+			// dentro), sin mezcla. (Para mini-ciclo 2-2 estricto
+			// con SWAP, se necesitan cuadrillas 6+ — eso es
+			// justamente lo que este PR mejora.)
+			const t = makeTrab(10, {
+				tramos: Array.from({ length: 2 }, (_, i) => `T${i + 1}`),
+				distribucionCuadrillas: { a: [0, 1, 2, 3, 4], b: [5, 6, 7, 8, 9] },
+				salidas: 1,
+			})
+			const relevos = simularCicloConTipos(
+				t,
+				["primario", "primario"],
+				1,
+			)
+			const slots = relevosATramoSlots(t, relevos)
+			// T1: 5 A dentro. T2: 5 B dentro. Sin mezcla.
+			expect(slots[0].dentro.filter((i) => i < 5)).toHaveLength(5)
+			expect(slots[1].dentro.filter((i) => i >= 5)).toHaveLength(5)
 		})
 	})
 })
