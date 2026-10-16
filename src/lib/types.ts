@@ -57,14 +57,6 @@ export interface Trabajadera {
   tramosClaves: number[]
   cuadrillaDoblada?: boolean
   distribucionCuadrillas?: { a: number[]; b: number[] } | null
-  /**
-   * v1.5.0: Anclas — costaleros marcados que se mantienen cargando
-   * durante relevos de SU cuadrilla y en transiciones mixtas A↔B.
-   * Los índices deben estar contenidos en `distribucionCuadrillas.a`
-   * o `.b` respectivamente. Sin anclas marcadas (undefined), el
-   * algoritmo usa el comportamiento legacy mini-ciclo 2-2 puro.
-   */
-  anclas?: { a: number[]; b: number[] } | null
   /** Parallel to tramos; length invariant: tramosTipo.length === tramos.length when present */
   tramosTipo?: TramoTipo[]
 }

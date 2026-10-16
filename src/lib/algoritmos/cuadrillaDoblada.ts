@@ -60,10 +60,7 @@ export class CuadrillaDobladaDistribucionInvalidaError extends Error {
       | "fuera_de_rango"
       | "sub_ancho"
       | "overlap"
-      | "suma_incorrecta"
-      | "ancla_fuera_de_cuadrilla"
-      | "ancla_duplicada"
-      | "ancla_fuera_de_rango",
+      | "suma_incorrecta",
     detail?: string,
   ) {
     const mensajes: Record<typeof motivo, string> = {
@@ -72,9 +69,6 @@ export class CuadrillaDobladaDistribucionInvalidaError extends Error {
       sub_ancho: `la cuadrilla ${cuadrilla} tiene menos de ${detail ?? "ancho"} miembros`,
       overlap: `el índice ${indice} aparece en la cuadrilla ${cuadrilla} y también en la otra`,
       suma_incorrecta: `la suma de A+B no coincide con el total de costaleros (suma=${detail ?? "?"})`,
-      ancla_fuera_de_cuadrilla: `el ancla con índice ${indice} no pertenece a la cuadrilla ${cuadrilla}`,
-      ancla_duplicada: `el índice ${indice} aparece más de una vez como ancla de la cuadrilla ${cuadrilla}`,
-      ancla_fuera_de_rango: `el ancla con índice ${indice} está fuera de rango (nombres tiene ${detail ?? "N"} elementos)`,
     }
     super(
       `Distribución de cuadrilla inválida (cuadrilla ${cuadrilla}): ${mensajes[motivo]}. ` +
@@ -140,7 +134,7 @@ export type CuadrillaId = "A" | "B"
  * costaleros between A and B in a single relevo, so the prior
  * `"principal" | "intermedio"` distinction collapsed into a single value.
  */
-export type TipoRelevo = "intra" | "inter"
+export type TipoRelevo = "intra"
 
 export interface Cuadrilla {
 	id: CuadrillaId
@@ -160,31 +154,11 @@ export interface Relevo {
 	cuadrilla: CuadrillaId
 	sale: string[]
 	entra: string[]
-	/**
-	 * v1.5.0: Personas que se mantienen en `cargando` durante este
-	 * relevo sin pasar por disp (porque son anclas que sobrevivieron
-	 * la transición). Incluye anclas propias y externas. El adapter
-	 * `relevosATramoSlots` las suma al `dentro` para que el capataz
-	 * vea el total correcto de personas cargando.
-	 */
-	mantiene?: string[]
 }
 
 export interface EstadoCuadrilla {
 	cargando: string[]
 	disponibles: string[]
-	/**
-	 * v1.5.0: Anclas (por nombre) que están actualmente en `cargando`.
-	 * Las anclas no salen en SWAP; se mantienen incluso durante
-	 * `transicionActiva`. Si un ancla no está en `cargando` (porque
-	 * está esperando turno), aparece en `disponibles` como un
-	 * costalero normal — se reincorpora al primer LOAD.
-	 *
-	 * Si el set está vacío, no hay lógica de ancla activa (legacy).
-	 * Default `[]` para mantener compatibilidad con código/tests
-	 * que construyen `EstadoCuadrilla` directamente.
-	 */
-	anclasCargando?: string[]
 }
 
 export interface EstadoPlan {
@@ -423,97 +397,19 @@ export function validarDistribucionCuadrillas(
 }
 
 /**
- * v1.5.0: Valida que las anclas estén bien formadas.
- *
- * Reglas:
- *  - Cada ancla debe ser un índice válido en [0, totalNombres).
- *  - Sin duplicados dentro de A ni dentro de B.
- *  - Anclas de A ⊆ distribución.A; anclas de B ⊆ distribución.B.
- *    (Una ancla de A que apunta a un índice que está en B es un error,
- *    porque el ancla "pertenece" a su cuadrilla para efectos de carga.)
- *
- * No valida: que las anclas sobrevivan a las bajas (eso lo hace
- * `simularCicloConTipos` después del filter, y lanza el error genérico
- * de sub-ancho si el resultado es inviable).
- */
-export function validarAnclas(
-	anclas: { a: number[]; b: number[] },
-	distribucion: { a: number[]; b: number[] },
-	totalNombres: number,
-): void {
-	const distASet = new Set(distribucion.a)
-	const distBSet = new Set(distribucion.b)
-	const seenA = new Set<number>()
-	for (const idx of anclas.a) {
-		if (idx < 0 || idx >= totalNombres) {
-			throw new CuadrillaDobladaDistribucionInvalidaError(
-				"A",
-				idx,
-				"ancla_fuera_de_rango",
-				String(totalNombres),
-			)
-		}
-		if (seenA.has(idx)) {
-			throw new CuadrillaDobladaDistribucionInvalidaError("A", idx, "ancla_duplicada")
-		}
-		seenA.add(idx)
-		if (!distASet.has(idx)) {
-			throw new CuadrillaDobladaDistribucionInvalidaError(
-				"A",
-				idx,
-				"ancla_fuera_de_cuadrilla",
-			)
-		}
-	}
-	const seenB = new Set<number>()
-	for (const idx of anclas.b) {
-		if (idx < 0 || idx >= totalNombres) {
-			throw new CuadrillaDobladaDistribucionInvalidaError(
-				"B",
-				idx,
-				"ancla_fuera_de_rango",
-				String(totalNombres),
-			)
-		}
-		if (seenB.has(idx)) {
-			throw new CuadrillaDobladaDistribucionInvalidaError("B", idx, "ancla_duplicada")
-		}
-		seenB.add(idx)
-		if (!distBSet.has(idx)) {
-			throw new CuadrillaDobladaDistribucionInvalidaError(
-				"B",
-				idx,
-				"ancla_fuera_de_cuadrilla",
-			)
-		}
-	}
-}
-
-/**
  * Crea el estado inicial. Empieza con A marcada como activa pero NINGUNA
  * cuadrilla está aún cargando — todas tienen `cargando = []` y la totalidad
  * de sus miembros en `disponibles`. El primer relevo principal rearma la
  * primera cuadrilla activa desde sus disponibles.
  */
-export function crearEstadoInicial(
-	distribucion: Distribucion,
-	ancho = ANCHO_TRABAJADERA,
-	anclas?: { a: string[]; b: string[] },
-): EstadoPlan {
+export function crearEstadoInicial(distribucion: Distribucion, ancho = ANCHO_TRABAJADERA): EstadoPlan {
 	void ancho
 	function init(miembros: string[]): EstadoCuadrilla {
-		// v1.5.0: las anclas se inicializan en `disponibles` (no en
-		// `cargando`) — al primer LOAD de la cuadrilla, se meten
-		// automáticamente. A partir de ahí se quedan en `cargando`
-		// hasta que la cuadrilla termina su turno completo.
 		return {
 			cargando: [],
 			disponibles: [...miembros],
-			anclasCargando: [],
 		}
 	}
-	void anclas
-	void ancho
 	return {
 		cuadrillaActiva: "A",
 		estados: {
@@ -554,40 +450,22 @@ export function transicionActiva(
 	if (estado.cuadrillaActiva === nueva) return estado
 	const activa = estado.cuadrillaActiva
 	const eActiva = estado.estados[activa]
-	// v1.5.0: las anclas que están actualmente en `cargando` se
-	// MANTIENEN ahí (no van al disp). Esto es lo que produce los
-	// relevos mixtos A↔B del patrón ideal: las anclas de la
-	// cuadrilla saliente siguen cargando mientras la nueva cuadrilla
-	// aporta el resto. Los no-anclas sí transicionan al disp (legacy).
-	const anclasCargando = eActiva.anclasCargando ?? []
-	const cargandoNoAnclas = eActiva.cargando.filter(
-		(name) => !anclasCargando.includes(name),
-	)
-	const cargandoAnclas = eActiva.cargando.filter((name) =>
-		anclasCargando.includes(name),
-	)
 	return {
 		cuadrillaActiva: nueva,
 		estados: {
 			...estado.estados,
 			[activa]: {
-				// Mantenemos las anclas en cargando (no se van al disp).
-				// Si la nueva activa es la misma cuadrilla, las anclas
-				// siguen sin relevo explícito. Si es la otra, las
-				// anclas se quedan "ancladas" mientras B entra.
-				cargando: cargandoAnclas,
-				// v1.4.1: just-unloaded (los no-anclas que estaban en
-				// cargando) van al FRENTE del disp, y el "sale"
-				// anterior (que ya estaba en disp) va al FINAL. Esto
-				// es la inversión del invariante de v1.3.2 — pero la
-				// intención es la misma: que el costalero que acaba
-				// de salir espere más antes de volver a cargar. Antes
-				// el "sale anterior" iba al frente y trapaba la
-				// rotación (siempre salía y entraba el mismo). Ahora
-				// va al final y deja que otros miembros de la
-				// cuadrilla roten primero.
-				disponibles: [...cargandoNoAnclas, ...eActiva.disponibles],
-				anclasCargando: eActiva.anclasCargando,
+				cargando: [],
+				// v1.4.1: just-unloaded (los que estaban en cargando) van
+				// al FRENTE del disp, y el "sale" anterior (que ya
+				// estaba en disp) va al FINAL. Esto es la inversión del
+				// invariante de v1.3.2 — pero la intención es la misma:
+				// que el costalero que acaba de salir espere más antes
+				// de volver a cargar. Antes el "sale anterior" iba al
+				// frente y trapaba la rotación (siempre salía y entraba
+				// el mismo). Ahora va al final y deja que otros miembros
+				// de la cuadrilla roten primero.
+				disponibles: [...eActiva.cargando, ...eActiva.disponibles],
 			},
 		},
 	}
@@ -623,8 +501,6 @@ export function aplicarRelevoIntermedio(
 	ancho = ANCHO_TRABAJADERA,
 	regla2 = true,
 	streaks: Map<string, number> = new Map(),
-	anclasSet?: Set<string>,
-	anclasExternas: number = 0,
 ): { estado: EstadoPlan; relevo: Relevo } {
 	const activa = estado.cuadrillaActiva
 	const eActiva = estado.estados[activa]
@@ -634,61 +510,9 @@ export function aplicarRelevoIntermedio(
 	// desde disp (los primeros ANCHO pasan a cargando, el resto queda en
 	// disp). Esto es un no-swap (sale=[], entra=los que entraron) que
 	// ocurre naturalmente justo después de una `transicionActiva`.
-	//
-	// v1.5.0: si cargando.length < ancho, también es un LOAD (parcial).
-	// Esto ocurre cuando la cuadrilla vuelve a estar activa y solo las
-	// anclas se mantuvieron en cargando tras `transicionActiva`. Las
-	// anclas pre-cargadas se mantienen; se completa con no-anclas del
-	// disp hasta llegar a `ancho`.
-	// v1.5.0: el caso LOAD se activa en dos situaciones:
-	//   1. cargando === 0 (caso inicial o recién transitado sin
-	//      anclas) → LOAD puro desde el disp.
-	//   2. cargando < ancho PERO hay anclas propias pre-cargadas
-	//      (caso típico: la cuadrilla vuelve a estar activa tras una
-	//      transición y solo se mantuvieron las anclas). Aquí
-	//      necesitamos rellenar con no-anclas del disp para volver
-	//      a `ancho`.
-	// Si cargando < ancho pero NO hay anclas propias cargadas, NO
-	// es un LOAD (sería un SWAP — entrar al camino SWAP).
-	const cargandoAnclas = (eActiva.anclasCargando ?? []).filter((n) =>
-		eActiva.cargando.includes(n),
-	)
-	const esLoadPorAnclasExternas =
-		cargandoAnclas.length > 0 && eActiva.cargando.length < ancho
-	if (eActiva.cargando.length === 0 || esLoadPorAnclasExternas) {
-		// Si ya hay personas en cargando, son las anclas que
-		// sobrevivieron la transición. Las tratamos como "ya
-		// cargando" y completamos hasta `ancho` con no-anclas del
-		// disp. Si la cuadrilla está completamente vacía (caso
-		// inicial), se cargan tanto anclas como no-anclas hasta
-		// llegar a `ancho` desde el disp.
-		// v1.5.0: total de candidatos = disponibles normales +
-		// anclas en disponibles + anclas ya en cargando (que se
-		// mantienen). Si anclasSet está definido, filtramos las
-		// anclas del disp normal y las tratamos como "entran
-		// primero" para mantener la regla de "5 dentro mínimo
-		// aunque haya más disponibles".
-		const dispNoAnclas = anclasSet
-			? eActiva.disponibles.filter((n) => !anclasSet.has(n))
-			: eActiva.disponibles
-		const dispAnclasEnDisp = anclasSet
-			? eActiva.disponibles.filter((n) => anclasSet.has(n))
-			: []
-		// `cargandoAnclas` ya está definido arriba (en el check de
-		// entrada al LOAD). Lo reusamos.
-		const cargandoNoAnclas = eActiva.cargando.filter(
-			(n) => !cargandoAnclas.includes(n),
-		)
-		// v1.5.0: las anclas externas ya cuentan hacia `ancho` (están
-		// en el paso), así que la cuadrilla activa solo necesita
-		// candidatos para `ancho - anclasExternas` huecos.
-		const huecosRequeridos = ancho - anclasExternas
-		const totalCandidatos =
-			dispNoAnclas.length +
-			dispAnclasEnDisp.length +
-			cargandoAnclas.length
-		if (totalCandidatos < huecosRequeridos) {
-			if (totalCandidatos === 0) {
+	if (eActiva.cargando.length === 0) {
+		if (eActiva.disponibles.length < ancho) {
+			if (eActiva.disponibles.length === 0) {
 				throw new Error(
 					`Cuadrilla ${activa} está completamente vacía (sin cargando ni disponibles) para relevo intermedio`,
 				)
@@ -696,26 +520,20 @@ export function aplicarRelevoIntermedio(
 			throw new CuadrillaDobladaSinDisponibleError(-1, activa)
 		}
 
-		// v1.5.0: las anclas que ya están en cargando (sobrevivieron
-		// a la transición) se MANTIENEN. Si la cuadrilla está
-		// completamente vacía (caso inicial), cargamos anclas + no-anclas
-		// del disp hasta llegar a `ancho`. Si hay anclas pre-cargadas,
-		// las mantenemos y completamos con no-anclas del disp.
-		// v1.5.0: `anclasExternas` = cuántas anclas de la OTRA
-		// cuadrilla se mantienen en cargando (porque no salieron en
-		// la transición). Esas cuentan para el `ancho` total desde
-		// el punto de vista del capataz (5 dentro siempre), así que
-		// esta cuadrilla solo necesita cargar `ancho - anclasExternas
-		// - anclasPropiasCargando` personas del disp.
-		const huecosLibres = ancho - cargandoAnclas.length - anclasExternas
-		const anclasQueEntran =
-			cargandoAnclas.length === 0
-				? dispAnclasEnDisp.slice(0, huecosLibres)
-				: []
-		const huecosParaNoAnclas = huecosLibres - anclasQueEntran.length
+		// Pick entra: Rule 2 override (correr la ventana para incluir al
+		// primero en disp con streak >= 3) o FIFO (los primeros `ancho`).
+		//
+		// Lógica: buscamos el primer costalero en disp con streak >= 3.
+		//   - Si está dentro de los primeros `ancho`, no hay que mover
+		//     nada — el FIFO natural ya lo trae adentro.
+		//   - Si está más allá, desplazamos la ventana de carga para que
+		//     quede al FINAL del entra (su streak resetea a 0).
+		//   - Si no hay streak-3 o no se puede correr la ventana lo
+		//     suficiente (streak-3 al final + disp muy corta), fallback
+		//     al FIFO natural.
 		let entraIdx = 0
 		if (regla2) {
-			const disp = dispNoAnclas
+			const disp = eActiva.disponibles
 			let bestIdx = -1
 			for (let i = 0; i < disp.length; i++) {
 				if ((streaks.get(disp[i]) ?? 0) >= 3) {
@@ -724,31 +542,23 @@ export function aplicarRelevoIntermedio(
 				}
 			}
 			if (bestIdx >= 0) {
-				const candidate = bestIdx - (huecosParaNoAnclas - 1)
-				if (candidate >= 0 && candidate + huecosParaNoAnclas <= disp.length) {
+				// Posición del streak-3 en el entra: al final (índice
+				// `ancho-1`). Por lo tanto, entraIdx = bestIdx - (ancho - 1).
+				const candidate = bestIdx - (ancho - 1)
+				if (candidate >= 0 && candidate + ancho <= disp.length) {
 					entraIdx = candidate
 				}
+				// Si candidate < 0, ya está dentro de la ventana natural
+				// (bestIdx < ancho) — no hay que mover nada.
+				// Si candidate + ancho > disp.length, no entran todos —
+				// fallback al FIFO natural.
 			}
 		}
-		const noAnclasQueEntran = dispNoAnclas.slice(entraIdx, entraIdx + huecosParaNoAnclas)
-		const restantesNoAnclas = [
-			...dispNoAnclas.slice(0, entraIdx),
-			...dispNoAnclas.slice(entraIdx + huecosParaNoAnclas),
-		]
-		const restantesAnclas = dispAnclasEnDisp.slice(anclasQueEntran.length)
-		// El "entra" del Relevo son los que PASAN de disp → cargando
-		// en este relevo. NO incluye las anclas que ya estaban en
-		// cargando (porque no hay "sale" que las traiga, ya estaban).
-		const nuevosCargando = [
-			...cargandoAnclas,
-			...anclasQueEntran,
-			...cargandoNoAnclas,
-			...noAnclasQueEntran,
-		]
-		const restantes = [...restantesAnclas, ...restantesNoAnclas]
-		const nuevasAnclasCargando = [
-			...cargandoAnclas,
-			...anclasQueEntran,
+		const nuevosCargando = eActiva.disponibles
+			.slice(entraIdx, entraIdx + ancho)
+		const restantes = [
+			...eActiva.disponibles.slice(0, entraIdx),
+			...eActiva.disponibles.slice(entraIdx + ancho),
 		]
 		const nuevoEstado: EstadoPlan = {
 			cuadrillaActiva: activa,
@@ -757,15 +567,13 @@ export function aplicarRelevoIntermedio(
 				[activa]: {
 					cargando: nuevosCargando,
 					disponibles: restantes,
-					anclasCargando: nuevasAnclasCargando,
 				},
 			},
 		}
 
 		// Streak updates: los que entran vuelven a inside (streak = 0);
 		// los que quedan en disp acumulan (streak += 1).
-		for (const p of noAnclasQueEntran) streaks.set(p, 0)
-		for (const p of anclasQueEntran) streaks.set(p, 0)
+		for (const p of nuevosCargando) streaks.set(p, 0)
 		for (const p of restantes) {
 			streaks.set(p, (streaks.get(p) ?? 0) + 1)
 		}
@@ -783,116 +591,51 @@ export function aplicarRelevoIntermedio(
 			numero: 0,
 			cuadrilla: activa,
 			sale: [],
-			// "entra" = lo que pasa de disp a cargando en ESTE relevo.
-			// NO incluye las anclas que ya estaban en cargando
-			// (propias ni externas) — esos no se "mueven".
-			entra: [...anclasQueEntran, ...noAnclasQueEntran],
+			entra: nuevosCargando,
 		}
-		// v1.5.0: si hay anclas externas, este relevo es MIXTO
-		// (la otra cuadrilla tiene a alguien en cargando). Lo
-		// marcamos como tipo "inter" para que la UI lo muestre
-		// distintivamente. Mantenemos `cuadrilla` = la activa
-		// (la que "hace" el relevo en este turno).
-		// `mantiene` = personas que se quedan en cargando sin
-		// pasar por disp (anclas propias pre-cargadas + anclas
-		// externas). El adapter `relevosATramoSlots` las suma al
-		// `dentro` del slot para que el capataz vea el total
-		// correcto.
-		if (anclasExternas > 0) {
-			relevo.tipo = "inter"
-		}
-		relevo.mantiene = [
-			...cargandoAnclas,
-			...estado.estados[activa === "A" ? "B" : "A"].anclasCargando ?? [],
-		]
 		return { estado: nuevoEstado, relevo }
 	}
 
 	// Camino normal: sale uno de cargando (FIFO), entra uno de disp (FIFO
 	// — o Rule 2 override).
-	// v1.5.0: el "sale" debe ser un no-ancla. Buscar el primer
-	// no-ancla en cargando; si todos son anclas, error.
-	let saleIdx = 0
-	if (anclasSet) {
-		let foundNoAncla = false
-		for (let i = 0; i < eActiva.cargando.length; i++) {
-			if (!anclasSet.has(eActiva.cargando[i])) {
-				saleIdx = i
-				foundNoAncla = true
+	if (eActiva.disponibles.length === 0) {
+		// v1.2.90 B3: error estructurado con índice de tramo y cuadrilla,
+		// capturado por calcularCiclo y surfaceado al usuario.
+		// (tramoIdx = -1 indica que se llamó directo sin contexto de simulación)
+		throw new CuadrillaDobladaSinDisponibleError(-1, activa)
+	}
+	const sale = eActiva.cargando[0]
+	const restoCargando = eActiva.cargando.slice(1)
+
+	let entraIdx = 0
+	if (regla2) {
+		for (let i = 0; i < eActiva.disponibles.length; i++) {
+			if ((streaks.get(eActiva.disponibles[i]) ?? 0) >= 3) {
+				entraIdx = i
 				break
 			}
 		}
-		if (!foundNoAncla) {
-			throw new Error(
-				`Cuadrilla ${activa} no puede hacer swap: todos los cargando son anclas`,
-			)
-		}
 	}
-	// v1.5.0: el "entra" es un no-ancla del disp. Si no hay
-	// no-anclas en disp, se permite un "swap parcial" (solo sale
-	// 1, no entra nadie — el que sale va al disp). Esto ocurre
-	// cuando la cuadrilla tiene más cargando que ANCHO (caso
-	// típico: 6 A con 1 ancla cargando en T1, 1 swap en T2 para
-	// mantener 5 dentro).
-	const dispNoAnclasSwap = anclasSet
-		? eActiva.disponibles.filter((n) => !anclasSet.has(n))
-		: eActiva.disponibles
-	if (dispNoAnclasSwap.length === 0 && !anclasSet) {
-		// Legacy: si no hay disp y no estamos en modo ancla, error.
-		throw new CuadrillaDobladaSinDisponibleError(-1, activa)
-	}
-	if (dispNoAnclasSwap.length === 0 && eActiva.cargando.length <= ANCHO_TRABAJADERA) {
-		// Modo ancla pero no estamos "sobrecargados": error.
-		throw new CuadrillaDobladaSinDisponibleError(-1, activa)
-	}
-	const sale = eActiva.cargando[saleIdx]
-	const restoCargando = [
-		...eActiva.cargando.slice(0, saleIdx),
-		...eActiva.cargando.slice(saleIdx + 1),
+	const entra = eActiva.disponibles[entraIdx]
+	const restoDisponibles = [
+		...eActiva.disponibles.slice(0, entraIdx),
+		...eActiva.disponibles.slice(entraIdx + 1),
 	]
-
-	let entraIdx = 0
-	let entra: string | null = null
-	if (dispNoAnclasSwap.length > 0) {
-		if (regla2) {
-			for (let i = 0; i < dispNoAnclasSwap.length; i++) {
-				if ((streaks.get(dispNoAnclasSwap[i]) ?? 0) >= 3) {
-					entraIdx = i
-					break
-				}
-			}
-		}
-		entra = dispNoAnclasSwap[entraIdx]
-	}
-	const restoDisponibles = entra !== null
-		? [
-				...eActiva.disponibles.slice(0, eActiva.disponibles.indexOf(entra)),
-				...eActiva.disponibles.slice(eActiva.disponibles.indexOf(entra) + 1),
-			]
-		: [...eActiva.disponibles]
-	// Si el sale era ancla, lo sacamos de anclasCargando. Si no,
-	// mantenemos el set como está.
-	const nuevasAnclasCargando = (anclasSet && eActiva.anclasCargando)
-		? eActiva.anclasCargando.filter((n) => n !== sale)
-		: eActiva.anclasCargando ?? []
 
 	const nuevoEstado: EstadoPlan = {
 		cuadrillaActiva: activa,
 		estados: {
 			...estado.estados,
 			[activa]: {
-				cargando: entra !== null
-					? [...restoCargando, entra]
-					: restoCargando,
+				cargando: [...restoCargando, entra],
 				disponibles: [...restoDisponibles, sale],
-				anclasCargando: nuevasAnclasCargando,
 			},
 		},
 	}
 
 	// Streak updates
 	streaks.set(sale, 1) // acaba de salir al disp
-	if (entra !== null) streaks.set(entra, 0) // acaba de entrar al cargando
+	streaks.set(entra, 0) // acaba de entrar al cargando
 	for (const p of restoDisponibles) {
 		streaks.set(p, (streaks.get(p) ?? 0) + 1)
 	}
@@ -912,14 +655,7 @@ export function aplicarRelevoIntermedio(
 		numero: 0,
 		cuadrilla: activa,
 		sale: [sale],
-		entra: entra !== null ? [entra] : [],
-		// v1.5.0: `mantiene` = personas que se quedan en cargando
-		// sin pasar por disp (anclas externas de la otra
-		// cuadrilla). El adapter `relevosATramoSlots` las suma al
-		// `dentro` del slot.
-		mantiene: [
-			...estado.estados[activa === "A" ? "B" : "A"].anclasCargando ?? [],
-		],
+		entra: [entra],
 	}
 	return { estado: nuevoEstado, relevo }
 }
@@ -1179,12 +915,6 @@ export function simularCicloConTipos(
 	if (t.distribucionCuadrillas) {
 		validarDistribucionCuadrillas(t.distribucionCuadrillas, t.nombres.length)
 	}
-	// v1.5.0: validate anclas (si están marcadas). Mismo criterio
-	// fail-fast que `validarDistribucionCuadrillas` — antes de mutar
-	// estado, antes de cualquier relevo.
-	if (t.anclas && t.distribucionCuadrillas) {
-		validarAnclas(t.anclas, t.distribucionCuadrillas, t.nombres.length)
-	}
 
 	const costaleros = t.nombres;
 	// v1.2.90 B1: filtrar costaleros de baja para que NO aparezcan en la
@@ -1242,28 +972,7 @@ export function simularCicloConTipos(
 		a: cuadrillas.a.miembros,
 		b: cuadrillas.b.miembros,
 	}
-	// v1.5.0: anclas por nombre (post-filter de bajas). Se resuelven
-	// aquí una vez y se pasan a las funciones internas como Set<string>
-	// (lookup O(1) en `aplicarRelevoIntermedio`). Si no hay anclas
-	// marcadas, el set es undefined y el comportamiento es legacy
-	// (mini-ciclo 2-2 puro sin mezcla A↔B).
-	const anclasNombres: { a: string[]; b: string[] } | undefined =
-		t.anclas
-			? {
-					a: t.anclas.a
-						.map((i) => t.nombres[i])
-						.filter((n): n is string => n !== undefined && !bajas.includes(t.nombres.indexOf(n))),
-					b: t.anclas.b
-						.map((i) => t.nombres[i])
-						.filter((n): n is string => n !== undefined && !bajas.includes(t.nombres.indexOf(n))),
-				}
-			: undefined
-	const anclasSetA = anclasNombres ? new Set(anclasNombres.a) : undefined
-	const anclasSetB = anclasNombres ? new Set(anclasNombres.b) : undefined
-	const anclasSetActiva = (cuad: CuadrillaId): Set<string> | undefined =>
-		cuad === "A" ? anclasSetA : anclasSetB
-
-	let estado = crearEstadoInicial(distCompleta, ANCHO_TRABAJADERA, anclasNombres)
+	let estado = crearEstadoInicial(distCompleta)
 	const relevos: Relevo[] = []
 	let n = 1
 	const streaks = new Map<string, number>()
@@ -1304,19 +1013,11 @@ export function simularCicloConTipos(
 				estado = transicionActiva(estado, cuadrillaTurno)
 			}
 
-			// v1.5.0: contar cuántas anclas de la OTRA cuadrilla
-			// siguen en cargando (sobrevivieron la transición).
-			// Esas cuentan hacia el `ancho` total, así que la
-			// cuadrilla activa solo necesita cargar `ancho -
-			// anclasExternas` personas en su primer LOAD.
-			const inactiva: CuadrillaId = estado.cuadrillaActiva === "A" ? "B" : "A"
-			const anclasExternas = (estado.estados[inactiva].anclasCargando ?? []).length
-
 			// 2. Primer relevo del turno: LOAD si la cuadrilla
 			//    está vacía, SWAP si ya estaba cargada de un relevo
 			//    anterior (caso de salidas > 1 con la misma
 			//    cuadrilla volviendo a entrar).
-			const rLoad = aplicarRelevoIntermedio(estado, ANCHO_TRABAJADERA, true, streaks, anclasSetActiva(estado.cuadrillaActiva), anclasExternas)
+			const rLoad = aplicarRelevoIntermedio(estado, ANCHO_TRABAJADERA, true, streaks)
 			estado = rLoad.estado
 			relevos.push({ ...rLoad.relevo, numero: n++ })
 			tramoIdx += 1
@@ -1327,7 +1028,7 @@ export function simularCicloConTipos(
 			//    en `dispatcher.ts` lo surfacea al usuario como
 			//    mensaje claro. NO cede silenciosamente.
 			if (tramoIdx < tramosTipo.length) {
-				const rSwap = aplicarRelevoIntermedio(estado, ANCHO_TRABAJADERA, true, streaks, anclasSetActiva(estado.cuadrillaActiva))
+				const rSwap = aplicarRelevoIntermedio(estado, ANCHO_TRABAJADERA, true, streaks)
 				estado = rSwap.estado
 				relevos.push({ ...rSwap.relevo, numero: n++ })
 				tramoIdx += 1
@@ -1365,9 +1066,8 @@ export function relevosATramoSlots(
 	for (const relevo of relevos) {
 		if (lastCuadrilla !== null && lastCuadrilla !== relevo.cuadrilla) {
 			// Cuadrilla activa cambió: descartamos cargando previo y
-			// arrancamos con los que entran + los que se mantienen
-			// (anclas propias pre-cargadas + externas).
-			cargando = [...relevo.entra, ...(relevo.mantiene ?? [])]
+			// arrancamos con los que entran.
+			cargando = [...relevo.entra]
 		} else {
 			const saleSet = new Set(relevo.sale)
 			cargando = cargando.filter((name) => !saleSet.has(name))
@@ -1376,22 +1076,10 @@ export function relevosATramoSlots(
 					cargando.push(name)
 				}
 			}
-			// v1.5.0: si el relevo actual tiene `mantiene` (anclas
-			// externas que se mantienen), asegurarse de que estén en
-			// `cargando`. Esto pasa durante un LOAD de la
-			// cuadrilla activa mientras la otra cuadrilla tiene
-			// anclas propias que se mantienen.
-			for (const name of relevo.mantiene ?? []) {
-				if (!cargando.includes(name)) {
-					cargando.push(name)
-				}
-			}
 		}
 		lastCuadrilla = relevo.cuadrilla
 
-		const dentroSet = new Set(cargando)
-
-		const dentroIndices = [...dentroSet].map((name) => {
+		const dentroIndices = cargando.map((name) => {
 			const idx = t.nombres.indexOf(name)
 			if (idx === -1) {
 				throw new Error(`No se pudo mapear nombre a índice: ${name}`)
