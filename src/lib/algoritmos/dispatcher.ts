@@ -191,20 +191,31 @@ function intentarSwapParaPines(
 
 			const partner = partnerArr[partnerIdx];
 
-			// Hacer swap
-			dist.a = dist.a.filter((i) => i !== partner);
-			dist.b = dist.b.filter((i) => i !== partner);
+			// Hacer swap. v1.4.6: el código previo NO removía `ci` de su
+			// cuadrilla origen, así que `ci` quedaba duplicado en A∩B y el
+			// `validarDistribucionCuadrillas` del recalc tiraba error → el
+			// dispatcher caía al fallback `completarAuto` (greedy sin
+			// mini-ciclo 2-2). El fix: remover `ci` explícitamente de su
+			// cuadrilla origen antes de hacer push al destino.
+			//
+			// v1.4.6 (continuación): además del overlap, hay que poner
+			// `ci` al FRENTE del array de la cuadrilla destino, no solo
+			// añadirlo. `simularCicloConTipos` carga los primeros 5 del
+			// `disponibles` (FIFO); si `ci` queda al final tras el sort,
+			// no entra en el primer LOAD y el pin "D" sigue insatisfecho
+			// → otro swaploop infinito → fallback. Prepender resuelve
+			// ambos problemas.
 			if (necesitaIrA === "A") {
-				dist.a.push(ci);
-				dist.b.push(partner);
+				dist.a = dist.a.filter((i) => i !== partner);
+				dist.b = dist.b.filter((i) => i !== ci);
+				dist.a = [ci, ...dist.a];
+				dist.b = [...dist.b, partner];
 			} else {
-				dist.a.push(partner);
-				dist.b.push(ci);
+				dist.a = dist.a.filter((i) => i !== ci);
+				dist.b = dist.b.filter((i) => i !== partner);
+				dist.b = [ci, ...dist.b];
+				dist.a = [...dist.a, partner];
 			}
-
-			// Reordenar para mantener invariante
-			dist.a.sort((x, y) => x - y);
-			dist.b.sort((x, y) => x - y);
 
 			mejoroAlMenosUnaVez = true;
 		}

@@ -125,6 +125,52 @@ describe("dispatchSimulacion (M4)", () => {
 		expect(plan[0].dentro).toContain(0);
 	});
 
+	// ══════════════════════════════════════════════════════════════
+	// v1.4.6: cuadrilla doblada + pins en T1 debe respetar el
+	// pin Y preservar mini-ciclo 2-2. Antes: el swap en
+	// intentarSwapParaPines NO removía `ci` de su cuadrilla origen
+	// → overlap A∩B → validarDistribucionCuadrillas tiraba → fallback
+	// a completarAuto (greedy sin mini-ciclo) → T1+T2 con miembros
+	// mezclados de A y B. Después: el swap prepended `ci` al frente
+	// de la cuadrilla destino, el FIFO del LOAD lo recoge, los pines
+	// se satisfacen, y mini-ciclo 2-2 se mantiene (T1+T2 = A).
+	// ══════════════════════════════════════════════════════════════
+
+	it("cuadrilla doblada con pin D en T1: respeta pin y mini-ciclo 2-2", () => {
+		const t = makeCuadrillaDoblada();
+		// Pin D en c7 (idx 6, en B originalmente) en T1
+		// Pin F en c8 (idx 7, en B originalmente) en T1
+		const p: ("L" | "D" | "F" | "LF" | "LS")[][] = Array.from(
+			{ length: 6 },
+			() => Array(12).fill("L" as const),
+		);
+		p[0][6] = "D"; // c7 debe estar dentro en T1
+		p[0][7] = "F"; // c8 debe estar fuera en T1
+		t.pinned = p;
+		const { plan: result, distribucion, error } = dispatchSimulacion(t);
+		expect(error).toBeUndefined();
+		expect(result).toHaveLength(6);
+		// c7 dentro en T1, c8 fuera en T1
+		expect(result[0].dentro).toContain(6);
+		expect(result[0].fuera).toContain(7);
+		// Mini-ciclo 2-2: T1 y T2 por la MISMA cuadrilla (Regla 1).
+		// Tras el swap, c7 está en A → A hace T1+T2 → todos los
+		// miembros de T1 y T2 pertenecen a A.
+		const A = new Set(distribucion?.a ?? t.distribucionCuadrillas!.a);
+		for (const slot of result.slice(0, 2)) {
+			const dentro = new Set(slot.dentro);
+			const aIn = [...dentro].filter((i) => A.has(i)).length;
+			expect(aIn).toBe(5);
+		}
+		// T3 y T4 por la otra cuadrilla (B)
+		const B = new Set(distribucion?.b ?? t.distribucionCuadrillas!.b);
+		for (const slot of result.slice(2, 4)) {
+			const dentro = new Set(slot.dentro);
+			const bIn = [...dentro].filter((i) => B.has(i)).length;
+			expect(bIn).toBe(5);
+		}
+	});
+
 	it("cuadrilla doblada con distribución inválida: devuelve error (no throw)", () => {
 		const t = makeCuadrillaDoblada();
 		// Índice fuera de rango
