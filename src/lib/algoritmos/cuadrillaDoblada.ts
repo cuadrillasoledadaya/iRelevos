@@ -890,10 +890,14 @@ export function cuadrillaDobladaATramoSlots(
  * coinciden longitudes. Throws CuadrillaDobladaSinPrimarioError si no
  * hay ningún tramo primario.
  *
- * @param t           Trabajadera (provides nombres, distribucionCuadrillas, etc.)
- * @param tramosTipo  Per-tramo type designation, length must equal t.tramos.length
- * @param salidas     Number of cycles to simulate (default 1, backward compat).
- *                    Each cycle produces t.tramos.length relevos. Must be >= 1.
+ * @param t             Trabajadera (provides nombres, distribucionCuadrillas, etc.)
+ * @param tramosTipo    Per-tramo type designation, length must equal t.tramos.length
+ * @param salidas       Number of cycles to simulate (default 1, backward compat).
+ *                      Each cycle produces t.tramos.length relevos. Must be >= 1.
+ * @param turnoInicial  Starting turno index (default 0 → cuadrilla A does T1+T2;
+ *                      1 → B does T1+T2; 2 → A again; etc.). Used by the dispatcher
+ *                      to honor pins que fijan qué cuadrilla arranca el primer
+ *                      relevo sin necesidad de mover costaleros entre A y B.
  *
  * ## Output length vs t.tramos.length (UI consequence)
  *
@@ -916,6 +920,7 @@ export function simularCicloConTipos(
 	t: Trabajadera,
 	tramosTipo: TramoTipo[],
 	salidas: number = 1,
+	turnoInicial: number = 0,
 ): Relevo[] {
 	if (tramosTipo.length !== t.tramos.length) {
 		throw new Error("tramosTipo length must equal tramos length");
@@ -1021,7 +1026,7 @@ export function simularCicloConTipos(
 	// Contador de turno: 0=A, 1=B, 2=A, 3=B, ... (alternancia
 	// estricta 2-2). NO depende del tipo de slot — la cadencia es
 	// forzada por la posición del turno, no por P/S.
-	let turno = 0
+	let turno = turnoInicial
 	for (let ciclo = 0; ciclo < salidas; ciclo++) {
 		let tramoIdx = 0
 		while (tramoIdx < tramosTipo.length) {

@@ -126,48 +126,94 @@ describe("dispatchSimulacion (M4)", () => {
 	});
 
 	// ══════════════════════════════════════════════════════════════
-	// v1.4.6: cuadrilla doblada + pins en T1 debe respetar el
-	// pin Y preservar mini-ciclo 2-2. Antes: el swap en
-	// intentarSwapParaPines NO removía `ci` de su cuadrilla origen
-	// → overlap A∩B → validarDistribucionCuadrillas tiraba → fallback
-	// a completarAuto (greedy sin mini-ciclo) → T1+T2 con miembros
-	// mezclados de A y B. Después: el swap prepended `ci` al frente
-	// de la cuadrilla destino, el FIFO del LOAD lo recoge, los pines
-	// se satisfacen, y mini-ciclo 2-2 se mantiene (T1+T2 = A).
+	// v1.4.7: cuadrilla doblada + pins en T1 respeta el pin Y
+	// preserva mini-ciclo 2-2. Antes (v1.4.6) se hacía swap A↔B,
+	// mezclando miembros de distintas cuadrillas. Ahora el algoritmo
+	// NO mueve costaleros entre cuadrillas: determina qué cuadrilla
+	// debe estar activa para T1 (la que contiene al D-pinned) y
+	// reordena su `disp` para que el LOAD respete D (al frente) y
+	// excluya F (al final). El mini-ciclo 2-2 strict se mantiene:
+	// si B es activa, B hace T1+T2; luego A hace T3+T4; etc.
 	// ══════════════════════════════════════════════════════════════
 
-	it("cuadrilla doblada con pin D en T1: respeta pin y mini-ciclo 2-2", () => {
+	it("cuadrilla doblada con pines en T1 (caso A): respeta pin y mini-ciclo 2-2", () => {
 		const t = makeCuadrillaDoblada();
-		// Pin D en c7 (idx 6, en B originalmente) en T1
-		// Pin F en c8 (idx 7, en B originalmente) en T1
+		// Pin D en c1 (idx 0, en A originalmente) en T1 → A es la activa
+		// Pin F en c2 (idx 1, en A originalmente) en T1 → c2 outside T1
 		const p: ("L" | "D" | "F" | "LF" | "LS")[][] = Array.from(
 			{ length: 6 },
 			() => Array(12).fill("L" as const),
 		);
-		p[0][6] = "D"; // c7 debe estar dentro en T1
-		p[0][7] = "F"; // c8 debe estar fuera en T1
+		p[0][0] = "D"; // c1 dentro en T1
+		p[0][1] = "F"; // c2 fuera en T1
 		t.pinned = p;
 		const { plan: result, distribucion, error } = dispatchSimulacion(t);
 		expect(error).toBeUndefined();
 		expect(result).toHaveLength(6);
-		// c7 dentro en T1, c8 fuera en T1
-		expect(result[0].dentro).toContain(6);
-		expect(result[0].fuera).toContain(7);
-		// Mini-ciclo 2-2: T1 y T2 por la MISMA cuadrilla (Regla 1).
-		// Tras el swap, c7 está en A → A hace T1+T2 → todos los
-		// miembros de T1 y T2 pertenecen a A.
-		const A = new Set(distribucion?.a ?? t.distribucionCuadrillas!.a);
+		// c1 dentro en T1, c2 fuera en T1
+		expect(result[0].dentro).toContain(0);
+		expect(result[0].fuera).toContain(1);
+		// Distribución original preservada (NO swap A↔B). Los conjuntos
+		// son los mismos — solo cambia el orden dentro de cada cuadrilla
+		// (D-pinned al frente, F-pinned al final).
+		expect(distribucion).toBeDefined();
+		expect([...distribucion!.a].sort((x, y) => x - y)).toEqual([0, 1, 2, 3, 4, 5]);
+		expect([...distribucion!.b].sort((x, y) => x - y)).toEqual([6, 7, 8, 9, 10, 11]);
+		// D-pinned al frente de A
+		expect(distribucion!.a[0]).toBe(0);
+		// T1+T2 = A (Regla 1 estricta)
+		const A = new Set(distribucion!.a);
 		for (const slot of result.slice(0, 2)) {
 			const dentro = new Set(slot.dentro);
 			const aIn = [...dentro].filter((i) => A.has(i)).length;
 			expect(aIn).toBe(5);
 		}
-		// T3 y T4 por la otra cuadrilla (B)
-		const B = new Set(distribucion?.b ?? t.distribucionCuadrillas!.b);
+		// T3+T4 = B
+		const B = new Set(distribucion!.b);
 		for (const slot of result.slice(2, 4)) {
 			const dentro = new Set(slot.dentro);
 			const bIn = [...dentro].filter((i) => B.has(i)).length;
 			expect(bIn).toBe(5);
+		}
+	});
+
+	it("cuadrilla doblada con pines en T1 (caso B): respeta pin y mini-ciclo 2-2 (caso del capataz)", () => {
+		const t = makeCuadrillaDoblada();
+		// Caso reportado: c8 (idx 7, en B) D en T1, c9 (idx 8, en B) F en T1.
+		// B debe ser la cuadrilla activa para T1+T2 — el algoritmo
+		// reordena el disp de B (sin mover nadie a A) y arranca con
+		// turnoInicial=1.
+		const p: ("L" | "D" | "F" | "LF" | "LS")[][] = Array.from(
+			{ length: 6 },
+			() => Array(12).fill("L" as const),
+		);
+		p[0][7] = "D"; // c8 dentro en T1
+		p[0][8] = "F"; // c9 fuera en T1
+		t.pinned = p;
+		const { plan: result, distribucion, error } = dispatchSimulacion(t);
+		expect(error).toBeUndefined();
+		expect(result).toHaveLength(6);
+		// c8 dentro en T1, c9 fuera en T1
+		expect(result[0].dentro).toContain(7);
+		expect(result[0].fuera).toContain(8);
+		// Distribución ORIGINAL preservada — ningún costalero se movió
+		// entre cuadrillas (NO swap A↔B).
+		expect(distribucion).toBeDefined();
+		expect(distribucion!.a).toEqual([0, 1, 2, 3, 4, 5]);
+		expect(distribucion!.b.sort((x, y) => x - y)).toEqual([6, 7, 8, 9, 10, 11]);
+		// T1+T2 = B (B es activa porque contiene al D-pinned)
+		const B = new Set(distribucion!.b);
+		for (const slot of result.slice(0, 2)) {
+			const dentro = new Set(slot.dentro);
+			const bIn = [...dentro].filter((i) => B.has(i)).length;
+			expect(bIn).toBe(5);
+		}
+		// T3+T4 = A
+		const A = new Set(distribucion!.a);
+		for (const slot of result.slice(2, 4)) {
+			const dentro = new Set(slot.dentro);
+			const aIn = [...dentro].filter((i) => A.has(i)).length;
+			expect(aIn).toBe(5);
 		}
 	});
 

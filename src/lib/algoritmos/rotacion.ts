@@ -56,7 +56,10 @@ export function objSalidas(
 	return obj;
 }
 
-export function calcularCiclo(t: Trabajadera): {
+export function calcularCiclo(
+	t: Trabajadera,
+	turnoInicial: number = 0,
+): {
 	plan: TramoSlot[];
 	objetivo: Record<number, number>;
 	error?: string;
@@ -70,7 +73,12 @@ export function calcularCiclo(t: Trabajadera): {
 	// Per-tramo dispatch: tramosTipo present
 			if (t.tramosTipo && t.tramosTipo.length > 0) {
 				try {
-					const relevos = simularCicloConTipos(t, t.tramosTipo, salidas);
+					const relevos = simularCicloConTipos(
+						t,
+						t.tramosTipo,
+						salidas,
+						turnoInicial,
+					);
 					const plan = relevosATramoSlots(t, relevos);
 				const aplicaRegla5 = false;
 				const objetivo = objSalidas(total, numTramos, salidas, aplicaRegla5);

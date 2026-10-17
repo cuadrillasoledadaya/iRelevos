@@ -123,126 +123,60 @@ function pinesInsatisfechos(
  * Nota: la heurística es simple y no garantiza optimalidad. Si no
  * converge, el caller hace fallback a `completarAuto`.
  */
-function intentarSwapParaPines(
+function intentarReorderParaPines(
 	t: Trabajadera,
-	planActualInicial: TramoSlot[],
 	pinesFallidos: { ti: number; ci: number; esperado: "D" | "F" }[],
-): boolean {
+): { turnoInicial: 0 | 1 } | null {
 	const dist = t.distribucionCuadrillas;
-	if (!dist) return false;
+	if (!dist) return null;
+	if (pinesFallidos.length === 0) return null;
 
-	// Identificar costaleros pineados (no se pueden swapear)
-	const p = getPinned(t);
-	const pineados = new Set<number>();
-	for (let ti = 0; ti < p.length; ti++) {
-		for (let ci = 0; ci < p[ti].length; ci++) {
-			if (p[ti][ci] !== "L" && p[ti][ci] !== "LS") {
-				pineados.add(ci);
-			}
-		}
+	// v1.4.7: NO movemos costaleros entre A y B — eso mezclaba las
+	// cuadrillas. En su lugar determinamos qué cuadrilla debe estar
+	// activa para T1+T2 (mini-ciclo 2-2 estricto) a partir de los pines
+	// y reordenamos el `disponibles` de esa cuadrilla para que el LOAD
+	// respete D (al frente) y excluya F (al final). El cálculo del
+	// plan empieza con `turnoInicial` adecuado.
+
+	// Solo miramos los pines de T1 (mini-ciclo 2-2 arranca en T1).
+	const pinsT1 = getPinned(t)[0] ?? [];
+	const dPinned: number[] = [];
+	const fPinned: number[] = [];
+	for (let ci = 0; ci < pinsT1.length; ci++) {
+		const v = pinsT1[ci];
+		if (v === "D" || v === "LS") dPinned.push(ci);
+		if (v === "F" || v === "LF") fPinned.push(ci);
 	}
 
-	let mejoroAlMenosUnaVez = true;
-	let iteraciones = 0;
-	const MAX_ITER = pinesFallidos.length * 4 + 1;
-	let planActual = planActualInicial;
-	let fallidosActuales = pinesFallidos;
-
-	while (mejoroAlMenosUnaVez && iteraciones++ < MAX_ITER) {
-		mejoroAlMenosUnaVez = false;
-
-		for (const fallido of fallidosActuales) {
-			const { ci, esperado, ti } = fallido;
-			const dentro = new Set(planActual[ti].dentro);
-
-			// Identificar cuadrilla actual del costalero pineado
-			const enA = dist.a.includes(ci);
-			const enB = dist.b.includes(ci);
-
-			// Necesitamos mover ci a la cuadrilla opuesta:
-			//   pin "D" → debe estar en A (donde rotará con 5 dentro)
-			//   pin "F" → debe estar en B (donde rotará con F fuera)
-			const necesitaIrA: "A" | "B" | null =
-				esperado === "D" && enB ? "A" :
-				esperado === "F" && enA ? "B" :
-				null;
-			if (necesitaIrA === null) continue;
-
-			// Buscar swap partner en la cuadrilla de destino
-			// Preferimos alguien que YA está en el estado correcto (D o F)
-			// según la rotación, para que el swap sea efectivo.
-			const partnerArr = necesitaIrA === "A" ? dist.a : dist.b;
-			let partnerIdx = -1;
-
-			if (esperado === "D" && dentro.has(ci) === false) {
-				// Pin "D" insatisfecho: ci está en B y debe estar dentro.
-				// Buscar partner en A que según rotación esté dentro en ti.
-				partnerIdx = partnerArr.findIndex(
-					(idx) => !pineados.has(idx) && idx !== ci && dentro.has(idx),
-				);
-			}
-			if (partnerIdx === -1) {
-				// Fallback: cualquier costalero no pineado
-				partnerIdx = partnerArr.findIndex(
-					(idx) => !pineados.has(idx) && idx !== ci,
-				);
-			}
-			if (partnerIdx === -1) continue;
-
-			const partner = partnerArr[partnerIdx];
-
-			// Hacer swap. v1.4.6: el código previo NO removía `ci` de su
-			// cuadrilla origen, así que `ci` quedaba duplicado en A∩B y el
-			// `validarDistribucionCuadrillas` del recalc tiraba error → el
-			// dispatcher caía al fallback `completarAuto` (greedy sin
-			// mini-ciclo 2-2). El fix: remover `ci` explícitamente de su
-			// cuadrilla origen antes de hacer push al destino.
-			//
-			// v1.4.6 (continuación): además del overlap, hay que poner
-			// `ci` al FRENTE del array de la cuadrilla destino, no solo
-			// añadirlo. `simularCicloConTipos` carga los primeros 5 del
-			// `disponibles` (FIFO); si `ci` queda al final tras el sort,
-			// no entra en el primer LOAD y el pin "D" sigue insatisfecho
-			// → otro swaploop infinito → fallback. Prepender resuelve
-			// ambos problemas.
-			if (necesitaIrA === "A") {
-				dist.a = dist.a.filter((i) => i !== partner);
-				dist.b = dist.b.filter((i) => i !== ci);
-				dist.a = [ci, ...dist.a];
-				dist.b = [...dist.b, partner];
-			} else {
-				dist.a = dist.a.filter((i) => i !== ci);
-				dist.b = dist.b.filter((i) => i !== partner);
-				dist.b = [ci, ...dist.b];
-				dist.a = [...dist.a, partner];
-			}
-
-			mejoroAlMenosUnaVez = true;
-		}
-
-		// Recalcular plan con la nueva distribución
-		try {
-			const recalc = calcularCiclo(t);
-			if (recalc.error || !recalc.plan.length) {
-				return false;
-			}
-			planActual = recalc.plan;
-		} catch {
-			return false;
-		}
-
-		// Re-evaluar pines insatisfechos
-		const nuevosFallidos = pinesInsatisfechos(t, planActual);
-		if (nuevosFallidos.length === 0) return true;
-		if (nuevosFallidos.length < fallidosActuales.length) {
-			fallidosActuales = nuevosFallidos;
-		} else {
-			// No mejoró — descartar swap
-			return false;
-		}
+	// Cuadrilla activa = la que contiene a los D-pinned en T1.
+	// Si no hay D-pinned en T1, mirar F-pinned: la cuadrilla que NO los
+	// contiene es la activa.
+	let activeCuadrilla: "A" | "B" = "A";
+	if (dPinned.length > 0) {
+		const inA = dPinned.filter((ci) => dist.a.includes(ci)).length;
+		const inB = dPinned.filter((ci) => dist.b.includes(ci)).length;
+		if (inB > inA) activeCuadrilla = "B";
+	} else if (fPinned.length > 0) {
+		// F-pinned en T1 → la cuadrilla activa es la OPUESTA a la que los contiene
+		const inA = fPinned.filter((ci) => dist.a.includes(ci)).length;
+		const inB = fPinned.filter((ci) => dist.b.includes(ci)).length;
+		if (inA > inB) activeCuadrilla = "B";
 	}
 
-	return false;
+	// Reordenar disp de la cuadrilla activa:
+	//   D-pinned (en T1) → al frente (garantiza que entren en el LOAD)
+	//   F-pinned (en T1) → al final (garantiza que NO entren en el LOAD)
+	//   resto → en medio (FIFO natural)
+	const targetKey = activeCuadrilla === "A" ? "a" : "b";
+	const current = [...dist[targetKey]];
+	const dInActive = dPinned.filter((ci) => current.includes(ci));
+	const fInActive = fPinned.filter((ci) => current.includes(ci));
+	const middle = current.filter(
+		(ci) => !dInActive.includes(ci) && !fInActive.includes(ci),
+	);
+	dist[targetKey] = [...dInActive, ...middle, ...fInActive];
+
+	return { turnoInicial: activeCuadrilla === "A" ? 0 : 1 };
 }
 
 /**
@@ -276,7 +210,7 @@ function dispatchConPines(t: Trabajadera): ResultadoSimulacion {
 		};
 	}
 
-	// 2. Snapshot de la distribución original (para rollback si swapping no converge)
+	// 2. Snapshot de la distribución original (para rollback si reordering no converge)
 	const distOriginal: DistribucionIndices = {
 		a: [...t.distribucionCuadrillas.a],
 		b: [...t.distribucionCuadrillas.b],
@@ -292,7 +226,7 @@ function dispatchConPines(t: Trabajadera): ResultadoSimulacion {
 		throw caught;
 	}
 
-	// 4. Calcular plan con distribución actual
+	// 4. Calcular plan con distribución actual (turnoInicial=0 = A arranca)
 	let planActual: TramoSlot[] = [];
 	let objetivoActual: Record<number, number> = {};
 	{
@@ -309,31 +243,36 @@ function dispatchConPines(t: Trabajadera): ResultadoSimulacion {
 		return { plan: planActual, objetivo: objetivoActual, analisis };
 	}
 
-	// 6. Intentar swapping A↔B
-	const swapped = intentarSwapParaPines(t, planActual, fallidos);
-	if (swapped) {
-		// Recalcular con nueva distribución
-		const recalc = calcularCiclo(t);
+	// 6. v1.4.7: en lugar de swap A↔B (mezclaba cuadrillas), determinamos
+	//    qué cuadrilla debe estar activa para T1 y reordenamos su `disp`.
+	//    El mini-ciclo 2-2 strict se mantiene: si B es activa, B hace T1+T2,
+	//    luego A hace T3+T4, etc.
+	const reorden = intentarReorderParaPines(t, fallidos);
+	if (reorden) {
+		const recalc = calcularCiclo(t, reorden.turnoInicial);
 		if (!recalc.error && recalc.plan.length) {
-			const analisis = analizar(
-				recalc.plan,
-				t.nombres.length,
-				recalc.objetivo,
-				t,
-			);
-			return {
-				plan: recalc.plan,
-				objetivo: recalc.objetivo,
-				analisis,
-				distribucion: {
-					a: [...t.distribucionCuadrillas.a],
-					b: [...t.distribucionCuadrillas.b],
-				},
-			};
+			const recalcFallidos = pinesInsatisfechos(t, recalc.plan);
+			if (recalcFallidos.length === 0) {
+				const analisis = analizar(
+					recalc.plan,
+					t.nombres.length,
+					recalc.objetivo,
+					t,
+				);
+				return {
+					plan: recalc.plan,
+					objetivo: recalc.objetivo,
+					analisis,
+					distribucion: {
+						a: [...t.distribucionCuadrillas.a],
+						b: [...t.distribucionCuadrillas.b],
+					},
+				};
+			}
 		}
 	}
 
-	// 7. Si swapping no convergió, rollback y fallback a greedy
+	// 7. Si reordering no convergió, rollback y fallback a greedy
 	t.distribucionCuadrillas.a = distOriginal.a;
 	t.distribucionCuadrillas.b = distOriginal.b;
 	const res = completarAuto(t);
