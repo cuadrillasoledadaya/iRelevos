@@ -894,6 +894,23 @@ export function cuadrillaDobladaATramoSlots(
  * @param tramosTipo  Per-tramo type designation, length must equal t.tramos.length
  * @param salidas     Number of cycles to simulate (default 1, backward compat).
  *                    Each cycle produces t.tramos.length relevos. Must be >= 1.
+ *
+ * ## Output length vs t.tramos.length (UI consequence)
+ *
+ * The returned Relevo[] has length = t.tramos.length × salidas (when the
+ * SWAP path runs every turno of the mini-cycle 2-2). The adapter
+ * `relevosATramoSlots` produces one TramoSlot per Relevo, so
+ * `t.plan.length` ends up being `t.tramos.length × salidas` even though
+ * `t.tramos.length` is unchanged.
+ *
+ * As of v1.4.5 the UI still renders the grid with `t.tramos.length`
+ * columns (see `PlanPage.tsx` <thead> loop). That means for salidas > 1
+ * the user only sees the FIRST ciclo and the per-costalero `xN` shown
+ * next to each name counts F cells over the FULL plan (all ciclos),
+ * which can confuse: "I only see 11 F cells but x24".
+ *
+ * The algorithm is correct. Fixing the visual mismatch is tracked as
+ * deferred — see CONTEXTO-SESION-2026-10-16 / decision "opción 3".
  */
 export function simularCicloConTipos(
 	t: Trabajadera,

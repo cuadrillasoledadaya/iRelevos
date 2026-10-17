@@ -712,6 +712,17 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						<thead>
 							<tr>
 								<th className="col-name">Costalero</th>
+								{/*
+								 * Column count = t.tramos.length, NOT t.plan.length.
+								 * For cuadrilla-doblada with salidas > 1 the plan has
+								 * `t.tramos.length × salidas` slots (see simularCicloConTipos
+								 * JSDoc), so only the FIRST ciclo is visible here. The xN
+								 * badge in each row counts F cells over the FULL plan, which
+								 * is why a user with 20 visible columns and salidas=2 sees
+								 * e.g. x24 even though only ~12 of those 24 F cells are
+								 * visible on screen. Algorithm is correct; visual mismatch
+								 * is a known/accepted limitation (CONTEXTO-SESION-2026-10-16).
+								 */}
 								{t.tramos.map((_, ti) => {
 									const esClave = t.tramosClaves?.includes(ti);
 									return (
