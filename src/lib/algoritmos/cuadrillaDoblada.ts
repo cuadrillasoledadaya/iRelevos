@@ -60,7 +60,13 @@ export class CuadrillaDobladaDistribucionInvalidaError extends Error {
       | "fuera_de_rango"
       | "sub_ancho"
       | "overlap"
-      | "suma_incorrecta",
+      | "suma_incorrecta"
+      // v1.5.0 — anclas
+      | "ancla_fuera_de_rango"
+      | "ancla_duplicada"
+      | "ancla_overlap"
+      | "ancla_fuera_de_cuadrilla"
+      | "ancla_baja",
     detail?: string,
   ) {
     const mensajes: Record<typeof motivo, string> = {
@@ -69,6 +75,11 @@ export class CuadrillaDobladaDistribucionInvalidaError extends Error {
       sub_ancho: `la cuadrilla ${cuadrilla} tiene menos de ${detail ?? "ancho"} miembros`,
       overlap: `el índice ${indice} aparece en la cuadrilla ${cuadrilla} y también en la otra`,
       suma_incorrecta: `la suma de A+B no coincide con el total de costaleros (suma=${detail ?? "?"})`,
+      ancla_fuera_de_rango: `el ancla ${indice} está fuera de rango (nombres tiene ${detail ?? "N"} elementos)`,
+      ancla_duplicada: `el ancla ${indice} aparece más de una vez en la cuadrilla ${cuadrilla}`,
+      ancla_overlap: `el ancla ${indice} aparece en la cuadrilla ${cuadrilla} y también en la otra`,
+      ancla_fuera_de_cuadrilla: `el ancla ${indice} no pertenece a la cuadrilla ${cuadrilla}`,
+      ancla_baja: `el ancla ${indice} está de baja`,
     }
     super(
       `Distribución de cuadrilla inválida (cuadrilla ${cuadrilla}): ${mensajes[motivo]}. ` +
@@ -392,6 +403,97 @@ export function validarDistribucionCuadrillas(
 	for (const idx of distribucion.a) {
 		if (seenB.has(idx)) {
 			throw new CuadrillaDobladaDistribucionInvalidaError("A", idx, "overlap")
+		}
+	}
+}
+
+/**
+ * v1.5.0 — Anclas: valida `t.anclas` (índices dentro de `t.nombres`)
+ * ANTES de cualquier mutación de estado.
+ *
+ * Un ancla es un costalero que el capataz fija dentro del puesto de carga
+ * de su cuadrilla. Para que el motor pueda honorarlo, el ancla debe:
+ *   - existir en el padrón (`t.nombres`),
+ *   - estar activo (no en `t.bajas`),
+ *   - pertenecer a la cuadrilla que lo declara,
+ *   - no aparecer duplicado ni en las dos cuadrillas.
+ *
+ * Lanza `CuadrillaDobladaDistribucionInvalidaError` (motivos `ancla_*`) con
+ * la cuadrilla y el índice ofensivo para que la UI muestre un mensaje
+ * accionable. Sin anclas → no hay nada que validar.
+ */
+export function validarAnclas(t: Trabajadera): void {
+	const anclas = t.anclas
+	if (!anclas) return
+	const listaA = anclas.a ?? []
+	const listaB = anclas.b ?? []
+	const totalNombres = t.nombres.length
+	const bajas = new Set(t.bajas ?? [])
+
+	// 1. Rango — antes de nada (un índice inválido rompe cualquier índice
+	//    posterior, p.ej. `t.nombres[idx]`).
+	for (const [cuadrilla, lista] of [
+		["A", listaA],
+		["B", listaB],
+	] as const) {
+		for (const idx of lista) {
+			if (idx < 0 || idx >= totalNombres) {
+				throw new CuadrillaDobladaDistribucionInvalidaError(
+					cuadrilla,
+					idx,
+					"ancla_fuera_de_rango",
+					String(totalNombres),
+				)
+			}
+		}
+	}
+
+	// 2. Overlap A/B — antes que "fuera de cuadrilla", porque un índice en
+	//    ambas cuadrillas es un conflicto más específico.
+	const setA = new Set(listaA)
+	for (const idx of listaB) {
+		if (setA.has(idx)) {
+			throw new CuadrillaDobladaDistribucionInvalidaError(
+				"B",
+				idx,
+				"ancla_overlap",
+			)
+		}
+	}
+
+	// 3. Duplicados, bajas y pertenencia a la cuadrilla.
+	const dist = t.distribucionCuadrillas
+	for (const [cuadrilla, lista] of [
+		["A", listaA],
+		["B", listaB],
+	] as const) {
+		const seen = new Set<number>()
+		for (const idx of lista) {
+			if (seen.has(idx)) {
+				throw new CuadrillaDobladaDistribucionInvalidaError(
+					cuadrilla,
+					idx,
+					"ancla_duplicada",
+				)
+			}
+			seen.add(idx)
+			if (bajas.has(idx)) {
+				throw new CuadrillaDobladaDistribucionInvalidaError(
+					cuadrilla,
+					idx,
+					"ancla_baja",
+				)
+			}
+			if (dist) {
+				const miembros = cuadrilla === "A" ? dist.a : dist.b
+				if (!miembros.includes(idx)) {
+					throw new CuadrillaDobladaDistribucionInvalidaError(
+						cuadrilla,
+						idx,
+						"ancla_fuera_de_cuadrilla",
+					)
+				}
+			}
 		}
 	}
 }

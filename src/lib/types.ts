@@ -57,6 +57,13 @@ export interface Trabajadera {
   tramosClaves: number[]
   cuadrillaDoblada?: boolean
   distribucionCuadrillas?: { a: number[]; b: number[] } | null
+  /**
+   * v1.5.0 — Anclas: costaleros que el capataz marca a mano para que
+   * permanezcan SIEMPRE dentro del puesto de carga de su cuadrilla
+   * (nunca rotan fuera). Índices dentro de `nombres` (mismo espacio que
+   * `distribucionCuadrillas`). Ausente = sin anclas = comportamiento legacy.
+   */
+  anclas?: { a: number[]; b: number[] } | null
   /** Parallel to tramos; length invariant: tramosTipo.length === tramos.length when present */
   tramosTipo?: TramoTipo[]
 }

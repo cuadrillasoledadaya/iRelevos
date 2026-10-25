@@ -59,6 +59,7 @@ export {
 	simularCicloConTipos,
 	agruparEnCuadrillas,
 	validarDistribucionCuadrillas,
+	validarAnclas,
 	cuadrillaDobladaATramoSlots,
 	relevosATramoSlots,
 	tieneRolesAsignados,
