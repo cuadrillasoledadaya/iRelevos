@@ -548,6 +548,19 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 	const setDistribucionCuadrillas = trabajaderaStore.getState().setDistribucionCuadrillas;
 	const toggleAncla = trabajaderaStore.getState().toggleAncla;
 
+	// v1.5.0 — marcar un ancla puede fallar (p.ej. el costalero está de
+	// baja o ya no pertenece a su cuadrilla): el mensaje va al capataz en
+	// vez de romper la página.
+	function handleToggleAncla(cuadrilla: "A" | "B", idx: number) {
+		if (!esMando) return;
+		try {
+			toggleAncla(t.id, cuadrilla, idx);
+		} catch (err: unknown) {
+			const msg = err instanceof Error ? err.message : "Error desconocido";
+			if (typeof alert !== "undefined") alert(msg);
+		}
+	}
+
 	const [isOpen, setIsOpen] = useState(false);
 	const [planSel, setPlanSel] = useState("");
 
@@ -858,13 +871,16 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 											? t.distribucionCuadrillas!.a
 											: t.distribucionCuadrillas!.b;
 									const ancladas = t.anclas?.[clave] ?? [];
+									// Un costalero de baja no puede ser ancla.
+									const bajasSet = new Set(t.bajas ?? []);
+									const activos = miembros.filter((i: number) => !bajasSet.has(i));
 									return (
 										<div key={cuadrilla} className="f1">
 											<div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)]">
 												Cuadrilla {cuadrilla}
 											</div>
 											<div className="flex fw g1 mt1">
-												{miembros.map((idx: number) => {
+												{activos.map((idx: number) => {
 													const esAncla = ancladas.includes(idx);
 													return (
 														<button
@@ -878,7 +894,7 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 																	? `${t.nombres[idx]} — anclado (siempre dentro)`
 																	: `Anclar ${t.nombres[idx]}`
 																}
-															onClick={() => toggleAncla(t.id, cuadrilla, idx)}
+															onClick={() => handleToggleAncla(cuadrilla, idx)}
 															>
 																⚓ {shortName(t.nombres[idx])}
 														</button>

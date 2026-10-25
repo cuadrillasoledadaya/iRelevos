@@ -818,6 +818,27 @@ describe("ConfigPage — REQ-UI-CFG-9: Marcado de anclas", () => {
 		expect(screen.getByLabelText("Ancla Bob").getAttribute("aria-pressed")).toBe("false");
 	});
 
+	it("un costalero de baja no se ofrece como ancla", () => {
+		renderConfigPage({
+			trabajaderas: [conCuadrillaDoblada({ bajas: [0] })],
+		});
+		expect(screen.queryByLabelText("Ancla Alice")).toBeNull();
+		expect(screen.getByLabelText("Ancla Bob")).toBeTruthy();
+	});
+
+	it("si el store falla se avisa al capataz en vez de romper la página", () => {
+		const alertSpy = vi
+			.spyOn(window, "alert")
+			.mockImplementation(() => undefined);
+		mockToggleAncla.mockImplementationOnce(() => {
+			throw new Error("el ancla 0 está de baja");
+		});
+		renderConfigPage({ trabajaderas: [conCuadrillaDoblada()] });
+		fireEvent.click(screen.getByLabelText("Ancla Alice"));
+		expect(alertSpy).toHaveBeenCalledWith("el ancla 0 está de baja");
+		alertSpy.mockRestore();
+	});
+
 	it("sin cuadrilla doblada no se renderiza el bloque de anclas", () => {
 		renderConfigPage({
 			trabajaderas: [
