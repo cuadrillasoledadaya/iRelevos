@@ -170,6 +170,12 @@ export interface Relevo {
 export interface EstadoCuadrilla {
 	cargando: string[]
 	disponibles: string[]
+	/**
+	 * v1.5.0 — anclas: costaleros de esta cuadrilla que permanecen
+	 * SIEMPRE dentro del puesto de carga. Nunca aparecen en `cargando`
+	 * ni en `disponibles` (sólo los rotantes rotan).
+	 */
+	anclas?: string[]
 }
 
 export interface EstadoPlan {
@@ -499,24 +505,55 @@ export function validarAnclas(t: Trabajadera): void {
 }
 
 /**
+ * v1.5.0 — nombres de las anclas de una cuadrilla (a partir de los
+ * índices de `t.anclas`). Los índices inválidos se descartan (la
+ * validación se encarga antes).
+ */
+export function anclasDeCuadrilla(
+	t: Trabajadera,
+	cuadrilla: CuadrillaId,
+): string[] {
+	const idxs = cuadrilla === "A" ? t.anclas?.a : t.anclas?.b
+	if (!idxs || idxs.length === 0) return []
+	return idxs
+		.map((i) => t.nombres[i])
+		.filter((n): n is string => n !== undefined)
+}
+
+/**
+ * v1.5.0 — anclas de una working crew como nombres, por cuadrilla.
+ */
+function anclasDeT(t: Trabajadera): { a: string[]; b: string[] } {
+	return { a: anclasDeCuadrilla(t, "A"), b: anclasDeCuadrilla(t, "B") }
+}
+
+/**
  * Crea el estado inicial. Empieza con A marcada como activa pero NINGUNA
  * cuadrilla está aún cargando — todas tienen `cargando = []` y la totalidad
  * de sus miembros en `disponibles`. El primer relevo principal rearma la
  * primera cuadrilla activa desde sus disponibles.
  */
-export function crearEstadoInicial(distribucion: Distribucion, ancho = ANCHO_TRABAJADERA): EstadoPlan {
+export function crearEstadoInicial(
+	distribucion: Distribucion,
+	ancho = ANCHO_TRABAJADERA,
+	anclas?: { a: string[]; b: string[] },
+): EstadoPlan {
 	void ancho
-	function init(miembros: string[]): EstadoCuadrilla {
+	function init(miembros: string[], anclasCuadrilla: string[]): EstadoCuadrilla {
+		const setAnclas = new Set(anclasCuadrilla)
 		return {
 			cargando: [],
-			disponibles: [...miembros],
+			// v1.5.0: las anclas quedan RESERVADAS — no entran al disp
+			// (un ancla nunca rota fuera del puesto de carga).
+			disponibles: miembros.filter((m) => !setAnclas.has(m)),
+			anclas: [...anclasCuadrilla],
 		}
 	}
 	return {
 		cuadrillaActiva: "A",
 		estados: {
-			A: init(distribucion.a),
-			B: init(distribucion.b),
+			A: init(distribucion.a, anclas?.a ?? []),
+			B: init(distribucion.b, anclas?.b ?? []),
 		},
 	}
 }
@@ -567,7 +604,11 @@ export function transicionActiva(
 				// frente y trapaba la rotación (siempre salía y entraba
 				// el mismo). Ahora va al final y deja que otros miembros
 				// de la cuadrilla roten primero.
+				// v1.5.0: `cargando` sólo contiene rotantes — las anclas
+				// viven en `anclas` y NO van al disp (siguen dentro de su
+				// cuadrilla, que es la saliente).
 				disponibles: [...eActiva.cargando, ...eActiva.disponibles],
+				anclas: eActiva.anclas,
 			},
 		},
 	}
@@ -673,6 +714,9 @@ export function aplicarRelevoIntermedio(
 				[activa]: {
 					cargando: nuevosCargando,
 					disponibles: restantes,
+					// v1.5.0: las anclas de la cuadrilla se conservan
+					// (siguen dentro, no entran al disp).
+					anclas: eActiva.anclas,
 				},
 			},
 		}
@@ -683,6 +727,9 @@ export function aplicarRelevoIntermedio(
 		for (const p of restantes) {
 			streaks.set(p, (streaks.get(p) ?? 0) + 1)
 		}
+		// v1.5.0: las anclas están SIEMPRE dentro → streak 0 (nunca
+		// acumulan racha de fuera, no entran en el disp).
+		for (const p of eActiva.anclas ?? []) streaks.set(p, 0)
 		// v1.3.3 Regla 2 cross-cuadrilla: la cuadrilla INACTIVA también
 		// acumula streaks en su disp durante este slot. Sin esto, los
 		// costaleros de la cuadrilla opuesta quedan "congelados" en su
@@ -735,6 +782,8 @@ export function aplicarRelevoIntermedio(
 			[activa]: {
 				cargando: [...restoCargando, entra],
 				disponibles: [...restoDisponibles, sale],
+				// v1.5.0: las anclas de la cuadrilla se conservan.
+				anclas: eActiva.anclas,
 			},
 		},
 	}
@@ -823,7 +872,12 @@ export function simularCicloCompleto(
 		a: cuadrillas.a.miembros,
 		b: cuadrillas.b.miembros,
 	}
-	let estado = crearEstadoInicial(distCompleta, ancho)
+	// v1.5.0: las anclas de la working crew se reservan en el estado.
+	let estado = crearEstadoInicial(
+		distCompleta,
+		ancho,
+		t ? anclasDeT(t) : undefined,
+	)
 	const relevos: Relevo[] = []
 	let n = 1
 	const streaks = new Map<string, number>()
@@ -865,6 +919,8 @@ export function cuadrillaDobladaATramoSlots(
 	if (t.distribucionCuadrillas) {
 		validarDistribucionCuadrillas(t.distribucionCuadrillas, t.nombres.length)
 	}
+	// v1.5.0: las anclas también se validan en el path legacy.
+	validarAnclas(t)
 
 	// If no distribution provided, try to build one from t.distribucionCuadrillas (indices)
 	let dist = distribucion;
@@ -925,7 +981,9 @@ export function cuadrillaDobladaATramoSlots(
 	let lastCuadrilla: CuadrillaId | null = null;
 
 	for (const relevo of relevos) {
-		if (lastCuadrilla !== null && lastCuadrilla !== relevo.cuadrilla) {
+		const cambiaCuadrilla =
+			lastCuadrilla !== null && lastCuadrilla !== relevo.cuadrilla
+		if (cambiaCuadrilla) {
 			// Cuadrilla activa cambió: descartamos cargando previo y
 			// arrancamos con los que entran (sale=[] en load case).
 			cargando = [...relevo.entra]
@@ -937,6 +995,16 @@ export function cuadrillaDobladaATramoSlots(
 			for (const name of relevo.entra) {
 				if (!cargando.includes(name)) {
 					cargando.push(name)
+				}
+			}
+		}
+		// v1.5.0: las anclas de la cuadrilla activa están SIEMPRE dentro.
+		// Se suman al entrar a la cuadrilla (o en el primer relevo); en
+		// los swaps no hay que tocarlas (nunca salen).
+		if (cambiaCuadrilla || lastCuadrilla === null) {
+			for (const nombre of anclasDeCuadrilla(t, relevo.cuadrilla)) {
+				if (!cargando.includes(nombre)) {
+					cargando.push(nombre)
 				}
 			}
 		}
@@ -1043,6 +1111,9 @@ export function simularCicloConTipos(
 	if (t.distribucionCuadrillas) {
 		validarDistribucionCuadrillas(t.distribucionCuadrillas, t.nombres.length)
 	}
+	// v1.5.0: validar las anclas ANTES de cualquier mutación de estado
+	// (mismo criterio que la distribución).
+	validarAnclas(t)
 
 	const costaleros = t.nombres;
 	// v1.2.90 B1: filtrar costaleros de baja para que NO aparezcan en la
@@ -1100,7 +1171,7 @@ export function simularCicloConTipos(
 		a: cuadrillas.a.miembros,
 		b: cuadrillas.b.miembros,
 	}
-	let estado = crearEstadoInicial(distCompleta)
+	let estado = crearEstadoInicial(distCompleta, ANCHO_TRABAJADERA, anclasDeT(t))
 	const relevos: Relevo[] = []
 	let n = 1
 	const streaks = new Map<string, number>()
@@ -1207,7 +1278,9 @@ export function relevosATramoSlots(
 	let lastCuadrilla: CuadrillaId | null = null
 
 	for (const relevo of relevos) {
-		if (lastCuadrilla !== null && lastCuadrilla !== relevo.cuadrilla) {
+		const cambiaCuadrilla =
+			lastCuadrilla !== null && lastCuadrilla !== relevo.cuadrilla
+		if (cambiaCuadrilla) {
 			// Cuadrilla activa cambió: descartamos cargando previo y
 			// arrancamos con los que entran.
 			cargando = [...relevo.entra]
@@ -1217,6 +1290,14 @@ export function relevosATramoSlots(
 			for (const name of relevo.entra) {
 				if (!cargando.includes(name)) {
 					cargando.push(name)
+				}
+			}
+		}
+		// v1.5.0: las anclas de la cuadrilla activa están SIEMPRE dentro.
+		if (cambiaCuadrilla || lastCuadrilla === null) {
+			for (const nombre of anclasDeCuadrilla(t, relevo.cuadrilla)) {
+				if (!cargando.includes(nombre)) {
+					cargando.push(nombre)
 				}
 			}
 		}
