@@ -1,7 +1,8 @@
-# 📌 Contexto de sesión — 2 bugs de UI/import de cuadrillas
+# 📌 Contexto de sesión — v1.5.0 "Anclas" (cuadrilla doblada)
 
 **Fecha:** 2026-10-25 (sábado)
-**Estado:** Pausa · Los 2 fixes están pusheados y en producción · **Falta validación del capataz**
+**Estado:** Pausa · Los 2 bugs de la sesión anterior + la feature **Anclas**
+están pusheados · **Falta validación del capataz**
 
 ---
 
@@ -9,130 +10,135 @@
 
 - **Ruta:** `/home/chiqui/Proyectos ai/relevos antigra`
 - **Stack:** Next.js 14.2.35 + React 18 + TypeScript 5 + Zustand + Supabase + Vitest
-- **Nombre:** `relevos-app` **v1.4.9** ← bump hoy
-- **Deploy prod:** `https://i-relevos.vercel.app` (alias) — deploy `dpl_EXLnP98TD1iUn4UvejSZNe96J6Ad` ● Ready (Production)
-- **Git:** `main` · CI ✅ (run `40180957877` · test+build verdes) · working tree limpio
-- **Tests:** **920/920 verdes** (52 archivos) — 903 antes de hoy, +17 nuevos
+- **Nombre:** `relevos-app` **v1.5.0** ← bump de esta sesión
+- **Deploy prod:** `https://i-relevos.vercel.app` (alias)
+- **Git:** `main` · working tree limpio
+- **Tests:** **953/953 verdes** (53 archivos) — 920 al empezar la sesión, **+33**
 
 ---
 
-## 🐛 Bug 1 — v1.4.8 — Cuadrilla Doblada ON sin forma de apagarla
+## ✅ Lo que ya estaba en producción (sesión anterior)
 
-**Síntoma (capataz):** en Plan aparece el pill "Doblada ON"; al clicarlo va a
-Configuración, pero **el selector no aparece** → no puede ponerlo en OFF.
-"Callejón sin salida": Plan → Config → sin selector → Plan → …
+| Versión | Fix | Estado |
+|---|---|---|
+| v1.4.8 | Toggle "Cuadrilla Doblada" siempre accesible en Config (se podía quedar ON sin forma de apagarlo) | en prod · **sin validar por el capataz** |
+| v1.4.9 | Working crews con 6 costaleros por defecto + nº de cuadrillas del paso (`num_trabajadoras`) + import del censo que crea la cuadrilla que falta | en prod · **sin validar por el capataz** |
 
-### Causas (2)
+Guiones de validación: ver `openspec/changes/2026-10-25-fix-*-oculto/` y
+`.../2026-10-25-fix-trabajaderas-6-costaleros-por-defecto/`.
 
-1. **Gate de renderizado** (`ConfigPage.tsx`): el bloque "Cuadrilla Doblada" se
-   mostraba solo con `esMando && totalActivos >= 10` → usaba el umbral de
-   **activación** como gate de **visibilidad**. Con el flag ON y <10 costaleros
-   activos (por bajas/borrados) el bloque desaparecía.
-2. **Tarjetas colapsadas** (CSS): `.card .trab-body { display: none !important }`
-   → al navegar Plan → Config, la working crew llegaba cerrada aunque el gate
-   ya permitiera renderizar el selector.
+---
 
-### Fix (commits `0afef79` + `a0915c2`)
+## 🆕 v1.5.0 — Anclas (lo hecho en esta sesión)
 
-| Archivo | Cambio |
+**Qué es:** el capataz marca **anclas** = costaleros que quedan **siempre
+dentro** del puesto de carga de su cuadrilla (no rotan fuera). Con una ancla
+en A, el LOAD de A deja **6 dentro** (5 rotantes + el ancla) → el patrón que
+pedia el capataz: `T1=6D, T2=5D, T3=5D…`
+
+Decisiones ya aclaradas por el capataz (2026-10-16):
+**D1** marcadas a mano por el capataz · **D2** jerarquía
+`5-dentro > anclas > no-mezclar > max-3-consec`.
+
+### Commits (work-units, TDD estricto)
+
+| Commit | Contenido |
 |---|---|
-| `ConfigPage.tsx` | gate → `esMando && (totalActivos >= 10 \|\| t.cuadrillaDoblada)` (activar exige mínimo, **apagar nunca**) |
-| `ConfigPage.tsx` | aviso: `⚠ Solo N costaleros activos (mín. 10) — desactiva para volver al plan estándar` |
-| `PlanPage.tsx` | chip `⚠ N activos · mín. 10` en el header cuando el flag está ON bajo el mínimo |
-| `PlanPage.tsx` + `ConfigPage.tsx` + `uiStore.ts` | `uiStore.configFocusTid` (transitorio, no persistido) → Plan marca foco al navegar y Config **expande** la tarjeta de esa working crew |
-| `openspec/changes/2026-10-25-fix-cuadrilla-doblada-toggle-off-oculto/` | proposal + tasks + deltas de spec (ui/config-page, ui/plan-page) |
+| `328028b` | **T1** — `Trabajadora.anclas?: {a: number[]; b: number[]}` + `validarAnclas(t)` (motivos `ancla_*` en `CuadrillaDobladaDistribucionInvalidaError`) |
+| `e2d7cea` | **T2** — el motor: `EstadoCuadrilla.anclas`, anclas reservadas fuera del `disp`, LOAD 6 dentro, SWAP nunca saca un ancla, `transicionActiva` no las manda al `disp`, el plan las refleja |
+| `eee2062` | **T3** — análisis *anchor-aware*: `dentro5` cuenta rotantes, `okObj` por cuadrilla (±1), `objPorCuadrilla()` |
+| `3b50e0e` | **T4** — store: `setAnclas` / `toggleAncla`, saneado al cambiar la distribución, reindexado al borrar costaleros |
+| `7f730e6` | **T5/T6** — UI: bloque "Anclas" en Configuración (chip ⚓ por costalero) + marca ⚓ y contador en el Plan |
 
-**Tests nuevos (6):** toggle visible/accionable con flag ON bajo el mínimo ·
-ausente con flag OFF bajo el mínimo · aviso de mínimo · tarjeta expandida con
-foco / colapsada sin foco · chip de Plan.
+### Decisiones técnicas (importantes para continuar)
 
----
-
-## 🐛 Bug 2 — v1.4.9 — Working crews con 6 costaleros por defecto + nº de cuadrillas del paso
-
-**Síntoma (capataz):** "cuando se resetea toda la aplicación, al elegir el paso
-anterior no aplica bien los datos del número de trabalhadoras, siempre pone 6;
-además no puedo importar bien los costaleros porque esas working crews solo
-aparecen con 3 costaleros y tengo que crear costaleros nuevos para que el
-censo se pase correctamente. **Por defecto las working crews deberían contar
-con 6 costaleros ya definidos en su creación.**"
-
-### Causas (4)
-
-| # | Ubicación | Defecto |
-|---|---|---|
-| 1 | `adminService.createPaso` | working crews con `nombres: []`, `roles: []`, `salidas: 1`, 2 tramos → paso inservible |
-| 2 | `migrarDatos` (`lib/algoritmos/datos.ts`) | `if (!t.nombres)` no cubre `[]` (truthy) → los pasos ya creados **no se reparaban** |
-| 3 | `planStore.resetTodo` | hardcodeaba **1** working crew, ignorando `num_trabajadoras` del paso |
-| 4 | `adminService.syncTodoCenso` | `if (!trab) return` → **descartaba en silencio** las cuadrillas del censo que el paso no tenía |
-
-### Fix (commits `6a72b47` + `e827e49`)
-
-- **Factory canónica** `crearTrabajadoraBase(id)` en `src/lib/algoritmos/datos.ts`:
-  6 costaleros (`Costalero 1..6`) + `defaultRoles(6, id)` + `salidas: 2` +
-  3 tramos (`Tramo N (T{id})`) + `tramosTipo` 3×primario. Exportada en el barrel.
-  La usan `datosVacios()`, `addTrab()`, `createPaso()` y `resetTodo()`.
-  *Antes la forma estaba duplicada en 4 sitios y **cada copia difería**.*
-- `migrarDatos`: `if (!t.nombres || t.nombres.length === 0)` → 6 costaleros
-  (**repara los pasos ya existentes en BD**, sin migración).
-- `migrarDatos`: `if (!t.roles || t.roles.length === 0)` → roles por defecto.
-- `resetTodo`: reconstruye **N** working crews (`N = num_trabajaderas` del paso
-  activo) con 6 costaleros. Nueva dep `setPlanDeps(m, gt, gs, gn?)` cableada en
-  `src/stores/index.ts` (fallback: nº actual en `S`).
-- `syncTodoCenso`: si el censo referencia una working crew que el paso no
-  tiene, **la crea** con 6 costaleros en vez de descartarla.
-- `openspec/changes/2026-10-25-fix-trabajaderas-6-costaleros-por-defecto/`:
-  proposal + tasks (con nota de la verificación de columnas).
-
-**Tests nuevos (11):** factory (3) + reparación de `nombres: []` (2) ·
-`createPaso` con 6 costaleros (1, actualizado) · `syncTodoCenso` crea la
-cuadrilla que el censo referencia (1) · `resetTodo` con N cuadrillas (2).
+1. **Las anclas se reservan fuera del `disp`** al crear el estado → el LOAD
+   existente (`min(disponibles, ANCHO)`) ya carga los rotantes correctos y
+   las anclas se suman aparte. La fórmula del TODO
+   (`min(total, ANCHO + anclas)`) se simplifica a `min(rotantes, ANCHO)`.
+2. **El ancla suma dentro, nunca resta** → `dentro5` se recalcula sobre los
+   rotantes (6 dentro con 1 ancla = 5 rotantes dentro → cumple el mínimo).
+3. **El desequilibrio entre cuadrillas con anclas es intencionado** (la
+   cuadrilla anclada rota menos: 8 salidas de 12 tramos frente a 5-6 de la
+   otra) → el objetivo se reparte **por cuadrilla** (`objPorCuadrilla`) y
+   `okObj` admite ±1. Sin anclas, el análisis no cambia (mismo golden).
+4. **Golden test**: sin anclas el plan es **idéntico** al de antes
+   (`PLAN_SIN_ANCLAS` en `src/lib/algoritmos/anclas.test.ts`).
+5. **Bug de índices corregido**: `delCost` reindexaba las bajas pero **no**
+   la distribución A/B (índices desfasados). Ahora reindexa bajas,
+   distribución **y** anclas.
+6. **Trampa de escritura**: `trabajadora`/`Trabajadora` vs
+   `trabajadera`/`Trabajadera` — el modelo escribe la primera por inercia y
+   rompe los identificadores. **Siempre `tsc --noEmit` antes de commitear.**
 
 ---
 
-## 🔎 Verificación importante: nombres de columna reales (Supabase)
+## 🧪 Guion de validación (v1.5.0 — Anclas)
 
-Verificado contra la API REST (`GET /rest/v1/...?select=<col>`):
+Caso real: Trabajadera con 12 costaleros, A=6, B=6, cuadrilla doblada ON.
 
-| Tabla | Columna real | Variante que **NO** existe |
-|---|---|---|
-| `census` | **`trabajadera`** ✅ | `trabajadora` → `42703 column does not exist` |
-| `proyectos` | **`num_trabajaderas`** ✅ | `num_trabajadoras` → `42703` |
+1. Configuración → working crew → bloque **"Anclas"** debajo de la
+   distribución A/B (chips ⚓ con los 6 de A y los 6 de B).
+2. Marcar ⚓ en un costalero de A → el plan se recalcula y ese costalero
+   aparece **siempre dentro** mientras A está activa (y con marca ⚓ en el
+   Plan), y el header muestra "⚓ 1 ancla".
+3. El primer tramo de A debe tener **6 dentro** (5 rotantes + el ancla); los
+   tramos de B, 5 dentro.
+4. Desmarcar el ancla → el plan vuelve al patrón 5 dentro (y el chip
+   "⚓ 1 ancla" desaparece).
+5. Mover un costalero de A a B en "Editar distribución" → su ancla se
+   limpia sola (sanear) y no queda ninguna marca ⚓.
 
-⇒ **La grafía del repo es la correcta.** Ojo: `supabase/migrations/2026-05-24-update-rpc-for-rol.sql`
-(y el de `rol_sec`) documentan el RPC con `trabajadora`; el RPC aplicado en
-producción usa `trabajadera`. Deuda documental (no es código que se ejecuta).
+> Si el plan aparece con "⚠ Hay problemas en el plan", es **preexistente**
+> del modo cuadrilla doblada (regla `rep`/`cons` del análisis estándar): la
+> tarjeta ya salía así antes de las anclas. Lo nuevo es que **no** deben
+> salir "Desequilibrio en las salidas" ni "Algún tramo no tiene 5 dentro".
 
 ---
 
-## ⚠️ Trampas del entorno (IMPORTANTES para continuar)
+## 📌 Pendiente / follow-ups
 
-### 1. El filesystem de este proyecto es inconsistente (lecturas stale)
+- [ ] **Validación del capataz** en `https://i-relevos.vercel.app` de:
+      - [ ] v1.4.8 (toggle OFF accesible)
+      - [ ] v1.4.9 (6 costaleros por defecto + nº de cuadrillas + censo)
+      - [ ] v1.5.0 (anclas)
+- [ ] **Export** (`src/lib/exportar/`): no marca las anclas.
+- [ ] **Hard Reset**: borra las anclas (recrea las working crews) — decisión
+      consciente, documentada en el proposal.
+- [ ] Pasos antiguos: `migrarDatos` los repara al cargarlos, pero el
+      contenido en BD sigue viejo hasta el siguiente guardado a la nube.
+- [ ] El **motor** decide con `t.nombres.length >= 10` (padrón completo,
+      sin descontar bajas) mientras la UI usa `activos` → follow-up conocido.
 
-- Un mismo archivo puede leerse **vacío**, **truncado** o con **contenido viejo**
-  segundos después de escribirlo. `ls` puede no listar un archivo que existe.
-- **`os.replace()` (rename) rompe el archivo**: deja el path inaccesible
-  (`FileNotFoundError`) hasta hacer `rm` + `cp`.
-- **Usar escrituras in-place** (`open(path,"w")` + `fsync`), nunca rename.
-- **Verificar siempre** releyendo tras escribir (comparar contenido exacto).
-- `npx tsc --noEmit` con `"incremental": true` puede usar cache stale →
-  si un error parece absurdo, `rm tsconfig.tsbuildinfo` y re-ejecutar.
-- **Helper reusable** en `/tmp/fshelp.py` (read con reintentos + write in-place
-  con verificación). Reconstruirlo si no está.
+---
 
-### 2. Trampa de escritura: `trabajadora` vs `Trabajadera`
+## ⚠️ Trampas del entorno (IMPORTES para continuar)
 
-El dominio usa **dos grafías distintas** y es fácil colarse:
+### 1. Filesystem inconsistente (lecturas stale)
 
-| Grafía | Qué es | Dónde |
-|---|---|---|
-| `Trabajadera` / `trabajaderas` | la working crew (cuadrilla) | tipo, `content.trabajaderas` |
-| `trabajadera` | **columna DB** (censo, perfiles) | `census.trabajadera` |
-| `num_trabajaderas` | columna DB (proyectos) | nº de cuadrillas del paso |
+- Un mismo archivo puede leerse **vacío**, truncado o viejo segundos
+  después de escribirlo; `ls` puede no listar un archivo que existe;
+  `open(path)` puede lanzar `FileNotFoundError` aunque el archivo exista.
+- **Usar escrituras in-place** (`open(path,"w")` + `fsync`), nunca
+  `os.replace()`/rename.
+- **Verificar siempre** releyendo tras escribir.
+- Si un error de `tsc` parece absurdo: `rm tsconfig.tsbuildinfo` y re-ejecutar.
+- Para editar JSX con tabs, usar un script **python** que locate la línea
+  por contenido y la reescriba: el `edit` tool falla si el `oldText` no
+  coincide **exactamente** (tabs vs espacios).
 
-Mi modelo tiende a escribir `trabajadora`/`Trabajadora` (con 'o') por inercia →
-identificadores rotos que `tsc` detecta… **a veces tarde**. **Regla: pasar
-siempre `tsc --noEmit` + suite completa antes de commitear.**
+### 2. Trampa de escritura: `trabajadora` vs `trabajadera`
+
+| Grafía | Qué es |
+|---|---|
+| `Trabajadera` / `trabajaderas` | la working crew (cuadrilla) |
+| `trabajadera` | columna DB (`census.trabajadera`) |
+| `num_trabajaderas` | columna DB (`proyectos.num_trabajaderas`) |
+
+El modelo escribe `trabajadora`/`Trabajadora` (con 'o') por inercia →
+identificadores rotos que `tsc` detecta. **Regla: `npm run type-check` +
+suite completa antes de commitear.** Un `grep -rn "trabajadora"` sobre `src/`
+antes de commitear salva el susto.
 
 ### 3. Verificar contra la BD, no contra la intuición
 
@@ -140,55 +146,12 @@ Antes de "arreglar" un nombre de columna, comprobarlo con `curl` a PostgREST.
 
 ---
 
-## 🔄 Estado actual / qué falta
-
-- [x] Bug 1 (v1.4.8) arreglado, pusheado y en producción
-- [x] Bug 2 (v1.4.9) arreglado, pusheado y en producción
-- [ ] **Validación del capataz en `https://i-relevos.vercel.app`** ← pendiente
-- [ ] Decidir qué hacer con los **pasos antiguos**: `migrarDatos` los repara al
-      cargarlos (6 costaleros), pero el contenido en BD sigue viejo hasta el
-      siguiente guardado a la nube. ¿Forzar un guardado? ¿Script de migración?
-
-### Guion de validación (Bug 2)
-
-1. Admin → crear un Paso nuevo → las working crews deben aparecer con **6
-   costaleros**, 2 salidas, 3 tramos.
-2. Cargar el paso anterior → sus working crews deben aparecer con 6 costaleros.
-3. Admin → CensTab → sincronizar el censo → los costaleros deben caer en su
-   cuadrilla correcta; si el paso no tiene esa cuadrilla, se crea sola.
-4. Configuración → **Hard Reset** → el paso debe quedar con **el nº de
-   cuadrillas declarado** (no 1), cada una con 6 costaleros.
-
-### Guion de validación (Bug 1)
-
-1. Plan → working crew con cuadrilla doblada ON y <10 activos → chip
-   `⚠ N activos · mín. 10`.
-2. Click en el pill "Doblada" → Config, **tarjeta expandida**, bloque visible
-   con el aviso → click en el toggle → **OFF** (esto antes era imposible).
-
----
-
-## 📌 Pendiente de la sesión anterior: v1.5.0 — "Anclas"
-
-`.pi/TODO-fix-anclas.md` (T1–T9, sin marcar). Resumen:
-
-- Marcar **anclas** (costaleros que no salen en el relevo) manualmente por el
-  capataz → `Trabajadora.anclas`.
-- Jerarquía de reglas: **5-dentro > anclas > no-mezclar > max-3-consec**.
-- Tocar `aplicarRelevoIntermedio` y `transicionActiva` **rompe la suite** →
-  commits por tarea + suite completa en cada paso.
-- ⚠️ La branch `fix/cuadrilla-doblada-cadencia-y-regla2` está **8 commits
-  atrás** de main (v1.4.5): rebasar o arrancar desde main.
-
----
-
 ## 💡 Lo que NO hacer
 
 - ❌ No reintroducir el swap A↔B para satisfacer pines (el capataz lo rechazó)
 - ❌ No romper la cadencia mini-ciclo 2-2 ni la Regla 1 (no mezclar cuadrillas)
-- ❌ No tocar el gate `n >= 10` del motor en este ticket (queda como follow-up:
-  el motor usa `nombres.length` (padrón completo) y la UI `activos` → conviven)
-- ❌ No commitear sin `npm test` (920) + `type-check` + `lint` + CI verdes
+- ❌ No tocar el gate `n >= 10` del motor en este ticket
+- ❌ No commitear sin `npm test` (953) + `type-check` + `lint` + CI verdes
 - ❌ No usar `os.replace()` / rename en este filesystem
 
 ---
