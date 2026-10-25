@@ -256,3 +256,83 @@ describe("trabajaderaStore cuadrilla doblada", () => {
     });
   });
 });
+
+describe("trabajaderaStore anclas (v1.5.0)", () => {
+  function conDistribucion(): void {
+    const t = datos.trabajaderas[0];
+    t.cuadrillaDoblada = true;
+    t.distribucionCuadrillas = { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] };
+  }
+
+  it("setAnclas guarda las anclas e invalida el plan", () => {
+    conDistribucion();
+    const t = datos.trabajaderas[0];
+    t.plan = [{ dentro: [0, 1, 2, 3, 4], fuera: [5] }];
+    t.obj = { 0: 1 };
+    t.analisis = { conteo: {}, okObj: true, dentro5: true, primer: [], ultimo: [], rep: [], cons: 0 };
+
+    trabajaderaStore.getState().setAnclas(1, { a: [5], b: [] });
+
+    expect(t.anclas).toEqual({ a: [5], b: [] });
+    expect(t.plan).toBeNull();
+    expect(t.obj).toBeNull();
+    expect(t.analisis).toBeNull();
+  });
+
+  it("setAnclas lanza si el ancla no pertenece a la cuadrilla", () => {
+    conDistribucion();
+    expect(() =>
+      trabajaderaStore.getState().setAnclas(1, { a: [7], b: [] }),
+    ).toThrow();
+    expect(datos.trabajaderas[0].anclas).toBeUndefined();
+  });
+
+  it("setAnclas lanza si el ancla esta de baja", () => {
+    conDistribucion();
+    datos.trabajaderas[0].bajas = [3];
+    expect(() =>
+      trabajaderaStore.getState().setAnclas(1, { a: [3], b: [] }),
+    ).toThrow();
+  });
+
+  it("toggleAncla marca y desmarca", () => {
+    conDistribucion();
+    const t = datos.trabajaderas[0];
+
+    trabajaderaStore.getState().toggleAncla(1, "A", 5);
+    expect(t.anclas).toEqual({ a: [5], b: [] });
+
+    trabajaderaStore.getState().toggleAncla(1, "B", 7);
+    expect(t.anclas).toEqual({ a: [5], b: [7] });
+
+    trabajaderaStore.getState().toggleAncla(1, "A", 5);
+    expect(t.anclas).toEqual({ a: [], b: [7] });  });
+
+  it("setDistribucionCuadrillas sanea las anclas que dejan de ser validas", () => {
+    conDistribucion();
+    const t = datos.trabajaderas[0];
+    trabajaderaStore.getState().setAnclas(1, { a: [5], b: [7] });
+
+    // El costalero 5 se mueve de A a B: su ancla de A ya no es valida.
+    trabajaderaStore
+      .getState()
+      .setDistribucionCuadrillas(1, [0, 1, 2, 3, 4, 6], [5, 7, 8, 9, 10, 11]);
+
+    expect(t.anclas).toEqual({ a: [], b: [7] });
+  });
+
+  it("delCost reindexa las anclas y la distribucion", () => {
+    conDistribucion();
+    const t = datos.trabajaderas[0];
+    trabajaderaStore.getState().setAnclas(1, { a: [5], b: [7] });
+
+    // Se borra el costalero 0 -> los indices > 0 se desplazan una posicion.
+    trabajaderaStore.getState().delCost(1, 0);
+
+    expect(t.anclas).toEqual({ a: [4], b: [6] });
+    expect(t.distribucionCuadrillas).toEqual({
+      a: [0, 1, 2, 3, 4],
+      b: [5, 6, 7, 8, 9, 10],
+    });
+  });
+});

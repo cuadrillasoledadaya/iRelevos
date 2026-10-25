@@ -6,7 +6,7 @@
 
 import { create } from 'zustand'
 import { defaultRoles } from '@/lib/roles'
-import { tramosOptimos, aplicarSugerencias, generarSugerencias, sugerirDistribucion, tieneRolesAsignados, sugerirDistribucionIndex } from '@/lib/algoritmos'
+import { tramosOptimos, aplicarSugerencias, generarSugerencias, sugerirDistribucion, tieneRolesAsignados, sugerirDistribucionIndex, validarAnclas } from '@/lib/algoritmos'
 import { crearTrabajaderaBase } from '@/lib/algoritmos/datos'
 import type { DatosPerfil, RolCode, Trabajadera, TramoTipo } from '@/lib/types'
 import type { SugerenciaRes } from '@/lib/algoritmos'
@@ -41,6 +41,14 @@ export interface TrabajaderaStore {
     pinsInvalidated: boolean
   }
   setDistribucionCuadrillas: (tid: number, a: number[], b: number[]) => void
+  /**
+   * v1.5.0 — anclas: costaleros que quedan siempre dentro del puesto de
+   * carga de su cuadrilla. Lanza si el ancla no es válida (no pertenece a
+   * su cuadrilla, está de baja, etc.).
+   */
+  setAnclas: (tid: number, anclas: { a: number[]; b: number[] }) => void
+  /** Marca/desmarca un ancla (toggle). */
+  toggleAncla: (tid: number, cuadrilla: "A" | "B", idx: number) => void
   /** Set tipo (primario/secundario) for a specific tramo; validates 0 <= ti < tramos.length */
   setTipoTramo: (tid: number, ti: number, tipo: TramoTipo) => void
 }
@@ -92,6 +100,22 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
         t.nombres.splice(i, 1)
         t.roles?.splice(i, 1)
         t.bajas = bajas.filter(b => b !== i).map(b => (b > i ? b - 1 : b))
+        // v1.5.0: las anclas y la distribución A/B viven en el mismo
+        // espacio de índices que `nombres` — al borrar un costalero hay
+        // que reindexarlas o quedan apuntando al costalero equivocado.
+        const reindex = (idx: number) => (idx > i ? idx - 1 : idx)
+        if (t.anclas) {
+          t.anclas = {
+            a: (t.anclas.a ?? []).filter(x => x !== i).map(reindex),
+            b: (t.anclas.b ?? []).filter(x => x !== i).map(reindex),
+          }
+        }
+        if (t.distribucionCuadrillas) {
+          t.distribucionCuadrillas = {
+            a: t.distribucionCuadrillas.a.filter(x => x !== i).map(reindex),
+            b: t.distribucionCuadrillas.b.filter(x => x !== i).map(reindex),
+          }
+        }
         t.plan = null
         t.obj = null
         t.analisis = null
@@ -444,6 +468,50 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
           }
         }
         t.distribucionCuadrillas = { a: [...a], b: [...b] }
+        // v1.5.0: sanea las anclas que dejan de ser válidas con la nueva
+        // distribución (el costalero se movió de cuadrilla → su ancla ya
+        // no aplica). Las que siguen siendo válidas se conservan.
+        if (t.anclas) {
+          t.anclas = {
+            a: (t.anclas.a ?? []).filter((idx) => a.includes(idx)),
+            b: (t.anclas.b ?? []).filter((idx) => b.includes(idx)),
+          }
+        }
+        t.plan = null
+        t.obj = null
+        t.analisis = null
+      })
+    },
+
+    setAnclas: (tid, anclas) => {
+      _mutar(d => {
+        const t = _getTrab(d, tid)
+        const nuevo = { a: [...(anclas.a ?? [])], b: [...(anclas.b ?? [])] }
+        // Validar ANTES de mutar: si el ancla no es válida (no pertenece
+        // a su cuadrilla, está de baja, duplicada…) no se toca nada.
+        validarAnclas({ ...t, anclas: nuevo })
+        t.anclas = nuevo
+        t.plan = null
+        t.obj = null
+        t.analisis = null
+      })
+    },
+
+    toggleAncla: (tid, cuadrilla, idx) => {
+      _mutar(d => {
+        const t = _getTrab(d, tid)
+        const actual = t.anclas ?? { a: [], b: [] }
+        const clave = cuadrilla === "A" ? "a" : "b"
+        const lista = actual[clave] ?? []
+        const nueva = lista.includes(idx)
+          ? lista.filter((x) => x !== idx)
+          : [...lista, idx].sort((x, y) => x - y)
+        const candidate: { a: number[]; b: number[] } = {
+          a: clave === "a" ? nueva : [...(actual.a ?? [])],
+          b: clave === "b" ? nueva : [...(actual.b ?? [])],
+        }
+        validarAnclas({ ...t, anclas: candidate })
+        t.anclas = candidate
         t.plan = null
         t.obj = null
         t.analisis = null
