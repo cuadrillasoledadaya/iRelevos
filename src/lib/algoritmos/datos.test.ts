@@ -3,7 +3,13 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { describe, it, expect } from "vitest";
-import { datosVacios, migrarDatos, BANCO_DEFAULT } from "./datos";
+import {
+	datosVacios,
+	migrarDatos,
+	crearTrabajaderaBase,
+	COSTALEROS_POR_TRABAJADERA,
+	BANCO_DEFAULT,
+} from "./datos";
 import type { DatosPerfil } from "../types";
 
 describe("datos", () => {
@@ -45,6 +51,36 @@ describe("datos", () => {
 			const d2 = datosVacios();
 			d1.banco.push("Extra");
 			expect(d2.banco).not.toContain("Extra");
+		});
+	});
+
+	// ── REQ-DAT-2: factory canónica de working crew ──────────────────
+	describe("crearTrabajaderaBase", () => {
+		it("crea una working crew con 6 costaleros por defecto", () => {
+			const t = crearTrabajaderaBase(3);
+			expect(t.id).toBe(3);
+			expect(t.nombres).toHaveLength(COSTALEROS_POR_TRABAJADERA);
+			expect(t.nombres[0]).toBe("Costalero 1");
+			expect(t.nombres[5]).toBe("Costalero 6");
+			expect(t.roles).toHaveLength(COSTALEROS_POR_TRABAJADERA);
+			expect(t.salidas).toBe(2);
+			expect(t.tramos).toEqual(["Tramo 1 (T3)", "Tramo 2 (T3)", "Tramo 3 (T3)"]);
+			expect(t.tramosTipo).toEqual(["primario", "primario", "primario"]);
+			expect(t.bajas).toEqual([]);
+			expect(t.plan).toBeNull();
+		});
+
+		it("COSTALEROS_POR_TRABAJADERA es 6", () => {
+			expect(COSTALEROS_POR_TRABAJADERA).toBe(6);
+		});
+
+		it("genera working crews independientes (sin arrays compartidos)", () => {
+			const a = crearTrabajaderaBase(1);
+			const b = crearTrabajaderaBase(2);
+			a.nombres.push("Extra");
+			a.tramos.push("Extra");
+			expect(b.nombres).toHaveLength(COSTALEROS_POR_TRABAJADERA);
+			expect(b.tramos).toHaveLength(3);
 		});
 	});
 
@@ -115,6 +151,70 @@ describe("datos", () => {
 			expect(t.regla5costaleros).toBe(false);
 			expect(t.puntuaciones).toEqual({});
 			expect(t.tramosClaves).toEqual([]);
+		});
+
+		// ── REQ-DAT-1: working crews con 6 costaleros por defecto ────────
+		it("debería reparar una working crew con nombres vacíos (pasos creados antes del fix)", () => {
+			const datosVacios = {
+				banco: [],
+				planes: [],
+				trabajaderas: [
+					{
+						id: 1,
+						nombres: [],
+						roles: [],
+						salidas: 1,
+						tramos: ["Inicio", "Final"],
+						bajas: [],
+						regla5costaleros: false,
+						puntuaciones: {},
+						tramosClaves: [],
+						plan: null,
+						obj: null,
+						analisis: null,
+						pinned: null,
+					},
+				],
+			};
+
+			const resultado = migrarDatos(datosVacios as unknown as DatosPerfil);
+			const t = resultado.trabajaderas[0];
+			expect(t.nombres).toHaveLength(COSTALEROS_POR_TRABAJADERA);
+			expect(t.nombres).toEqual([
+				"Costalero 1",
+				"Costalero 2",
+				"Costalero 3",
+				"Costalero 4",
+				"Costalero 5",
+				"Costalero 6",
+			]);
+			expect(t.roles).toHaveLength(COSTALEROS_POR_TRABAJADERA);
+		});
+
+		it("no debe tocar una working crew que ya tiene costaleros", () => {
+			const datos = {
+				banco: [],
+				planes: [],
+				trabajaderas: [
+					{
+						id: 1,
+						nombres: ["Juan", "Pedro"],
+						roles: [],
+						salidas: 2,
+						tramos: ["T1"],
+						bajas: [],
+						regla5costaleros: false,
+						puntuaciones: {},
+						tramosClaves: [],
+						plan: null,
+						obj: null,
+						analisis: null,
+						pinned: null,
+					},
+				],
+			};
+			const resultado = migrarDatos(datos as unknown as DatosPerfil);
+			expect(resultado.trabajaderas[0].nombres).toEqual(["Juan", "Pedro"]);
 		});
 
 		it("debería limpiar plan inválido con índice fuera de rango", () => {

@@ -16,6 +16,7 @@ import {
 	generarSugerenciasCorreccion,
 	type ResultadoBulkApply,
 	type BulkCorreccionesPreview,
+	crearTrabajaderaBase,
 } from "@/lib/algoritmos";
 import { ordenarDentroFisico } from "@/lib/roles";
 import type {
@@ -59,15 +60,25 @@ export interface PlanStore {
 type MutarFn = (fn: (draft: DatosPerfil) => void) => void;
 type GetTrabFn = (d: DatosPerfil, tid: number) => Trabajadera;
 type GetSFn = () => DatosPerfil;
+/** Nº de working crews declarado para el paso activo (columna num_trabajaderas) */
+type GetNumTrabajaderasFn = () => number;
 
 let _mutar: MutarFn;
 let _getTrab: GetTrabFn;
 let _getS: GetSFn;
+let _getNumTrabajaderas: GetNumTrabajaderasFn;
 
-export function setPlanDeps(m: MutarFn, gt: GetTrabFn, gs: GetSFn) {
+export function setPlanDeps(
+	m: MutarFn,
+	gt: GetTrabFn,
+	gs: GetSFn,
+	gn?: GetNumTrabajaderasFn,
+) {
 	_mutar = m;
 	_getTrab = gt;
 	_getS = gs;
+	// Fallback: el nº de working crews que hay ahora mismo en el content.
+	_getNumTrabajaderas = gn ?? (() => _getS().trabajaderas.length);
 }
 
 export const planStore = create<PlanStore>()((set, get) => ({
@@ -294,38 +305,12 @@ export const planStore = create<PlanStore>()((set, get) => ({
 
 		resetTodo: () => {
 			_mutar((d) => {
-				d.trabajaderas = [
-					{
-						id: 1,
-						nombres: [
-							"Costalero 1",
-							"Costalero 2",
-							"Costalero 3",
-							"Costalero 4",
-							"Costalero 5",
-							"Costalero 6",
-						],
-						salidas: 2,
-						roles: [
-							{ pri: "COS_I", sec: "COR" },
-							{ pri: "COS_D", sec: "COR" },
-							{ pri: "COS_I", sec: "FIJ_I" },
-							{ pri: "COS_D", sec: "FIJ_D" },
-							{ pri: "COR", sec: "COS_I" },
-							{ pri: "COR", sec: "COS_D" },
-						],
-						tramos: ["Tramo 1 (T1)", "Tramo 2 (T1)", "Tramo 3 (T1)"],
-						plan: null,
-						obj: null,
-						analisis: null,
-						pinned: null,
-						bajas: [],
-						regla5costaleros: false,
-						puntuaciones: {},
-						boquilla: {},
-						tramosClaves: [],
-					},
-				];
+				// v1.4.9: reconstruir tantas working crews como declara el paso
+				// (num_trabajaderas), cada una con 6 costaleros por defecto.
+				// Antes se hardcodeaba UNA working crew -> el paso perdia el resto
+				// y el capataz tenia que re-crearlas a mano.
+				const n = Math.max(1, _getNumTrabajaderas());
+				d.trabajaderas = Array.from({ length: n }, (_, i) => crearTrabajaderaBase(i + 1));
 				d.banco = [];
 			});
 		},

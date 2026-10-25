@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import type { Trabajadera, RolCode } from "@/lib/types";
 import type { UserRole } from "@/hooks/useAuth";
 import { defaultRoles } from "@/lib/roles";
+import { crearTrabajaderaBase } from "@/lib/algoritmos/datos";
 import type {
 	CensusEntry,
 	ImportEntry,
@@ -84,21 +85,9 @@ export async function createPaso(
 			...form,
 			content: {
 				banco: [],
-				trabajaderas: Array.from({ length: form.num_trabajaderas }, (_, i) => ({
-					id: i + 1,
-					nombres: [],
-					roles: [],
-					salidas: 1,
-					tramos: ["Inicio", "Final"],
-					bajas: [],
-					regla5costaleros: false,
-					plan: null,
-					obj: {},
-					analisis: null,
-					pinned: null,
-					puntuaciones: {},
-					tramosClaves: [],
-				})),
+				trabajaderas: Array.from({ length: form.num_trabajaderas }, (_, i) =>
+					crearTrabajaderaBase(i + 1),
+				),
 			},
 			temporada_id: activeTemporadaId,
 			user_id: userId,
@@ -367,8 +356,15 @@ export async function syncTodoCenso(
 
 	Object.entries(byTrab).forEach(([tidStr, entries]) => {
 		const tid = parseInt(tidStr);
-		const trab = content.trabajaderas.find((t) => t.id === tid);
-		if (!trab) return;
+		let trab = content.trabajaderas.find((t) => t.id === tid);
+		if (!trab) {
+			// v1.4.9: el censo puede referenciar working crews que el paso no
+			// tiene (p.ej. num_trabajaderas menor que las cuadrillas reales).
+			// Antes se descartaban en silencio -> el capataz perdia costaleros
+			// y tenia que crearlos a mano. Ahora se crean con 6 costaleros.
+			trab = crearTrabajaderaBase(tid);
+			content.trabajaderas.push(trab);
+		}
 
 		const esPrimero = tid === 1 || tid === 7;
 

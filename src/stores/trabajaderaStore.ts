@@ -7,6 +7,7 @@
 import { create } from 'zustand'
 import { defaultRoles } from '@/lib/roles'
 import { tramosOptimos, aplicarSugerencias, generarSugerencias, sugerirDistribucion, tieneRolesAsignados, sugerirDistribucionIndex } from '@/lib/algoritmos'
+import { crearTrabajaderaBase } from '@/lib/algoritmos/datos'
 import type { DatosPerfil, RolCode, Trabajadera, TramoTipo } from '@/lib/types'
 import type { SugerenciaRes } from '@/lib/algoritmos'
 
@@ -175,29 +176,7 @@ export const trabajaderaStore = create<TrabajaderaStore>()(() => ({
     addTrab: () => {
       _mutar(d => {
         const nextId = d.trabajaderas.length + 1
-        d.trabajaderas.push({
-          id: nextId,
-          nombres: [
-            'Costalero 1', 'Costalero 2', 'Costalero 3',
-            'Costalero 4', 'Costalero 5', 'Costalero 6',
-          ],
-          salidas: 2,
-          roles: defaultRoles(6, nextId),
-          tramos: [
-            `Tramo 1 (T${nextId})`,
-            `Tramo 2 (T${nextId})`,
-            `Tramo 3 (T${nextId})`,
-          ],
-          plan: null,
-          obj: null,
-          analisis: null,
-          pinned: null,
-          bajas: [],
-          regla5costaleros: false,
-          puntuaciones: {},
-          boquilla: {},
-          tramosClaves: [],
-        })
+        d.trabajaderas.push(crearTrabajaderaBase(nextId))
       })
     },
 

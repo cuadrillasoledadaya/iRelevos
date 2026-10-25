@@ -2,7 +2,7 @@
 // DATOS — factory y migración de datos de perfil
 // ══════════════════════════════════════════════════════════════════
 
-import type { DatosPerfil } from "../types";
+import type { DatosPerfil, Trabajadera } from "../types";
 import { defaultNombres } from "../nombres";
 import { defaultRoles } from "../roles";
 
@@ -23,31 +23,53 @@ const BANCO_DEFAULT = [
 
 export { BANCO_DEFAULT };
 
+/**
+ * Nº de costaleros por defecto de una trabajadera.
+ *
+ * v1.4.9: una trabajadera nace SIEMPRE con 6 costaleros. Antes esta forma
+ * estaba duplicada en 4 sitios (datosVacios, addTrab, createPaso, resetTodo)
+ * y cada copia diferia: unas usaban `nombres: []` (sin costaleros) y otras
+ * `salidas: 1` con 2 tramos. Esa divergencia es la que hacia que un paso
+ * recien creado fuera inservible para el capataz.
+ */
+export const COSTALEROS_POR_TRABAJADERA = 6;
+
+/**
+ * Trabajadera nueva (forma canonica de la app).
+ *
+ * 6 costaleros placeholder, roles por defecto, 2 salidas y 3 tramos
+ * (`Tramo N (T{id})`) - identico a `datosVacios()` y a `addTrab()`.
+ * Cada llamada devuelve arrays independientes (nunca referencias compartidas).
+ */
+export function crearTrabajaderaBase(id: number): Trabajadera {
+	return {
+		id,
+		nombres: defaultNombres(COSTALEROS_POR_TRABAJADERA),
+		salidas: 2,
+		roles: defaultRoles(COSTALEROS_POR_TRABAJADERA, id),
+		tramos: [
+			`Tramo 1 (T${id})`,
+			`Tramo 2 (T${id})`,
+			`Tramo 3 (T${id})`,
+		],
+		tramosTipo: ["primario", "primario", "primario"],
+		plan: null,
+		obj: null,
+		analisis: null,
+		pinned: null,
+		bajas: [],
+		regla5costaleros: false,
+		puntuaciones: {},
+		boquilla: {},
+		tramosClaves: [],
+	};
+}
+
 export function datosVacios(): DatosPerfil {
 	return {
 		banco: [...BANCO_DEFAULT],
 		planes: [],
-		trabajaderas: Array.from({ length: 7 }, (_, i) => ({
-			id: i + 1,
-			nombres: defaultNombres(6),
-			salidas: 2,
-			roles: defaultRoles(6, i + 1),
-			tramos: [
-				`Tramo 1 (T${i + 1})`,
-				`Tramo 2 (T${i + 1})`,
-				`Tramo 3 (T${i + 1})`,
-			],
-			tramosTipo: ["primario", "primario", "primario"],
-			plan: null,
-			obj: null,
-			analisis: null,
-			pinned: null,
-			bajas: [],
-			regla5costaleros: false,
-			puntuaciones: {},
-			boquilla: {},
-			tramosClaves: [],
-		})),
+		trabajaderas: Array.from({ length: 7 }, (_, i) => crearTrabajaderaBase(i + 1)),
 	};
 }
 
@@ -56,14 +78,17 @@ export function migrarDatos(datos: DatosPerfil): DatosPerfil {
 		datos.planes = [];
 	}
 	datos.trabajaderas = datos.trabajaderas.map((t) => {
-		if (!t.nombres) {
-			t.nombres = defaultNombres(6);
+		// v1.4.9: reparar tambien el array VACIO. Los pasos creados antes del
+		// fix se guardaron con `nombres: []` (truthy) -> el `if (!t.nombres)`
+		// original no los reparaba y el capataz tenia que crearlos a mano.
+		if (!t.nombres || t.nombres.length === 0) {
+			t.nombres = defaultNombres(COSTALEROS_POR_TRABAJADERA);
 		}
 		if (!t.salidas) t.salidas = 2;
 		if (!t.pinned) t.pinned = null;
 		if (!t.bajas) t.bajas = [];
 		if (!t.regla5costaleros) t.regla5costaleros = false;
-		if (!t.roles) {
+		if (!t.roles || t.roles.length === 0) {
 			t.roles = defaultRoles(t.nombres.length, t.id);
 		} else if (t.roles.length !== t.nombres.length) {
 			// Rellenar o truncar sin perder los roles existentes

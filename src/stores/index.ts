@@ -25,7 +25,18 @@ const mutar = createMutar(
 );
 
 // Wire dependencies via setters (stores are already created as singletons)
-setPlanDeps(mutar, getTrab, () => projectStore.getState().S);
+setPlanDeps(
+	mutar,
+	getTrab,
+	() => projectStore.getState().S,
+	() => {
+		// Nº de working crews del paso activo (columna num_trabajaderas).
+		// Fallback: las que hay ahora mismo en el content.
+		const st = projectStore.getState();
+		const paso = st.pasos.find((p) => p.id === st.pid);
+		return paso?.num_trabajaderas ?? st.S.trabajaderas.length;
+	},
+);
 setTrabajaderaDeps(mutar, getTrab, (tid) =>
 	planStore.getState().completarPlan(tid),
 	() => projectStore.getState().S,

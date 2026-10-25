@@ -230,15 +230,35 @@ describe("Pasos", () => {
 							banco: [],
 							trabajaderas: expect.arrayContaining([
 								expect.objectContaining({
-									id: 1,
-									nombres: [],
-									salidas: 1,
-								}),
+										id: 1,
+										nombres: [
+											"Costalero 1",
+											"Costalero 2",
+											"Costalero 3",
+											"Costalero 4",
+											"Costalero 5",
+											"Costalero 6",
+										],
+										salidas: 2,
+										roles: expect.arrayContaining([
+											expect.objectContaining({ pri: "PAT_I" }),
+										]),
+									}),
 								expect.objectContaining({
-									id: 2,
-									nombres: [],
-									salidas: 1,
-								}),
+										id: 2,
+										nombres: [
+											"Costalero 1",
+											"Costalero 2",
+											"Costalero 3",
+											"Costalero 4",
+											"Costalero 5",
+											"Costalero 6",
+										],
+										salidas: 2,
+										roles: expect.arrayContaining([
+											expect.objectContaining({ pri: "COS_I" }),
+										]),
+									}),
 							]),
 						}),
 					}),
@@ -942,6 +962,67 @@ describe("Censo", () => {
 
 			expect(result.error).toBeUndefined();
 			expect(result.data).toHaveProperty("content");
+		});
+
+		// v1.4.9: el censo puede referenciar working crews que el paso no
+		// tiene. Antes se descartaban en silencio -> el capataz perdia
+		// costaleros y tenia que crearlos a mano.
+		it("debe crear la working crew que el censo referencia y el paso no tiene", async () => {
+			const censusData = [
+				{
+					nombre: "Juan",
+					apellidos: "Perez",
+					apodo: "Juanito",
+					trabajadera: 3,
+					rol: "COR",
+					rol_sec: "FIJ_I",
+				},
+			];
+
+			const projContent = {
+				trabajaderas: [{ id: 1, nombres: ["Costalero 1", "Costalero 2"] }],
+			};
+
+			const censusSelectMock = vi.fn().mockReturnValue({
+				eq: vi.fn().mockReturnValue({
+					not: vi.fn().mockReturnValue({
+						order: vi.fn().mockResolvedValue({ data: censusData, error: null }),
+					}),
+				}),
+			});
+			const projSelectMock = vi.fn().mockReturnValue({
+				eq: vi.fn().mockReturnValue({
+					single: vi.fn().mockResolvedValue({ data: { content: projContent }, error: null }),
+				}),
+			});
+			const updateMock = vi.fn().mockReturnValue({
+				eq: vi.fn().mockResolvedValue({ error: null }),
+			});
+			const readBackMock = vi.fn().mockReturnValue({
+				eq: vi.fn().mockReturnValue({
+					single: vi.fn().mockResolvedValue({ data: { content: projContent }, error: null }),
+				}),
+			});
+
+			vi.mocked(supabase.from)
+				.mockReturnValueOnce({ select: censusSelectMock } as any)
+				.mockReturnValueOnce({ select: projSelectMock } as any)
+				.mockReturnValueOnce({ update: updateMock } as any)
+				.mockReturnValueOnce({ select: readBackMock } as any);
+
+			const result = await syncTodoCenso("proy-1");
+			expect(result.error).toBeUndefined();
+
+			const contenido = (updateMock.mock.calls[0][0] as { content: { trabajaderas: { id: number; nombres: string[] }[] } }).content;
+			console.log('DEBUG payload', JSON.stringify(contenido.trabajaderas.map((t) => ({ id: t.id, nombres: t.nombres }))));
+			expect(contenido.trabajaderas).toHaveLength(2);
+			const nueva = contenido.trabajaderas.find((t) => t.id === 3);
+			expect(nueva).toBeDefined();
+			expect(nueva!.nombres[0]).toBe("Juanito");
+			// la working crew original se resetea a placeholders (clean slate) y
+			// NO recibe los costaleros del censo (que son de la cuadrilla 3)
+			expect(contenido.trabajaderas[0].nombres).toHaveLength(6);
+			expect(contenido.trabajaderas[0].nombres).not.toContain("Juanito");
 		});
 
 		it("debe retornar error cuando no hay censo con trabajadera", async () => {

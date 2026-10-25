@@ -347,3 +347,46 @@ describe("planStore v1.2.92 #5 — per-iteration try/catch", () => {
     }
   });
 });
+
+// ══════════════════════════════════════════════════════════════════
+// resetTodo — v1.4.9: reconstruye las working crews del paso con 6
+// costaleros por defecto (antes hardcodeaba 1 working crew).
+// ══════════════════════════════════════════════════════════════════
+describe("planStore resetTodo", () => {
+  it("reconstruye tantas working crews como declara el paso, con 6 costaleros", () => {
+    datos = makeDatos();
+    setPlanDeps(
+      (fn) => fn(datos),
+      getTrab,
+      () => datos,
+      () => 3,
+    );
+
+    planStore.getState().resetTodo();
+
+    expect(datos.trabajaderas).toHaveLength(3);
+    expect(datos.trabajaderas.map((t) => t.id)).toEqual([1, 2, 3]);
+    datos.trabajaderas.forEach((t) => {
+      expect(t.nombres).toHaveLength(6);
+      expect(t.nombres[0]).toBe("Costalero 1");
+      expect(t.roles).toHaveLength(6);
+      expect(t.salidas).toBe(2);
+      expect(t.tramos).toHaveLength(3);
+    });
+    expect(datos.banco).toEqual([]);
+  });
+
+  it("usa el nº de working crews del content si el paso no lo declara", () => {
+    datos = makeDatos();
+    setPlanDeps(
+      (fn) => fn(datos),
+      getTrab,
+      () => datos,
+    );
+
+    planStore.getState().resetTodo();
+
+    expect(datos.trabajaderas).toHaveLength(1);
+    expect(datos.trabajaderas[0].nombres).toHaveLength(6);
+  });
+});

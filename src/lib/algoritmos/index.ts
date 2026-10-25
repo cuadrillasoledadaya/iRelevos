@@ -4,7 +4,13 @@
 // ══════════════════════════════════════════════════════════════════
 
 // Datos
-export { BANCO_DEFAULT, datosVacios, migrarDatos } from "./datos";
+export {
+	BANCO_DEFAULT,
+	datosVacios,
+	migrarDatos,
+	crearTrabajaderaBase,
+	COSTALEROS_POR_TRABAJADERA,
+} from "./datos";
 
 // Rotación
 export { objSalidas, calcularCiclo, tramosOptimos, analizar } from "./rotacion";
