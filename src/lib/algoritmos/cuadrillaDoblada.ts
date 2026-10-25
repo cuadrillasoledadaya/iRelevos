@@ -521,6 +521,15 @@ export function anclasDeCuadrilla(
 }
 
 /**
+ * v1.5.0 — ¿la working crew tiene anclas marcadas?
+ */
+export function tieneAnclas(t: Trabajadera): boolean {
+	const a = t.anclas?.a ?? []
+	const b = t.anclas?.b ?? []
+	return a.length > 0 || b.length > 0
+}
+
+/**
  * v1.5.0 — anclas de una working crew como nombres, por cuadrilla.
  */
 function anclasDeT(t: Trabajadera): { a: string[]; b: string[] } {

@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from "vitest"
 import type { Trabajadera } from "../types"
+import { dispatchSimulacion } from "./dispatcher"
 import {
 	validarAnclas,
 	CuadrillaDobladaDistribucionInvalidaError,
@@ -247,5 +248,50 @@ describe("anclas — motor", () => {
 		expect(() => simularCicloConTipos(t, t.tramosTipo!, t.salidas)).toThrowError(
 			CuadrillaDobladaDistribucionInvalidaError,
 		)
+	})
+})
+
+describe("anclas — analisis", () => {
+	it("el plan con anclas no se marca como error", () => {
+		const t = makeAnclasT({ anclas: { a: [5], b: [] } })
+		const res = dispatchSimulacion(t)
+		expect(res.error).toBeUndefined()
+		expect(res.analisis.dentro5).toBe(true)
+		expect(res.analisis.okObj).toBe(true)
+	})
+
+	it("sin anclas el analisis no cambia", () => {
+		const t = makeAnclasT()
+		const res = dispatchSimulacion(t)
+		expect(res.error).toBeUndefined()
+		expect(res.analisis.dentro5).toBe(true)
+		expect(res.analisis.okObj).toBe(true)
+		expect(res.objetivo).toEqual({
+			0: 7, 1: 7, 2: 7, 3: 7, 4: 7, 5: 7,
+			6: 7, 7: 7, 8: 7, 9: 7, 10: 7, 11: 7,
+		})
+	})
+
+	it("el objetivo con anclas se reparte por cuadrilla", () => {
+		const t = makeAnclasT({ anclas: { a: [5], b: [] } })
+		const res = dispatchSimulacion(t)
+		// Cuadrilla A (anclada): sus 6 miembros salen 8 veces cada uno.
+		for (const i of [0, 1, 2, 3, 4, 5]) {
+			expect(res.objetivo[i]).toBe(8)
+		}
+		// Cuadrilla B: 32 salidas repartidas entre 6 miembros -> 5 o 6.
+		for (const i of [6, 7, 8, 9, 10, 11]) {
+			expect(res.objetivo[i]).toBeGreaterThanOrEqual(5)
+			expect(res.objetivo[i]).toBeLessThanOrEqual(6)
+		}
+	})
+
+	it("el ancla nunca sale mientras su cuadrilla esta activa", () => {
+		const t = makeAnclasT({ anclas: { a: [5], b: [] } })
+		const res = dispatchSimulacion(t)
+		// El ancla esta dentro en los tramos de A y fuera en los de B.
+		const dentroEnA = res.plan.filter((s) => s.dentro.includes(5)).length
+		expect(dentroEnA).toBeGreaterThan(0)
+		expect(dentroEnA).toBeLessThan(res.plan.length)
 	})
 })

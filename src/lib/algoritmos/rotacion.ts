@@ -10,6 +10,7 @@ import {
 	CuadrillaDobladaSinPrimarioError,
 	CuadrillaDobladaSinDisponibleError,
 	CuadrillaDobladaDistribucionInvalidaError,
+	tieneAnclas,
 	UMBRAL_DOBLADO,
 } from "./cuadrillaDoblada";
 
@@ -56,6 +57,58 @@ export function objSalidas(
 	return obj;
 }
 
+/**
+ * v1.5.0 — conjunto de índices anclados de una working crew.
+ */
+function setAnclas(t?: Trabajadera): Set<number> {
+	if (!t?.anclas) return new Set<number>();
+	return new Set([...(t.anclas.a ?? []), ...(t.anclas.b ?? [])]);
+}
+
+/**
+ * v1.5.0 — objetivo (salidas esperadas por costalero) de una working crew
+ * CON anclas.
+ *
+ * Con anclas el desequilibrio ENTRE cuadrillas es INTENCIONAL: la
+ * cuadrilla anclada rota menos (sus miembros están fuera mientras la otra
+ * cuadrilla está activa). El objetivo global de `objSalidas` no describe
+ * ese plan, así que se reparte la media de salidas de CADA cuadrilla entre
+ * sus miembros (mismo reparto "base + extras").
+ *
+ * Las bajas no rotan (siempre están fuera): su objetivo es su propio
+ * conteo real, para que no falseen el equilibrio.
+ */
+export function objPorCuadrilla(
+	plan: TramoSlot[],
+	t: Trabajadera,
+): Record<number, number> {
+	const conteo: Record<number, number> = {};
+	plan.forEach((tramo) =>
+		tramo.fuera.forEach((i) => {
+			conteo[i] = (conteo[i] ?? 0) + 1;
+		}),
+	);
+	const dist = t.distribucionCuadrillas;
+	const obj: Record<number, number> = {};
+	if (!dist) return obj;
+	const bajas = new Set(t.bajas ?? []);
+	for (const key of ["a", "b"] as const) {
+		const miembros = dist[key].filter((i) => !bajas.has(i));
+		if (miembros.length === 0) continue;
+		const total = miembros.reduce((acc, i) => acc + (conteo[i] ?? 0), 0);
+		const base = Math.floor(total / miembros.length);
+		const extras = total % miembros.length;
+		miembros.forEach((i, k) => {
+			obj[i] = base + (k < extras ? 1 : 0);
+		});
+	}
+	// Bajas (y members fuera de la distribucion): siempre fuera.
+	for (let i = 0; i < t.nombres.length; i++) {
+		if (obj[i] === undefined) obj[i] = conteo[i] ?? 0;
+	}
+	return obj;
+}
+
 export function calcularCiclo(
 	t: Trabajadera,
 	turnoInicial: number = 0,
@@ -81,7 +134,11 @@ export function calcularCiclo(
 					);
 					const plan = relevosATramoSlots(t, relevos);
 				const aplicaRegla5 = false;
-				const objetivo = objSalidas(total, numTramos, salidas, aplicaRegla5);
+				// v1.5.0: con anclas el objetivo se reparte por cuadrilla
+				// (el desequilibrio entre cuadrillas es intencional).
+				const objetivo = tieneAnclas(t)
+					? objPorCuadrilla(plan, t)
+					: objSalidas(total, numTramos, salidas, aplicaRegla5);
 				return { plan, objetivo };
 			} catch (err: unknown) {
 				// Surface typed errors to the UI (don't throw — would crash
@@ -101,7 +158,10 @@ export function calcularCiclo(
 		// Legacy doblado: tramosTipo absent → cuadrillaDobladaATramoSlots
 		const plan = cuadrillaDobladaATramoSlots(t);
 		const aplicaRegla5 = false;
-		const objetivo = objSalidas(total, numTramos, salidas, aplicaRegla5);
+		// v1.5.0: mismo criterio de objetivo que en el path por tramos.
+		const objetivo = tieneAnclas(t)
+			? objPorCuadrilla(plan, t)
+			: objSalidas(total, numTramos, salidas, aplicaRegla5);
 		return { plan, objetivo };
 	}
 
@@ -201,12 +261,25 @@ export function analizar(
 			conteo[i]++;
 		}),
 	);
-	const okObj = Object.keys(conteo).every((i) => conteo[+i] === (obj[+i] ?? 0));
+	// v1.5.0: con anclas el objetivo es POR CUADRILLA (el desequilibrio
+	// entre cuadrillas es intencional) y se admite ±1 de desviación: el
+	// reparto FIFO no siempre queda exacto cuando el nº de slots de la
+	// cuadrilla no es múltiplo de sus miembros.
+	const anclas = setAnclas(t);
+	const hayAnclas = anclas.size > 0;
+	const okObj = Object.keys(conteo).every((i) => {
+		const c = conteo[+i];
+		const o = obj[+i] ?? 0;
+		return hayAnclas ? Math.abs(c - o) <= 1 : c === o;
+	});
 	const aplicaRegla5 = t?.regla5costaleros && total === 5;
 	const dentro_esperado = aplicaRegla5 ? 4 : 5;
-	const dentro5 = plan.every(
-		(tramo) => tramo.dentro.length === dentro_esperado,
-	);
+	// v1.5.0: las anclas NO cuentan para el mínimo de 5 dentro (jerarquía
+	// del capataz: "5 dentro" cuenta rotantes; el ancla suma, no resta).
+	const dentro5 = plan.every((tramo) => {
+		const rotantes = tramo.dentro.filter((i) => !anclas.has(i)).length;
+		return rotantes === dentro_esperado;
+	});
 	const primer = plan[0]?.fuera ?? [];
 	const ultimo = plan[plan.length - 1]?.fuera ?? [];
 	const rep = primer.filter((c) => ultimo.includes(c));
