@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
 	uiStore,
 	projectStore,
@@ -549,9 +549,22 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 
 	const [isOpen, setIsOpen] = useState(false);
 	const [planSel, setPlanSel] = useState("");
+
 	const [showEditor, setShowEditor] = useState(false);
 	const [editDist, setEditDist] = useState<{ a: number[]; b: number[]; warning?: string } | null>(null);
 	const [allSecError, setAllSecError] = useState<string | null>(null);
+
+	// v1.4.8: las tarjetas de working crew nacen colapsadas
+	// (`.card .trab-body { display: none !important }`). Cuando el capataz
+	// llega desde Plan (pill "Doblada" o "Editar en Configuración →"),
+	// PlanPage marca el foco para que la tarjeta de esa working crew quede
+	// expandida y el control que fue a buscar esté a la vista.
+	const configFocusTid = uiStore((s) => s.configFocusTid);
+	useEffect(() => {
+		if (configFocusTid !== null && configFocusTid === t.id) {
+			setIsOpen(true);
+		}
+	}, [configFocusTid, t.id]);
 
 	const total = t.nombres.length;
 	const nBajas = t.bajas?.length || 0;
@@ -733,8 +746,16 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 					</div>
 				</div>
 
-				{/* Cuadrilla Doblada master toggle — mando-only */}
-				{esMando && totalActivos >= 10 && (
+				{/* Cuadrilla Doblada master toggle — mando-only.
+				    BUG FIX v1.4.8: el gate de renderizado usaba el umbral de
+				    ACTIVACIÓN (totalActivos >= 10) como gate de VISIBILIDAD.
+				    Con el flag ya ON y la cuadrilla por debajo del mínimo (bajas,
+				    borrados, cambio de censo) el bloque desaparecía → el capataz
+				    se quedaba SIN forma de apagar el flag (callejón sin salida:
+				    Plan → click → Config → sin selector → volver a Plan…).
+				    Ahora el bloque se renderiza si hay ≥10 activos (para activar)
+				    O si el flag ya está activo (siempre se puede apagar). */}
+				{esMando && (totalActivos >= 10 || t.cuadrillaDoblada) && (
 					<div className="mbox mt3">
 						<div className="flex aic jb">
 							<div>
@@ -743,7 +764,9 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 								</div>
 								<div className="text-[0.55rem] text-[var(--cre-o)]">
 									{t.cuadrillaDoblada
-										? "Activa — configura tramos y distribución abajo"
+										? totalActivos >= 10
+											? "Activa — configura tramos y distribución abajo"
+											: `⚠ Solo ${totalActivos} costaleros activos (mín. 10) — desactiva para volver al plan estándar`
 										: "10+ costaleros disponibles — activar para rotación A/B"}
 								</div>
 							</div>

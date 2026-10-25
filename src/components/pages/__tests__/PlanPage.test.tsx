@@ -22,6 +22,7 @@ const { useAuth } = await import("@/hooks/useAuth");
 import ConfirmarAsignacionBanner from "../../feedback/ConfirmarAsignacionBanner";
 
 const mockSetActivePage = vi.fn((page: string) => page);
+const mockSetConfigFocusTid = vi.fn();
 const mockToggleCuadrillaDoblada = vi.fn(() => ({
 	anterior: false,
 	nuevo: true,
@@ -50,6 +51,7 @@ let currentPlanStoreState = {
 				setCellTarget: vi.fn(),
 				setBancoTarget: vi.fn(),
 				setActivePage: (page: string) => mockSetActivePage(page),
+				setConfigFocusTid: (tid: number | null) => mockSetConfigFocusTid(tid),
 			})),
 		},
 	projectStore: vi.fn((selector) =>
@@ -682,6 +684,34 @@ describe("MiPlanPersonal — costalero plan view", () => {
 			expect(mockSetActivePage).toHaveBeenCalledWith("config");
 		});
 
+		it("clicking the toggle marks the working crew as focus for Configuración", () => {
+			// v1.4.8: las tarjetas de Config nacen colapsadas
+			// (`.card .trab-body { display: none }`). Sin foco, el capataz
+			// llega a Config y no ve el selector que fue a buscar.
+			const t = makeTrabajadera({ cuadrillaDoblada: false });
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+
+			fireEvent.click(
+				screen.getByRole("button", { name: /Configurar Cuadrilla Doblada/i }),
+			);
+
+			expect(mockSetConfigFocusTid).toHaveBeenCalledWith(t.id);
+		});
+
 		it("toggle label shows OFF when cuadrillaDoblada is false", () => {
 			const t = makeTrabajadera({ cuadrillaDoblada: false });
 			const profile = makeCostaleroProfile({ role: "capataz" });
@@ -823,6 +853,68 @@ describe("MiPlanPersonal — costalero plan view", () => {
 			);
 			render(<PlanPage />);
 			expect(screen.getByText("⚒ Cuadrilla Doblada")).toBeInTheDocument();
+		});
+
+		// REQ-UI-PLAN-7: aviso de cuadrilla doblada activa por debajo del
+		// mínimo de 10 costaleros activos (el flag ON no se puede calcular
+		// y solo se apaga desde Configuración).
+		it("aviso de mínimo de costaleros cuando doblada está activa con menos de 10 activos", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				nombres: Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				roles: Array.from({ length: 12 }, () => ({
+					pri: "COR" as const,
+					sec: "FIJ_I" as const,
+				})),
+				bajas: [0, 1, 2, 3],
+			});
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+
+			expect(screen.getByText(/8 activos/i)).toBeInTheDocument();
+			expect(screen.getByText(/mín\. 10/i)).toBeInTheDocument();
+		});
+
+		it("sin aviso de mínimo cuando doblada está activa con 10+ activos", () => {
+			const t = makeTrabajadera({
+				cuadrillaDoblada: true,
+				nombres: Array.from({ length: 12 }, (_, i) => `c${i + 1}`),
+				roles: Array.from({ length: 12 }, () => ({
+					pri: "COR" as const,
+					sec: "FIJ_I" as const,
+				})),
+				bajas: [],
+			});
+			const profile = makeCostaleroProfile({ role: "capataz" });
+			vi.mocked(useAuth).mockReturnValue({
+				profile,
+				session: null,
+				user: null,
+				loading: false,
+				signOut: vi.fn(),
+			} as any);
+			vi.mocked(projectStore).mockImplementation((selector: any) =>
+				selector({
+					S: { banco: [], planes: [], trabajaderas: [t] },
+					censusBoquilla: {},
+				}),
+			);
+			render(<PlanPage />);
+
+			expect(screen.queryByText(/mín\. 10/i)).not.toBeInTheDocument();
 		});
 
 		it("Confirmar asignación hidden and skip banner shown when cuadrillaDoblada is true", () => {

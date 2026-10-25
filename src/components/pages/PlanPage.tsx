@@ -437,6 +437,7 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
   const toggleCuadrillaDoblada = trabajaderaStore.getState().toggleCuadrillaDoblada;
   const ultimoResultadoBulk = planStore((s) => s.ultimoResultadoBulk);
   const setActivePage = uiStore.getState().setActivePage;
+  const setConfigFocusTid = uiStore.getState().setConfigFocusTid;
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [showPinToast, setShowPinToast] = useState(false);
@@ -515,6 +516,23 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						⚒ Cuadrilla Doblada
 					</span>
 				)}
+				{/* v1.4.8: aviso de cuadrilla doblada activa por debajo del
+				    mínimo de 10 costaleros activos. El OFF vive en
+				    Configuración → sin este aviso el capataz ve un "ON"
+				    inerte y no sabe por qué el plan no le cuadra. */}
+				{t.cuadrillaDoblada && nActivos < 10 && (
+					<span
+						className="badge"
+						title="La cuadrilla doblada necesita 10+ costaleros activos. Desactívala en Configuración."
+						style={{
+							backgroundColor: "var(--warn-oro-bg)",
+							borderColor: "var(--warn-oro-bd)",
+							color: "var(--warn-oro)",
+						}}
+					>
+						⚠ {nActivos} activos · mín. 10
+					</span>
+				)}
 				{/* Cuadrilla Doblada toggle — navigation shortcut to ConfigPage */}
 				<button
 					type="button"
@@ -536,6 +554,9 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 								setTimeout(() => setShowPinToast(false), 4000);
 							}
 						}
+						// v1.4.8: las tarjetas de Config nacen colapsadas → marcar
+						// foco para que la working crew quede expandida al llegar.
+						setConfigFocusTid(t.id);
 						setActivePage("config");
 					}}
 				>
@@ -564,7 +585,10 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 							</div>
 							<button
 								className="btn btn-ghost btn-xs"
-								onClick={() => setActivePage("config")}
+								onClick={() => {
+									setConfigFocusTid(t.id);
+									setActivePage("config");
+								}}
 							>
 								Editar en Configuración →
 							</button>

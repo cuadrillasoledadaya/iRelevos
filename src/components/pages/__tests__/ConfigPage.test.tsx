@@ -47,6 +47,8 @@ const mockSetTipoTramo = vi.fn((tid: number, ti: number, tipo: string) => {
 });
 const mockSetDistribucionCuadrillas = vi.fn();
 const mockSetActivePage = vi.fn();
+/** Working crew que ConfigPage debe expandir al montar (v1.4.8) */
+let mockConfigFocusTid: number | null = null;
 
 const mockTrabajaderaStoreState = {
 	setSalidas: vi.fn(),
@@ -60,14 +62,30 @@ const mockTrabajaderaStoreState = {
 };
 
 vi.mock("@/stores", () => ({
-	uiStore: {
-		getState: vi.fn(() => ({
-			openSheet: vi.fn(),
-			setCellTarget: vi.fn(),
-			setBancoTarget: vi.fn(),
-			setActivePage: vi.fn(() => mockSetActivePage()),
-		})),
-	},
+	uiStore: Object.assign(
+		vi.fn((selector: any) =>
+			selector({
+				activePage: "config",
+				activeSheet: null,
+				tema: "light",
+				openEqs: new Set([1]),
+				swapSel: null,
+				cellTarget: null,
+				bancoTarget: null,
+				censusTarget: null,
+				configFocusTid: mockConfigFocusTid,
+			}),
+		),
+		{
+			getState: vi.fn(() => ({
+				openSheet: vi.fn(),
+				setCellTarget: vi.fn(),
+				setBancoTarget: vi.fn(),
+				setActivePage: vi.fn(() => mockSetActivePage()),
+				setConfigFocusTid: vi.fn(),
+			})),
+		},
+	),
 	bancoStore: {
 		getState: vi.fn(() => ({
 			addBanco: vi.fn(),
@@ -155,11 +173,14 @@ function makeMandoProfile(
 function renderConfigPage({
 	trabajaderas = [makeTrabajadera()],
 	profile = makeMandoProfile(),
+	focusTid = null,
 }: {
 	trabajaderas?: Trabajadera[];
 	profile?: Profile;
+	focusTid?: number | null;
 } = {}) {
 	// Initialize shared mutable state with deep copies
+	mockConfigFocusTid = focusTid;
 	resetMockState(trabajaderas.map((t) => ({ ...t, tramosTipo: t.tramosTipo ? [...t.tramosTipo] : undefined, distribucionCuadrillas: t.distribucionCuadrillas ? { a: [...t.distribucionCuadrillas.a], b: [...t.distribucionCuadrillas.b] } : null }) as Trabajadera));
 
 	vi.mocked(useAuth).mockReturnValue({
@@ -235,9 +256,97 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 				profile: makeMandoProfile({ role: "costalero" }),
 			});
 
-			// The toggle requires esMando && totalActivos >= 10
+			// The toggle requires esMando
 			// For non-mando, the cuadrilla doblada section should not render
 			expect(screen.queryByText("Doblada")).not.toBeInTheDocument();
+		});
+	});
+
+	// ═════════════════════════════════════════════════════════════
+	// REQ-UI-CFG-6: Master toggle visible cuando el flag está ON
+	// pero la cuadrilla quedó por debajo del mínimo de costaleros.
+	// Bug: el gate de renderizado usaba el umbral de ACTIVACIÓN
+	// (totalActivos >= 10) como gate de VISIBILIDAD → el capataz se
+	// quedaba sin forma de apagar el flag (callejón sin salida).
+	// ═════════════════════════════════════════════════════════════
+
+	describe("REQ-UI-CFG-6: Toggle visible con el flag activo bajo el mínimo", () => {
+		/** Trabajadera con 8 costaleros en el padrón y 0 bajas → 8 activos */
+		function makeTrabajaderaPocosActivos(
+			overrides: Partial<Trabajadera> = {},
+		): Trabajadera {
+			return makeTrabajadera({
+				nombres: [
+					"Alice", "Bob", "Charlie", "Dana", "Eve",
+					"Frank", "Grace", "Hank",
+				],
+				roles: Array(8).fill({ pri: "COR" as const, sec: "FIJ_I" as const }),
+				bajas: [],
+				...overrides,
+			});
+		}
+
+		it("renderiza el toggle cuando cuadrillaDoblada es true con menos de 10 activos", () => {
+			const t = makeTrabajaderaPocosActivos({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3], b: [4, 5, 6, 7] },
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			expect(screen.getByRole("button", { name: /Doblada/i })).toBeInTheDocument();
+			expect(screen.getByText("ON")).toBeInTheDocument();
+		});
+
+		it("el click sobre el toggle llama toggleCuadrillaDoblada (para apagar)", () => {
+			const t = makeTrabajaderaPocosActivos({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3], b: [4, 5, 6, 7] },
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			fireEvent.click(screen.getByRole("button", { name: /Doblada/i }));
+
+			expect(mockToggleCuadrillaDoblada).toHaveBeenCalledWith(t.id);
+		});
+
+		it("no renderiza el toggle cuando cuadrillaDoblada es false y hay menos de 10 activos", () => {
+			const t = makeTrabajaderaPocosActivos({ cuadrillaDoblada: false });
+			renderConfigPage({ trabajaderas: [t] });
+
+			expect(screen.queryByRole("button", { name: /Doblada/i })).not.toBeInTheDocument();
+		});
+
+		// v1.4.8: la tarjeta de Config nace colapsada
+		// (`.card .trab-body { display: none !important }`). PlanPage marca
+		// el foco al navegar para que la working crew quede expandida.
+		it("expande la tarjeta de la working crew enfocada", () => {
+			const t = makeTrabajadera();
+			const { container } = renderConfigPage({
+				trabajaderas: [t],
+				focusTid: t.id,
+			});
+
+			const card = container.querySelector(".card");
+			expect(card?.className).toContain("open");
+		});
+
+		it("mantiene la tarjeta colapsada si no hay foco", () => {
+			const t = makeTrabajadera();
+			const { container } = renderConfigPage({ trabajaderas: [t] });
+
+			const card = container.querySelector(".card");
+			expect(card?.className).not.toContain("open");
+		});
+
+		it("muestra el aviso de mínimo de 10 costaleros con el flag activo", () => {
+			const t = makeTrabajaderaPocosActivos({
+				cuadrillaDoblada: true,
+				distribucionCuadrillas: { a: [0, 1, 2, 3], b: [4, 5, 6, 7] },
+			});
+			renderConfigPage({ trabajaderas: [t] });
+
+			expect(screen.getByText(/8 costaleros activos/i)).toBeInTheDocument();
+			expect(screen.getByText(/mín\. 10/i)).toBeInTheDocument();
 		});
 	});
 

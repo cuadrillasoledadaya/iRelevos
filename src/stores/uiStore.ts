@@ -25,6 +25,15 @@ export interface UIStoreState {
 	cellTarget: CellTarget | null;
 	bancoTarget: { tid: number; ti: number } | null;
 	censusTarget: CensusTarget | null;
+	/**
+	 * Working crew whose Config card must be auto-expanded.
+	 * Set by PlanPage when navigating to Configuración (p.ej. al pulsar
+	 * el pill "Doblada"), because the Config cards are collapsed by
+	 * default (`.card .trab-body { display: none }`) — sin esto el
+	 * capataz aterriza en Config y no ve el control que fue a buscar.
+	 * No se persiste (solo activePage y tema).
+	 */
+	configFocusTid: number | null;
 }
 
 // ── Acciones ──────────────────────────────────────────────────────
@@ -40,6 +49,7 @@ export interface UIStoreActions {
 	setCellTarget: (t: CellTarget | null) => void;
 	setBancoTarget: (t: { tid: number; ti: number } | null) => void;
 	setCensusTarget: (t: CensusTarget | null) => void;
+	setConfigFocusTid: (tid: number | null) => void;
 }
 
 export type UIStore = UIStoreState & UIStoreActions;
@@ -117,6 +127,7 @@ export const createUIStore = () =>
 				cellTarget: null,
 				bancoTarget: null,
 				censusTarget: null,
+				configFocusTid: null,
 
 				// ── Acciones ──
 
@@ -156,6 +167,8 @@ export const createUIStore = () =>
 				setBancoTarget: (t) => set({ bancoTarget: t }),
 
 				setCensusTarget: (t) => set({ censusTarget: t }),
+
+				setConfigFocusTid: (tid) => set({ configFocusTid: tid }),
 			}),
 			{
 				name: "cpwa_ui_store",
