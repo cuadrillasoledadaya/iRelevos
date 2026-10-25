@@ -546,6 +546,7 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 	const toggleCuadrillaDoblada = trabajaderaStore.getState().toggleCuadrillaDoblada;
 	const setTipoTramo = trabajaderaStore.getState().setTipoTramo;
 	const setDistribucionCuadrillas = trabajaderaStore.getState().setDistribucionCuadrillas;
+	const toggleAncla = trabajaderaStore.getState().toggleAncla;
 
 	const [isOpen, setIsOpen] = useState(false);
 	const [planSel, setPlanSel] = useState("");
@@ -837,6 +838,59 @@ function ConfigTrabajadera({ t }: { t: Trabajadera }) {
 								)}
 							</div>
 						)}
+					{/* v1.5.0 — Anclas: costaleros que el capataz fija dentro
+					    del puesto de carga de su cuadrilla (no rotan fuera).
+					    Este bloque ya vive dentro del gate `esMando`. */}
+					{t.cuadrillaDoblada && t.distribucionCuadrillas && (
+						<div className="mt2">
+							<div className="text-[0.6rem] font-bold text-[var(--cd-tx)]">
+								Anclas
+							</div>
+							<div className="text-[0.55rem] text-[var(--cre-o)]">
+								El costalero anclado se queda siempre dentro del puesto de
+								carga de su cuadrilla (no rota fuera).
+							</div>
+							<div className="flex g4 mt1">
+								{(['A', 'B'] as const).map((cuadrilla) => {
+									const clave = cuadrilla === 'A' ? 'a' : 'b';
+									const miembros =
+										cuadrilla === 'A'
+											? t.distribucionCuadrillas!.a
+											: t.distribucionCuadrillas!.b;
+									const ancladas = t.anclas?.[clave] ?? [];
+									return (
+										<div key={cuadrilla} className="f1">
+											<div className="text-[0.55rem] uppercase tracking-wider text-[var(--cre-o)]">
+												Cuadrilla {cuadrilla}
+											</div>
+											<div className="flex fw g1 mt1">
+												{miembros.map((idx: number) => {
+													const esAncla = ancladas.includes(idx);
+													return (
+														<button
+															key={idx}
+															type="button"
+															className={`ancla-chip ${esAncla ? 'on' : 'off'}`}
+															aria-pressed={esAncla}
+															aria-label={`Ancla ${t.nombres[idx]}`}
+															title={
+																esAncla
+																	? `${t.nombres[idx]} — anclado (siempre dentro)`
+																	: `Anclar ${t.nombres[idx]}`
+																}
+															onClick={() => toggleAncla(t.id, cuadrilla, idx)}
+															>
+																⚓ {shortName(t.nombres[idx])}
+														</button>
+													);
+												})}
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						</div>
+					)}
 					</div>
 				)}
 

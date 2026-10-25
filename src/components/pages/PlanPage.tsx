@@ -492,6 +492,14 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 	const statusOk =
 		an?.okObj && an?.dentro5 && an?.rep.length === 0 && an?.cons === 0;
 
+	// v1.5.0 — Anclas: costaleros que quedan siempre dentro del puesto de
+	// carga de su cuadrilla. Se marcan con ⚓ en el plan.
+	const anclasIdx = useMemo(
+		() => new Set([...(t.anclas?.a ?? []), ...(t.anclas?.b ?? [])]),
+		[t.anclas],
+	);
+	const nAnclas = anclasIdx.size;
+
 	return (
 		<div
 			className={`card ${statusOk ? "ok" : an ? "err" : ""} ${isOpen ? "open" : ""} plan-trab`}
@@ -514,6 +522,20 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 						}}
 					>
 						⚒ Cuadrilla Doblada
+					</span>
+				)}
+				{/* v1.5.0: nº de anclas de la working crew */}
+				{nAnclas > 0 && (
+					<span
+						className="badge"
+						title="Costaleros anclados: permanecen siempre dentro del puesto de carga de su cuadrilla"
+						style={{
+							backgroundColor: "var(--warn-oro-bg)",
+							borderColor: "var(--warn-oro-bd)",
+							color: "var(--warn-oro)",
+						}}
+					>
+						⚓ {nAnclas} ancla{nAnclas === 1 ? "" : "s"}
 					</span>
 				)}
 				{/* v1.4.8: aviso de cuadrilla doblada activa por debajo del
@@ -826,6 +848,15 @@ const PlanTrabajadera = memo(function PlanTrabajadera({
 											<div className="flex aic jb gap-1">
 												<span className="truncate">
 													{shortName(nameAt(t, ci))}
+													{anclasIdx.has(ci) && (
+														<span
+															className="ancla-mark"
+															title="Ancla: siempre dentro del puesto de carga de su cuadrilla"
+															aria-label="Ancla"
+														>
+															⚓
+														</span>
+													)}
 												</span>
 												{an && an.conteo[ci] !== undefined && (
 													<span

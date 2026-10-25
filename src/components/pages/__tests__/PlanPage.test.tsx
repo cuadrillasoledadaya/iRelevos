@@ -1039,3 +1039,56 @@ describe("MiPlanPersonal — costalero plan view", () => {
 		});
 	});
 });
+
+describe("PlanPage — REQ-UI-PLAN-9: Marca de anclas", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	function renderCapataz(t: Trabajadera): void {
+		const profile = makeCostaleroProfile({ role: "capataz" });
+		vi.mocked(useAuth).mockReturnValue({
+			profile,
+			session: null,
+			user: null,
+			loading: false,
+			signOut: vi.fn(),
+		} as any);
+		vi.mocked(projectStore).mockImplementation((selector: any) =>
+			selector({
+				S: { banco: [], planes: [], trabajaderas: [t] },
+				censusBoquilla: {},
+			}),
+		);
+		render(<PlanPage />);
+	}
+
+	it("el costalero anclado aparece marcado con ⚓", () => {
+		const t = makeTrabajadera({
+			cuadrillaDoblada: true,
+			anclas: { a: [0], b: [] },
+			plan: [
+				{ dentro: [0, 1, 2, 3, 4], fuera: [] },
+				{ dentro: [0, 1, 2, 3, 4], fuera: [] },
+				{ dentro: [0, 1, 2, 3, 4], fuera: [] },
+			],
+		});
+		renderCapataz(t);
+		expect(screen.getAllByLabelText("Ancla").length).toBeGreaterThan(0);
+	});
+
+	it("el header muestra el número de anclas", () => {
+		const t = makeTrabajadera({
+			cuadrillaDoblada: true,
+			anclas: { a: [0], b: [1] },
+		});
+		renderCapataz(t);
+		expect(screen.getByText(/2 anclas/)).toBeInTheDocument();
+	});
+
+	it("sin anclas no hay marca ⚓", () => {
+		const t = makeTrabajadera({ cuadrillaDoblada: true });
+		renderCapataz(t);
+		expect(screen.queryByLabelText("Ancla")).not.toBeInTheDocument();
+	});
+});

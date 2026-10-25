@@ -46,6 +46,8 @@ const mockSetTipoTramo = vi.fn((tid: number, ti: number, tipo: string) => {
 	}
 });
 const mockSetDistribucionCuadrillas = vi.fn();
+/** v1.5.0 — anclas */
+const mockToggleAncla = vi.fn();
 const mockSetActivePage = vi.fn();
 /** Working crew que ConfigPage debe expandir al montar (v1.4.8) */
 let mockConfigFocusTid: number | null = null;
@@ -59,6 +61,7 @@ const mockTrabajaderaStoreState = {
 	toggleCuadrillaDoblada: mockToggleCuadrillaDoblada,
 	setTipoTramo: mockSetTipoTramo,
 	setDistribucionCuadrillas: mockSetDistribucionCuadrillas,
+	toggleAncla: mockToggleAncla,
 };
 
 vi.mock("@/stores", () => ({
@@ -767,5 +770,62 @@ describe("ConfigPage — Cuadrilla Doblada Configuration", () => {
 			expect(detailsBody?.textContent).toContain("Hank");
 			expect(detailsBody?.textContent).toContain("Ivy");
 		});
+	});
+});
+
+describe("ConfigPage — REQ-UI-CFG-9: Marcado de anclas", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockToggleCuadrillaDoblada.mockReturnValue({
+			anterior: false,
+			nuevo: true,
+			distribucionAplicada: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+			pinsInvalidated: false,
+		});
+	});
+
+	function conCuadrillaDoblada(over: Partial<Trabajadera> = {}): Trabajadera {
+		return makeTrabajadera({
+			cuadrillaDoblada: true,
+			distribucionCuadrillas: {
+				a: [0, 1, 2, 3, 4, 5],
+				b: [6, 7, 8, 9, 10, 11],
+			},
+			...over,
+		});
+	}
+
+	it("renderiza el bloque de anclas con los miembros de A y B", () => {
+		renderConfigPage({ trabajaderas: [conCuadrillaDoblada()] });
+		expect(screen.getByText("Anclas")).toBeTruthy();
+		expect(screen.getByLabelText("Ancla Alice")).toBeTruthy();
+		expect(screen.getByLabelText("Ancla Leo")).toBeTruthy();
+	});
+
+	it("el click en un ancla llama toggleAncla con cuadrilla e indice", () => {
+		renderConfigPage({ trabajaderas: [conCuadrillaDoblada()] });
+		fireEvent.click(screen.getByLabelText("Ancla Alice"));
+		expect(mockToggleAncla).toHaveBeenCalledWith(1, "A", 0);
+		fireEvent.click(screen.getByLabelText("Ancla Leo"));
+		expect(mockToggleAncla).toHaveBeenCalledWith(1, "B", 11);
+	});
+
+	it("el ancla marcado se ve marcado", () => {
+		renderConfigPage({
+			trabajaderas: [conCuadrillaDoblada({ anclas: { a: [0], b: [] } })],
+		});
+		expect(screen.getByLabelText("Ancla Alice").getAttribute("aria-pressed")).toBe("true");
+		expect(screen.getByLabelText("Ancla Bob").getAttribute("aria-pressed")).toBe("false");
+	});
+
+	it("sin cuadrilla doblada no se renderiza el bloque de anclas", () => {
+		renderConfigPage({
+			trabajaderas: [
+				makeTrabajadera({
+					distribucionCuadrillas: { a: [0, 1, 2, 3, 4, 5], b: [6, 7, 8, 9, 10, 11] },
+				}),
+			],
+		});
+		expect(screen.queryByText("Anclas")).toBeNull();
 	});
 });
