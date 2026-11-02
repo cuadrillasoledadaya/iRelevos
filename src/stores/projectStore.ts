@@ -114,6 +114,7 @@ export const createProjectStore = () =>
 
 					if (!error && data) {
 						get().setPasos(data as PasoDB[]);
+						get().fetchCensusApodos();
 					}
 				},
 

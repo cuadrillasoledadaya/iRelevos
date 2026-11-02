@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { uiStore, temporadaStore, trabajaderaStore } from "@/stores";
+import { uiStore, temporadaStore, trabajaderaStore, projectStore } from "@/stores";
 import { supabase } from "@/lib/supabase";
 import type { RolCode } from "@/lib/types";
 
@@ -13,6 +13,10 @@ interface CensusEntry {
 	trabajadera?: number;
 	rol?: RolCode;
 	rol_sec?: RolCode;
+}
+
+interface EditingApodoState {
+	[id: string]: string | undefined;
 }
 
 export default function CensusSheet() {
@@ -27,6 +31,8 @@ export default function CensusSheet() {
 	const [census, setCensus] = useState<CensusEntry[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [filter, setFilter] = useState("");
+	const [editingApodo, setEditingApodo] = useState<EditingApodoState>({});
+	const [savingApodo, setSavingApodo] = useState<Record<string, boolean>>({});
 
 	const isOpen = activeSheet === "censo";
 
@@ -151,6 +157,50 @@ export default function CensusSheet() {
 															@{c.apodo}
 														</div>
 													)}
+												{editingApodo[c.id] !== undefined && (
+													<div className="mt-2 flex gap-2">
+														<input
+															className="inp w-48"
+															placeholder="Apodo"
+															value={editingApodo[c.id]}
+															onChange={e => setEditingApodo({ ...editingApodo, [c.id]: e.target.value })}
+															style={{ height: "34px", fontSize: "0.85rem" }}
+														/>
+														<button
+															onClick={() => {
+																const v = (editingApodo[c.id] ?? "").trim();
+																if (v === c.apodo) {
+																	setEditingApodo({ ...editingApodo, [c.id]: undefined });
+																	return;
+																}
+																setSavingApodo({ ...savingApodo, [c.id]: true });
+																fetch(`/api/census/${c.id}/apodo`, {
+																	method: "PATCH",
+																	headers: { "Content-Type": "application/json" },
+																	body: JSON.stringify({ apodo: v }),
+																})
+																	.then(async res => {
+																		if (!res.ok) throw new Error("Error al guardar");
+																		const updated = await res.json();
+																		setCensus(census.map(x => (x.id === c.id ? { ...x, apodo: updated.apodo } : x)));
+																		setEditingApodo({ ...editingApodo, [c.id]: undefined });
+																		projectStore.getState().aplicarApodosATrabajadoras();
+																	})
+																	.catch(err => {
+																		console.error(err);
+																		alert("No se pudo guardar el apodo");
+																	})
+																	.finally(() => setSavingApodo({ ...savingApodo, [c.id]: false }));
+															}}														className="btn btn-oro btn-sm"
+															style={{ height: "34px", padding: "0 8px", fontSize: "0.75rem", display: savingApodo[c.id] ? "none" : "inline-block" }}
+														>💾</button>
+														<button
+															onClick={() => setEditingApodo({ ...editingApodo, [c.id]: undefined })}
+															className="btn btn-ghost btn-sm"
+															style={{ height: "34px", padding: "0 8px", fontSize: "0.75rem" }}
+														>✕</button>
+													</div>
+												)}
 												</div>
 												{c.trabajadera && (
 													<div
