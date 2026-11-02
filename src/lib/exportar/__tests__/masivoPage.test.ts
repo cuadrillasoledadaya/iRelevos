@@ -27,10 +27,9 @@ describe('masivoPage — estructura', () => {
     expect(html).toContain('page-break-after:always')
   })
 
-  it('debe incluir el header con nombre del paso', () => {
+  it('debe incluir el header con el nombre de la hermandad', () => {
     const html = masivoPage(validData(0, 'Esperanza'))
-    expect(html).toContain('Hermandad')
-    expect(html).toContain('Esperanza')
+    expect(html).toContain('Muy Antigua, Real e Ilustre Hermandad Franciscana de Penitencia')
   })
 
   it('debe mostrar el nombre del costalero en grande', () => {
@@ -168,7 +167,7 @@ describe('masivoPage — edge cases', () => {
     const t = createTrabajaderaValida(20, 1, 6)
     const data = mapMasivo(t, t.nombres[0], 0)
     const html = masivoPage(data)
-    expect(html).toContain('Hermandad · ')
+    expect(html).toContain('Muy Antigua, Real e Ilustre Hermandad Franciscana de Penitencia')
     expect(html.length).toBeGreaterThan(100)
   })
 

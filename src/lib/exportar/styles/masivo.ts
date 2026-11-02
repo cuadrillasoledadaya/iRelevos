@@ -80,7 +80,7 @@ export function masivoPageHeaderHTML(
   fecha: string
 ): string {
   return `<div style="text-align:center;border-bottom:3px solid ${COLORS.primary};padding-bottom:8px;margin-bottom:10px;">
-          <div style="font-size:9pt;color:${COLORS.gray};letter-spacing:2px;text-transform:uppercase;">Hermandad · ${nombrePaso}</div>
+          <div style="font-size:9pt;color:${COLORS.gray};letter-spacing:2px;text-transform:uppercase;">Muy Antigua, Real e Ilustre Hermandad Franciscana de Penitencia de la Vera Cruz, Santo Entierro de Cristo y María Santísima en su Soledad</div>
           <div style="font-size:18pt;font-weight:900;color:${COLORS.dark};letter-spacing:1px;margin:4px 0;">${costaleroNombre}</div>
           <div style="font-size:10pt;color:${COLORS.primary};font-weight:700;">TRABAJADERA ${trabajaderaId}</div>
           <div style="font-size:8pt;color:${COLORS.gray};margin-top:2px;">${fecha}</div>
@@ -97,13 +97,13 @@ export function masivoStatsHTML(
   ultimoTramo: number | null
 ): string {
   const statBox = (label: string, value: string) =>
-    `<div style="background:${COLORS.warmPage};border:1px solid ${COLORS.primary};border-radius:6px;padding:6px 12px;text-align:center;">
+    `<div style="background:#ffffff;border:1px solid ${COLORS.primary};border-radius:6px;padding:6px 12px;text-align:center;">
        <div style="font-size:8pt;color:${COLORS.gray};">${label}</div>
        <div style="font-size:14pt;font-weight:900;color:${COLORS.primary};">${value}</div>
      </div>`
 
   return `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:6px;">
-          <div style="background:${COLORS.warmPage};border:1px solid ${COLORS.primary};border-radius:6px;padding:6px 12px;text-align:center;">
+          <div style="background:#ffffff;border:1px solid ${COLORS.primary};border-radius:6px;padding:6px 12px;text-align:center;">
             <div style="font-size:8pt;color:${COLORS.gray};">Salidas</div>
             <div style="font-size:14pt;font-weight:900;color:${COLORS.primary};">${salidas}<span style="font-size:9pt;color:${COLORS.gray};">/${objetivo}</span></div>
           </div>
