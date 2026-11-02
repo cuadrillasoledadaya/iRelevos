@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { withCors, handleCorsPreflight } from "@/lib/cors";
+import { handleCorsPreflight } from "@/lib/cors";
 import { jsonResponse } from "@/lib/apiHelpers";
 import { logger } from "@/lib/logger";
 
