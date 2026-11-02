@@ -209,10 +209,14 @@ export const createProjectStore = () =>
 
 			aplicarApodosATrabajadoras: () => {
 				const { S, censusApodos } = get();
-				if (!censusApodos || Object.keys(censusApodos).length === 0) return;
+				if (!censusApodos || Object.keys(censusApodos).length === 0) {
+					console.log('[apodos] No hay apodos en censusApodos');
+					return;
+				}
+				console.log('[apodos] censusApodos:', JSON.stringify(censusApodos));
 
 				const trabajaderas = S.trabajaderas?.map((t: Trabajadera) => {
-					const apodos = t.nombres.map((nombre: string) => {
+					const apodos = t.nombres.map((nombre: string, idx: number) => {
 						const trimmed = nombre.trim();
 						// 1. Match exacto por nombre completo
 						const exact = censusApodos[trimmed];
@@ -221,13 +225,31 @@ export const createProjectStore = () =>
 						const firstName = trimmed.split(' ')[0];
 						const byFirst = censusApodos[firstName];
 						if (byFirst && byFirst.length === 1) return byFirst[0];
-						// Si hay múltiples (ej. dos Rafaels), no asignar automáticamente
+						// 3. Si hay múltiples, intentar match por orden de aparición en el censo
+						// (el primer apodo para ese nombre va al primer índice con ese nombre)
+						if (byFirst && byFirst.length > 1) {
+							// Contar cuántas veces hemos visto este nombre antes en esta trabajadera
+							const countBefore = t.nombres.slice(0, idx).filter(n => n.trim() === firstName).length;
+							if (countBefore < byFirst.length) return byFirst[countBefore];
+						}
 						return undefined;
 					});
 					const tieneApodos = apodos.some((a: string | undefined) => !!a);
+					console.log("[apodos] Trabajadera " + t.id + ": nombres=" + JSON.stringify(t.nombres) + ", apodos=" + JSON.stringify(apodos));
 					return tieneApodos ? { ...t, apodos } : t;
 				}) ?? [];
 
+				set({ S: { ...S, trabajaderas } });
+			},
+
+			asignarApodoATrabajadora: (tid: number, ci: number, apodo: string) => {
+				const { S } = get();
+				const trabajaderas = S.trabajaderas?.map((t: Trabajadera) => {
+					if (t.id !== tid) return t;
+					const apodos = [...(t.apodos ?? Array(t.nombres.length).fill(undefined))];
+					apodos[ci] = apodo.trim() || undefined;
+					return { ...t, apodos };
+				}) ?? [];
 				set({ S: { ...S, trabajaderas } });
 			},vaciarCenso: async () => {
 					const { pid, pasos } = get();

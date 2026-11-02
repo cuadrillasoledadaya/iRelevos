@@ -54,6 +54,7 @@ export default function CensusSheet() {
 
 		if (isOpen && activeTemporadaId) {
 			fetchCensus();
+			projectStore.getState().fetchCensusApodos();
 		}
 	}, [isOpen, activeTemporadaId]);
 
@@ -80,6 +81,11 @@ export default function CensusSheet() {
 			.includes(filter.toLowerCase()),
 	);
 
+	function syncApodosATrabajadoras() {
+		projectStore.getState().aplicarApodosATrabajadoras();
+		alert("✓ Apodos sincronizados a las trabajaderas. Revisa la hoja del Capataz y las exportaciones.");
+	}
+
 	return (
 		<>
 			<div className={`bso${isOpen ? " open" : ""}`} onClick={closeSheet} />
@@ -101,6 +107,13 @@ export default function CensusSheet() {
 						style={{ height: "40px" }}
 					/>
 				</div>
+				<button
+					className="btn btn-oro btn-sm"
+					onClick={syncApodosATrabajadoras}
+					style={{ height: "40px", marginLeft: "8px", fontSize: "0.75rem" }}
+				>
+					🔄 Sincronizar apodos a trabajaderas
+				</button>
 
 				<div
 					className="bs-body"
