@@ -6,3 +6,4 @@ export { exportarDatos, exportarPerfil, parsearImport, type ImportResult } from 
 export { exportarRelevos, exportarRelevosIndividual, exportarRelevosMultiplesItems } from './exportar/relevos'
 export { exportarPDF } from './exportar/pdf-capataz'
 export { exportarPDFMasivoTodas } from './exportar/pdf-masivo'
+export type { RelevosTableData, CapatazTableData, MasivoPageData } from './exportar/types'

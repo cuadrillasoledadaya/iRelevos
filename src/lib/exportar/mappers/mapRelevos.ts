@@ -33,15 +33,16 @@ function rolCodeToLabel(rol: RolCode): string {
  *
  * @param t            Trabajadera con plan (puede ser null)
  * @param costaleroIdx Índice del costalero a resaltar (opcional, default -1 = ninguno)
+ * @param fecha        Fecha opcional para el encabezado (formato legible)
  * @returns RelevosTableData con headers, filas, y fuera precomputados
  */
 export function mapRelevos(
 	t: Trabajadera,
 	costaleroIdx = -1,
-	fechaOverride?: string,
+	fecha?: string,
 ): RelevosTableData {
 	// ── Fecha ──────────────────────────────────────────────────────
-	const fecha = fechaOverride ?? new Date().toLocaleDateString("es-ES", {
+	const fechaResuelta = fecha ?? new Date().toLocaleDateString("es-ES", {
 		day: "2-digit",
 		month: "long",
 		year: "numeric",
@@ -58,6 +59,16 @@ export function mapRelevos(
 		}),
 	);
 	headers.push({ emoji: "", label: "FUERA" });
+
+	// ── Guard: sin tramos → sin filas de datos ─────────────────────
+	if (!t.tramos || t.tramos.length === 0) {
+		return {
+			trabajaderaId: t.id,
+			fecha: fechaResuelta,
+			headers,
+			rows: [],
+		};
+	}
 
 	// ── Filas ──────────────────────────────────────────────────────
 	const rows = t.tramos.map((nombreTramo, ti) => {
@@ -84,7 +95,7 @@ export function mapRelevos(
 
 	return {
 		trabajaderaId: t.id,
-		fecha,
+		fecha: fechaResuelta,
 		headers,
 		rows,
 	};
