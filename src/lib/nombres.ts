@@ -13,6 +13,8 @@ export function esc(s: unknown): string {
 
 export function nameAt(t: Trabajadera, idx: number): string {
   const i = +idx
+  // Priorizar apodo si existe para este índice
+  if (t.apodos?.[i]) return t.apodos[i]
   return t.nombres[i] ?? (i + 1).toString()
 }
 

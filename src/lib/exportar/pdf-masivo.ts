@@ -3,6 +3,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import type { Trabajadera } from '../types'
+import { nameAt } from '../nombres'
 import { mapMasivo } from './mappers/mapMasivo'
 import { masivoPage } from './templates/masivoPage'
 import { masivoBaseCSS } from './styles/masivo'
@@ -21,7 +22,8 @@ export function exportarPDFMasivoTodas(trabajaderas: Trabajadera[], nombrePaso: 
       .map((nombre, ci) => ({ nombre, ci }))
       .filter(({ ci }) => !t.bajas?.includes(ci))
 
-    activos.forEach(({ nombre: nombreCostalero, ci: costaleroIdx }) => {
+    activos.forEach(({ ci: costaleroIdx }) => {
+      const nombreCostalero = nameAt(t, costaleroIdx)
       const data = mapMasivo(t, nombreCostalero, costaleroIdx, nombrePaso, fecha)
       paginas.push(masivoPage(data))
     })

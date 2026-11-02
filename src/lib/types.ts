@@ -43,6 +43,8 @@ export type TramoTipo = 'primario' | 'secundario'
 export interface Trabajadera {
   id: number
   nombres: string[]
+  /** Apodos opcionales, paralelo a `nombres` (misma longitud). Si hay apodo para un índice, se prioriza sobre el nombre real en pantalla y exportaciones. Índices sin apodo contienen `undefined`. */
+  apodos?: (string | undefined)[]
   roles: Rol[]
   salidas: number
   tramos: string[]

@@ -28,6 +28,7 @@ export interface ProjectStoreState {
 	S: DatosPerfil;
 	censusHeights: Record<string, number>;
 	censusBoquilla: Record<string, boolean>;
+	censusApodos: Record<string, string>;
 }
 
 export interface ProjectStoreActions {
@@ -36,6 +37,8 @@ export interface ProjectStoreActions {
 	refetchPasos: () => Promise<void>;
 	fetchCensusHeights: () => Promise<void>;
 	fetchCensusBoquilla: () => Promise<void>;
+	fetchCensusApodos: () => Promise<void>;
+	aplicarApodosATrabajadoras: () => void;
 	vaciarCenso: () => Promise<void>;
 }
 
@@ -61,7 +64,7 @@ export const createProjectStore = () =>
 				S: datosVacios(),
 				censusHeights: {},
 				censusBoquilla: {},
-
+				censusApodos: {},
 				// ── Acciones ──
 
 				setPid: (id) => {
@@ -71,6 +74,7 @@ export const createProjectStore = () =>
 						pid: id,
 						...deriveFromPasos(pasos, id),
 					});
+					get().aplicarApodosATrabajadoras();
 				},
 
 				setPasos: (pasos) => {
@@ -93,6 +97,7 @@ export const createProjectStore = () =>
 						pid: nextPid,
 						...deriveFromPasos(pasos, nextPid),
 					});
+					get().aplicarApodosATrabajadoras();
 				},
 
 				refetchPasos: async () => {
@@ -169,6 +174,50 @@ export const createProjectStore = () =>
 						set({ censusBoquilla: map });
 					}
 				},
+
+				fetchCensusApodos: async () => {
+				const activeTemporadaId = getActiveTemporadaId();
+				if (!activeTemporadaId) return;
+
+				const { data } = await supabase
+					.from("census")
+					.select("nombre, apellidos, apodo")
+					.eq("temporada_id", activeTemporadaId);
+
+				if (data) {
+					const map: Record<string, string> = {};
+					data.forEach((c: {
+						nombre: string;
+						apellidos: string;
+						apodo?: string;
+					}) => {
+						const fullName = `${c.nombre} ${c.apellidos}`.trim();
+						if (c.apodo) {
+							map[fullName] = c.apodo.trim();
+							map[c.nombre.trim()] = c.apodo.trim();
+						}
+					});
+					set({ censusApodos: map });
+					get().aplicarApodosATrabajadoras();
+				}
+			},
+
+			aplicarApodosATrabajadoras: () => {
+				const { S, censusApodos } = get();
+				if (!censusApodos || Object.keys(censusApodos).length === 0) return;
+
+				const trabajaderas = S.trabajaderas?.map((t) => {
+					const apodos = t.nombres.map((nombre) => {
+						const apodo = censusApodos[nombre] ?? censusApodos[nombre.trim()];
+						return apodo || undefined;
+					});
+					const tieneApodos = apodos.some((a) => !!a);
+					return tieneApodos ? { ...t, apodos } : t;
+				}) ?? [];
+
+				set({ S: { ...S, trabajaderas } });
+			},
+
 
 				vaciarCenso: async () => {
 					const { pid, pasos } = get();
