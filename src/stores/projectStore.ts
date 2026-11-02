@@ -6,7 +6,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { DatosPerfil, PasoDB } from "@/lib/types";
+import type { DatosPerfil, PasoDB, Trabajadera } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { datosVacios } from "@/lib/algoritmos";
 import { deriveFromPasos } from "./helpers";
@@ -28,7 +28,7 @@ export interface ProjectStoreState {
 	S: DatosPerfil;
 	censusHeights: Record<string, number>;
 	censusBoquilla: Record<string, boolean>;
-	censusApodos: Record<string, string>;
+	censusApodos: Record<string, string[]>;
 }
 
 export interface ProjectStoreActions {
@@ -186,16 +186,20 @@ export const createProjectStore = () =>
 					.eq("temporada_id", activeTemporadaId);
 
 				if (data) {
-					const map: Record<string, string> = {};
+					const map: Record<string, string[]> = {};
 					data.forEach((c: {
 						nombre: string;
 						apellidos: string;
 						apodo?: string;
 					}) => {
 						const fullName = `${c.nombre} ${c.apellidos}`.trim();
+						const firstName = c.nombre.trim();
 						if (c.apodo) {
-							map[fullName] = c.apodo.trim();
-							map[c.nombre.trim()] = c.apodo.trim();
+							const apodo = c.apodo.trim();
+							if (!map[fullName]) map[fullName] = [];
+							map[fullName].push(apodo);
+							if (!map[firstName]) map[firstName] = [];
+							if (!map[firstName].includes(apodo)) map[firstName].push(apodo);
 						}
 					});
 					set({ censusApodos: map });
@@ -207,20 +211,25 @@ export const createProjectStore = () =>
 				const { S, censusApodos } = get();
 				if (!censusApodos || Object.keys(censusApodos).length === 0) return;
 
-				const trabajaderas = S.trabajaderas?.map((t) => {
-					const apodos = t.nombres.map((nombre) => {
-						const apodo = censusApodos[nombre] ?? censusApodos[nombre.trim()];
-						return apodo || undefined;
+				const trabajaderas = S.trabajaderas?.map((t: Trabajadera) => {
+					const apodos = t.nombres.map((nombre: string) => {
+						const trimmed = nombre.trim();
+						// 1. Match exacto por nombre completo
+						const exact = censusApodos[trimmed];
+						if (exact && exact.length === 1) return exact[0];
+						// 2. Match por primer nombre (solo si hay un único apodo para ese nombre)
+						const firstName = trimmed.split(' ')[0];
+						const byFirst = censusApodos[firstName];
+						if (byFirst && byFirst.length === 1) return byFirst[0];
+						// Si hay múltiples (ej. dos Rafaels), no asignar automáticamente
+						return undefined;
 					});
-					const tieneApodos = apodos.some((a) => !!a);
+					const tieneApodos = apodos.some((a: string | undefined) => !!a);
 					return tieneApodos ? { ...t, apodos } : t;
 				}) ?? [];
 
 				set({ S: { ...S, trabajaderas } });
-			},
-
-
-				vaciarCenso: async () => {
+			},vaciarCenso: async () => {
 					const { pid, pasos } = get();
 					if (!pid) return;
 
