@@ -28,6 +28,7 @@ export default function CensusSheet() {
 	const setRolPri = trabajaderaStore.getState().setRolPri;
 	const setRolSec = trabajaderaStore.getState().setRolSec;
 	const activeTemporadaId = temporadaStore((s) => s.activeTemporadaId);
+	const pid = projectStore((s) => s.pid);
 	const [census, setCensus] = useState<CensusEntry[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [filter, setFilter] = useState("");
@@ -38,12 +39,19 @@ export default function CensusSheet() {
 
 	useEffect(() => {
 		async function fetchCensus() {
-			if (!activeTemporadaId) return;
+			// El censo del proyecto activo (importado desde iCuadrilla) puede
+			// tener temporada_id NULL -> hay que filtrar por proyecto O por
+			// temporada, no solo por temporada.
+			const filtros: string[] = [];
+			if (pid) filtros.push(`proyecto_id.eq.${pid}`);
+			if (activeTemporadaId) filtros.push(`temporada_id.eq.${activeTemporadaId}`);
+			if (filtros.length === 0) return;
+
 			setLoading(true);
 			const { data, error } = await supabase
 				.from("census")
 				.select("id, nombre, apellidos, apodo, trabajadera, rol, rol_sec")
-				.eq("temporada_id", activeTemporadaId)
+				.or(filtros.join(","))
 				.order("nombre", { ascending: true });
 
 			if (!error && data) {
@@ -52,11 +60,11 @@ export default function CensusSheet() {
 			setLoading(false);
 		}
 
-		if (isOpen && activeTemporadaId) {
+		if (isOpen && (activeTemporadaId || pid)) {
 			fetchCensus();
 			projectStore.getState().fetchCensusApodos();
 		}
-	}, [isOpen, activeTemporadaId]);
+	}, [isOpen, activeTemporadaId, pid]);
 
 	function handleSelect(c: CensusEntry) {
 		if (censusTarget) {
@@ -81,8 +89,10 @@ export default function CensusSheet() {
 			.includes(filter.toLowerCase()),
 	);
 
-	function syncApodosATrabajadoras() {
-		projectStore.getState().aplicarApodosATrabajadoras();
+	async function syncApodosATrabajaderas() {
+		// Recarga el censo y aplica los apodos a las cuadrillas (y los
+		// guarda en el paso).
+		await projectStore.getState().fetchCensusApodos();
 		alert("✓ Apodos sincronizados a las trabajaderas. Revisa la hoja del Capataz y las exportaciones.");
 	}
 
@@ -109,7 +119,7 @@ export default function CensusSheet() {
 				</div>
 				<button
 					className="btn btn-oro btn-sm"
-					onClick={syncApodosATrabajadoras}
+					onClick={syncApodosATrabajaderas}
 					style={{ height: "40px", marginLeft: "8px", fontSize: "0.75rem" }}
 				>
 					🔄 Sincronizar apodos a trabajaderas
@@ -197,7 +207,9 @@ export default function CensusSheet() {
 																		const updated = await res.json();
 																		setCensus(census.map(x => (x.id === c.id ? { ...x, apodo: updated.apodo } : x)));
 																		setEditingApodo({ ...editingApodo, [c.id]: undefined });
-																		projectStore.getState().aplicarApodosATrabajadoras();
+																		// Recargar el índice de apodos y aplicarlo a las
+																		// cuadrillas (queda guardado en la nube).
+																		await projectStore.getState().fetchCensusApodos();
 																	})
 																	.catch(err => {
 																		console.error(err);

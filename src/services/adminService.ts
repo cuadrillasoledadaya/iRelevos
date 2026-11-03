@@ -207,16 +207,49 @@ export async function saveCensusEdit(
 	id: string,
 	editForm: CensusEditForm,
 ): Promise<ServiceResult> {
-	const { error } = await supabase
-		.from("census")
-		.update({
-			...editForm,
-			trabajadera: editForm.trabajadera
-				? parseInt(String(editForm.trabajadera))
-				: null,
-			altura: editForm.altura ? parseFloat(String(editForm.altura)) : null,
-		})
-		.eq("id", id);
+	const payload = {
+		...editForm,
+		trabajadera: editForm.trabajadera
+			? parseInt(String(editForm.trabajadera))
+			: null,
+		altura: editForm.altura ? parseFloat(String(editForm.altura)) : null,
+	};
+
+	// Primero por la API (service role): el censo importado desde
+	// iCuadrilla tiene `temporada_id = NULL` y algunas políticas RLS
+	// dejaban esas filas fuera del alcance del cliente — el apodo
+	// "se guardaba" pero no arrives nunca a la base de datos.
+	const {
+		data: { session },
+	} = await supabase.auth.getSession();
+
+	if (session?.access_token) {
+		try {
+			const res = await fetch(`/api/census/${id}`, {
+				method: "PATCH",
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${session.access_token}`,
+				},
+				body: JSON.stringify(payload),
+			});
+
+			if (res.ok) return {};
+
+			const body = await res.json().catch(() => ({}));
+			return {
+				error: body.error || `Error ${res.status} al guardar en el censo`,
+			};
+		} catch (err: unknown) {
+			// Si la API no está disponible se intenta el update directo.
+			console.error(
+				"Error al llamar a la API del censo, se intenta update directo:",
+				err instanceof Error ? err.message : "unknown",
+			);
+		}
+	}
+
+	const { error } = await supabase.from("census").update(payload).eq("id", id);
 
 	return error ? { error: error.message } : {};
 }

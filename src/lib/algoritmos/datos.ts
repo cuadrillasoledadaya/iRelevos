@@ -77,6 +77,11 @@ export function migrarDatos(datos: DatosPerfil): DatosPerfil {
 	if (!datos.planes) {
 		datos.planes = [];
 	}
+	// v1.5.8: un content legacy sin `trabajaderas` reventaba al migrar
+	// (TypeError al mapear) y dejaba la app sin proyecto. Se sanea.
+	if (!Array.isArray(datos.trabajaderas)) {
+		datos.trabajaderas = [];
+	}
 	datos.trabajaderas = datos.trabajaderas.map((t) => {
 		// v1.4.9: reparar tambien el array VACIO. Los pasos creados antes del
 		// fix se guardaron con `nombres: []` (truthy) -> el `if (!t.nombres)`

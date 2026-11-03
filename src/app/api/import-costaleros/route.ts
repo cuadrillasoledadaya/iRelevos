@@ -368,6 +368,41 @@ export async function POST(request: Request) {
 			);
 		}
 
+		// El RPC `full_sync_icuadrilla_census` inserta los registros SIN
+		// `temporada_id` (la columna queda NULL). Con esa temporada vacía
+		// los costaleros importados no aparecen en el Censo de Cuadrilla
+		// ni se cargan sus apodos/alturas (todo eso filtraba por
+		// temporada). Se reparan aquí con el service role.
+		const { data: proyecto, error: proyectoError } = await admin
+			.from("proyectos")
+			.select("temporada_id")
+			.eq("id", proyectoId)
+			.single();
+
+		if (proyectoError) {
+			logger.warn(
+				`${route}: no se pudo leer la temporada del proyecto`,
+				proyectoError.message,
+			);
+		} else if (proyecto?.temporada_id) {
+			const { error: fixError } = await admin
+				.from("census")
+				.update({ temporada_id: proyecto.temporada_id })
+				.eq("proyecto_id", proyectoId)
+				.is("temporada_id", null);
+
+			if (fixError) {
+				logger.warn(
+					`${route}: no se pudo rellenar temporada_id del censo importado`,
+					fixError.message,
+				);
+			} else {
+				logger.log(
+					`${route}: censo importado asociado a la temporada ${proyecto.temporada_id}`,
+				);
+			}
+		}
+
 		const duration = Date.now() - startTime;
 		logger.log(
 			`${route} 200: full sync completed`,

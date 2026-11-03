@@ -407,6 +407,75 @@ describe("POST /api/import-costaleros", () => {
 		});
 	});
 
+	// ── Backfill de temporada_id ──
+
+	it("debe rellenar temporada_id del censo importado (el RPC no lo hace)", async () => {
+		setupAuth();
+		process.env.ICUADRILLA_API_URL = "https://api.icuadrilla.test";
+		process.env.ICUADRILLA_API_TOKEN = "test-token";
+
+		mockFetch.mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: async () => [
+				{
+					id: 1,
+					nombre: "Juan",
+					apellidos: "García",
+					apodo: "El Rubio",
+					trabajadera: 3,
+				},
+			],
+		});
+
+		mockAdmin.rpc.mockResolvedValue({
+			data: { deleted: 0, inserted: 1 },
+			error: null,
+		});
+
+		// `from("proyectos")` → devuelve la temporada del paso
+		// `from("census")` → update con temporada_id
+		const updateMock = vi.fn().mockReturnValue({
+			eq: vi.fn().mockReturnValue({
+				is: vi.fn().mockResolvedValue({ error: null }),
+			}),
+		});
+		const proyectoSingle = vi.fn().mockResolvedValue({
+			data: { temporada_id: "temp-123" },
+			error: null,
+		});
+
+		mockAdmin.from.mockImplementation((table: string) => {
+			if (table === "census") return { update: updateMock };
+			if (table === "proyectos") {
+				return {
+					select: vi.fn().mockReturnThis(),
+					eq: vi.fn().mockReturnThis(),
+					single: proyectoSingle,
+				};
+			}
+			// profiles (auth)
+			return {
+				select: vi.fn().mockReturnThis(),
+				eq: vi.fn().mockReturnThis(),
+				single: vi.fn().mockResolvedValue({ data: { role: "superadmin" }, error: null }),
+			};
+		});
+
+		const req = new Request("http://localhost/api/import-costaleros", {
+			method: "POST",
+			headers: {
+				Authorization: "Bearer valid-token",
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ proyecto_id: VALID_UUID }),
+		});
+		const res = await POST(req);
+
+		expect(res.status).toBe(200);
+		expect(updateMock).toHaveBeenCalledWith({ temporada_id: "temp-123" });
+	});
+
 	// ── CORS ──
 
 	it("should call withCors on response", async () => {

@@ -726,7 +726,74 @@ describe("Censo", () => {
 	});
 
 	describe("saveCensusEdit", () => {
-		it("debe actualizar una entrada del censo correctamente", async () => {
+		it("debe actualizar una entrada del censo vía la API (service role)", async () => {
+			vi.mocked(supabase.auth.getSession).mockResolvedValue({
+				data: { session: { access_token: "token-123" } },
+				error: null,
+			} as any);
+
+			const fetchMock = vi.fn().mockResolvedValue({
+				ok: true,
+				json: async () => ({ ok: true }),
+			});
+			vi.stubGlobal("fetch", fetchMock);
+
+			const updateMock = vi.fn().mockReturnValue({
+				eq: vi.fn().mockResolvedValue({ error: null }),
+			});
+			vi.mocked(supabase.from).mockReturnValue({
+				update: updateMock,
+			} as any);
+
+			const result = await saveCensusEdit("census-1", {
+				nombre: "Juan Carlos",
+				altura: 180,
+			});
+
+			expect(result.error).toBeUndefined();
+			expect(fetchMock).toHaveBeenCalledWith(
+				"/api/census/census-1",
+				expect.objectContaining({ method: "PATCH" }),
+			);
+			// No hace falta el update directo (RLS) cuando la API responde.
+			expect(updateMock).not.toHaveBeenCalled();
+
+			vi.unstubAllGlobals();
+		});
+
+		it("debe retornar el error de la API", async () => {
+			vi.mocked(supabase.auth.getSession).mockResolvedValue({
+				data: { session: { access_token: "token-123" } },
+				error: null,
+			} as any);
+
+			const fetchMock = vi.fn().mockResolvedValue({
+				ok: false,
+				status: 403,
+				json: async () => ({ error: "No autorizado." }),
+			});
+			vi.stubGlobal("fetch", fetchMock);
+
+			const result = await saveCensusEdit("census-1", {
+				nombre: "Juan",
+			});
+
+			expect(result.error).toBe("No autorizado.");
+
+			vi.unstubAllGlobals();
+		});
+
+		it("debe hacer update directo si la API no está disponible", async () => {
+			vi.mocked(supabase.auth.getSession).mockResolvedValue({
+				data: { session: { access_token: "token-123" } },
+				error: null,
+			} as any);
+
+			vi.stubGlobal(
+				"fetch",
+				vi.fn().mockRejectedValue(new Error("network down")),
+			);
+
 			const eqMock = vi.fn().mockResolvedValue({ error: null });
 			const updateMock = vi.fn().mockReturnValue({ eq: eqMock });
 
@@ -740,9 +807,17 @@ describe("Censo", () => {
 			});
 
 			expect(result.error).toBeUndefined();
+			expect(updateMock).toHaveBeenCalled();
+
+			vi.unstubAllGlobals();
 		});
 
 		it("debe retornar error cuando Supabase falla", async () => {
+			vi.mocked(supabase.auth.getSession).mockResolvedValue({
+				data: { session: null },
+				error: null,
+			} as any);
+
 			const eqMock = vi.fn().mockResolvedValue({
 				error: { message: "column not found" },
 			});

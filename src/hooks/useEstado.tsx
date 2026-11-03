@@ -66,6 +66,9 @@ export function useEstado(): EstadoCtx {
 	useEffect(() => {
 		if (pid) {
 			projectStore.getState().fetchCensusBoquilla();
+			// Los apodos del censo del paso activo (v1.5.8): al cambiar de
+			// paso hay que recargarlos y aplicarlos a las cuadrillas.
+			projectStore.getState().fetchCensusApodos();
 		}
 	}, [pid]);
 

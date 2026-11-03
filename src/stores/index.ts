@@ -4,7 +4,7 @@
 // ══════════════════════════════════════════════════════════════════
 
 import { uiStore } from "./uiStore";
-import { projectStore, setTemporadaGetter } from "./projectStore";
+import { projectStore, setTemporadaGetter, setProjectStoreMutar } from "./projectStore";
 import { temporadaStore, setTemporadaRefetch } from "./temporadaStore";
 import { setTrabajaderaDeps, trabajaderaStore } from "./trabajaderaStore";
 import { setPlanDeps, planStore } from "./planStore";
@@ -48,6 +48,10 @@ setTemporadaRefetch(() => projectStore.getState().refetchPasos());
 // Inyectar el getter de temporada activa en projectStore
 // para romper la dependencia circular entre stores.
 setTemporadaGetter(() => temporadaStore.getState().activeTemporadaId);
+
+// El projectStore necesita `mutar` para persistir los apodos del censo
+// en el content del paso (y de ahí a la nube).
+setProjectStoreMutar(mutar);
 
 // ── Re-exportar stores standalone ─────────────────────────────────
 // Los consumidores pueden importar directamente si lo prefieren.

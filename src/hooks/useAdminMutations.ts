@@ -283,6 +283,9 @@ export function useAdminMutations(
 					prev.map((c) => (c.id === id ? { ...c, ...forms.editForm } : c)),
 				);
 				forms.setEditingId(null);
+				// Recargar los apodos del censo y aplicarlos a las
+				// cuadrillas (queda persistido en el paso).
+				await projectStore.getState().fetchCensusApodos();
 			} else {
 				alert(result.error);
 			}
