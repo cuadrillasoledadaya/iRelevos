@@ -4,13 +4,15 @@
 
 import type { Trabajadera } from '../../types'
 import type { CapatazTableData } from '../types'
+import { nameAt } from '../../nombres'
 
 /**
  * Versión local de nombrCompleto (antes en pdf-capataz.ts).
  * Retorna el nombre completo del costalero o su índice + 1 como fallback.
+ * Respeta apodos (nameAt).
  */
 function nombrCompleto(t: Trabajadera, idx: number): string {
-  return t.nombres[+idx] ?? String(+idx + 1)
+  return nameAt(t, idx)
 }
 
 /**
@@ -73,7 +75,7 @@ export function mapCapataz(t: Trabajadera, fechaOverride?: string): CapatazTable
   })
 
   // ── tbody rows ─────────────────────────────────────────────────
-  const tbodyRows = t.nombres.map((nombre, ci) => {
+  const tbodyRows = t.nombres.map((_, ci) => {
     const salV = an?.conteo[ci] ?? 0
     const espV = obj[ci] ?? 0
     const salCls = salV === espV ? 'ok' : 'warn'
@@ -95,7 +97,7 @@ export function mapCapataz(t: Trabajadera, fechaOverride?: string): CapatazTable
       }
       return `<td class="cel-x">—</td>`
     }).join('')
-    return `<tr><td class="td-nombre">${nombre}</td><td class="td-sal ${salCls}">${salV}/${espV}</td>${cells}</tr>`
+    return `<tr><td class="td-nombre">${nameAt(t, ci)}</td><td class="td-sal ${salCls}">${salV}/${espV}</td>${cells}</tr>`
   })
 
   // ── footer cells ───────────────────────────────────────────────

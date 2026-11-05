@@ -10,6 +10,7 @@ import {
 	exportarPDFMasivoTodas,
 } from "@/lib/exportar";
 import type { Trabajadera } from "@/lib/types";
+import { nameAt } from "@/lib/nombres";
 
 export default function RelevosSheet() {
 	const S = projectStore((s) => s.S);
@@ -86,7 +87,7 @@ export default function RelevosSheet() {
 		if (!t) return;
 		const ci = +ciIndividual;
 		closeSheet();
-		exportarRelevosIndividual(t, ci, t.nombres[ci], formatExportDate(exportDate));
+		exportarRelevosIndividual(t, ci, nameAt(t, ci), formatExportDate(exportDate));
 	}
 
 	function handleGenerarTodos() {
@@ -306,9 +307,9 @@ export default function RelevosSheet() {
 										>
 											<option value="">-- Selecciona --</option>
 											{trabajaderaIndividual.nombres.map(
-												(nombre: string, i: number) => (
+												(_nombre: string, i: number) => (
 													<option key={i} value={i}>
-														{nombre}
+														{nameAt(trabajaderaIndividual, i)}
 													</option>
 												),
 											)}

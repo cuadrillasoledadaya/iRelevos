@@ -315,3 +315,47 @@ describe('mapCapataz — edge cases', () => {
     expect(data.footerCells[0]).toContain('Costalero 6, Costalero 7')
   })
 })
+
+// ── Apodos: el capataz debe ver el apodo, no el nombre real ────────
+
+describe('mapCapataz — apodos', () => {
+  it('debe mostrar el apodo en las filas del cuerpo', () => {
+    const t = createTrabajaderaValida(1, 3, 6)
+    t.apodos = ['Rafa', undefined, 'Curro', undefined, undefined, 'Manu']
+
+    const data = mapCapataz(t)
+
+    expect(data.tbodyRows[0]).toContain('Rafa')
+    expect(data.tbodyRows[0]).not.toContain('Costalero 1')
+    expect(data.tbodyRows[2]).toContain('Curro')
+  })
+
+  it('debe mostrar el apodo de los costaleros fuera en el pie', () => {
+    const t = createTrabajaderaValida(1, 3, 6)
+    t.apodos = [undefined, undefined, undefined, undefined, undefined, 'Manu']
+
+    const data = mapCapataz(t)
+
+    // El costalero 6 (índice 5) es el "fuera" del plan por defecto
+    expect(data.footerCells[0]).toContain('Manu')
+    expect(data.footerCells[0]).not.toContain('Costalero 6')
+  })
+
+  it('debe caer al nombre real si no hay apodo', () => {
+    const t = createTrabajaderaValida(1, 3, 6)
+    t.apodos = ['Rafa', undefined, undefined, undefined, undefined, undefined]
+
+    const data = mapCapataz(t)
+
+    expect(data.tbodyRows[0]).toContain('Rafa')
+    expect(data.tbodyRows[1]).toContain('Costalero 2')
+  })
+
+  it('debe funcionar sin la propiedad apodos', () => {
+    const t = createTrabajaderaValida(1, 3, 6)
+
+    const data = mapCapataz(t)
+
+    expect(data.tbodyRows[0]).toContain('Costalero 1')
+  })
+})
